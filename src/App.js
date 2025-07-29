@@ -134,18 +134,14 @@ const AppContent = () => {
   };
 
   useEffect(() => {
+    // Always start with landing page - no auto-login
     const token = localStorage.getItem('authToken');
     if (token) {
-      const user = {
-        id: 1,
-        name: 'Navneet Kumar',
-        email: 'navneet@greencall.com',
-        role: 'super-admin',
-      };
-      setCurrentUser(user);
-      setIsLoggedIn(true);
-      changeView('dashboard');
+      // Clear any existing tokens on page load
+      localStorage.removeItem('authToken');
     }
+    // Always show landing page first
+    changeView('landing');
   }, []);
 
   const handleLogin = async (credentials) => {
