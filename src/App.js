@@ -140,8 +140,6 @@ const AppContent = () => {
       // Clear any existing tokens on page load
       localStorage.removeItem('authToken');
     }
-    // Always show landing page first
-    changeView('landing');
   }, []);
 
   const handleLogin = async (credentials) => {
@@ -335,8 +333,7 @@ const AppContent = () => {
       case 'automation': return <WorkflowAutomation darkMode={darkMode} currentUser={currentUser} crmData={crmData} />;
       case 'settings': return <Settings darkMode={darkMode} toggleDarkMode={toggleDarkMode} currentUser={currentUser} setActiveView={changeView} />;
       case 'api-test': return <ApiTestPage darkMode={darkMode} />;
-      case 'api-test-component': return <ApiTestComponent darkMode={darkMode} />;
-      case 'simple-api-test': return <SimpleApiTest darkMode={darkMode} />;
+
       case 'customers': return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
           <CustomerManagement darkMode={darkMode} crmData={crmData} userRole={currentUser?.role} />
