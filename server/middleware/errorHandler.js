@@ -1,8 +1,10 @@
-const { formatResponse } = require('../utils/helpers');
+const { formatResponse, sanitizeInput } = require('../utils/helpers');
 
 // Global error handler
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  // Sanitize error message before logging
+  const sanitizedMessage = typeof err.message === 'string' ? sanitizeInput(err.message) : 'Unknown error';
+  console.error('Error:', sanitizedMessage);
   
   let error = { ...err };
   error.message = err.message;
@@ -21,7 +23,12 @@ const errorHandler = (err, req, res, next) => {
   
   // Mongoose validation error
   if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map(val => val.message).join(', ');
+    const message = err.errors && typeof err.errors === 'object' 
+      ? Object.values(err.errors)
+          .filter(val => val && val.message)
+          .map(val => sanitizeInput(val.message))
+          .join(', ')
+      : 'Validation error';
     error = { message, statusCode: 400 };
   }
   

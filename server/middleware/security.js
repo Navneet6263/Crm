@@ -1,7 +1,7 @@
 const AuditLog = require('../models/AuditLog');
 const TokenBlacklist = require('../models/TokenBlacklist');
 const User = require('../models/User');
-const { securityLogger } = require('../utils/logger');
+const logger = require('../utils/logger');
 const { sanitizeInput } = require('../utils/helpers');
 const { sendSecurityAlert } = require('../utils/securityAlerts');
 
@@ -20,14 +20,14 @@ const auditLogger = (action) => {
       });
       
       // Log to security logger
-      securityLogger.info('Audit event', {
+      logger.info('Audit event', {
         action: sanitizeInput(action),
         userId: req.user?.id,
         userEmail: sanitizeInput(req.user?.email),
         ipAddress: req.ip
       });
     } catch (error) {
-      securityLogger.error('Audit log error', { error: error.message });
+      console.error('Audit log error:', error.message);
     }
     next();
   };

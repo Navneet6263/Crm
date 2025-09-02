@@ -2,17 +2,22 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const { formatResponse } = require('../utils/helpers');
 
-// Create new Super Admin (only existing Super Admin can do this)
+// Create new Super Admin (RESTRICTED - Only navneet@greencall.com can create)
 const createSuperAdmin = async (req, res) => {
   try {
     if (req.user.role !== 'super-admin') {
       return res.status(403).json(formatResponse(null, 'Only Super Admin can create Super Admin', 403));
     }
 
-    // Check if we already have 4 Super Admins (safety limit)
+    // SECURITY: Only allow navneet@greencall.com to create new superadmins
+    if (req.user.email !== 'navneet@greencall.com') {
+      return res.status(403).json(formatResponse(null, 'Unauthorized: Only main Super Admin can create new Super Admins', 403));
+    }
+
+    // Check if we already have 2 Super Admins (strict limit)
     const superAdminCount = await User.countDocuments({ role: 'super-admin', isActive: true });
-    if (superAdminCount >= 4) {
-      return res.status(400).json(formatResponse(null, 'Maximum 4 Super Admins allowed for security', 400));
+    if (superAdminCount >= 2) {
+      return res.status(400).json(formatResponse(null, 'Maximum 2 Super Admins allowed for security', 400));
     }
 
     const { name, email, password } = req.body;
@@ -191,6 +196,44 @@ const activateUser = async (req, res) => {
   }
 };
 
+// Delete Super Admin (permanent removal)
+const deleteSuperAdmin = async (req, res) => {
+  try {
+    if (req.user.role !== 'super-admin') {
+      return res.status(403).json(formatResponse(null, 'Only Super Admin can delete users', 403));
+    }
+
+    const { userId } = req.params;
+    
+    // Cannot delete themselves
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json(formatResponse(null, 'Cannot delete yourself', 400));
+    }
+
+    const userToDelete = await User.findById(userId);
+    if (!userToDelete) {
+      return res.status(404).json(formatResponse(null, 'User not found', 404));
+    }
+
+    // Prevent deleting the main super admin
+    if (userToDelete.email === 'navneet@greencall.com') {
+      return res.status(400).json(formatResponse(null, 'Cannot delete main Super Admin account - PROTECTED', 400));
+    }
+
+    // Only allow navneet@greencall.com to delete other superadmins
+    if (req.user.email !== 'navneet@greencall.com') {
+      return res.status(403).json(formatResponse(null, 'Only main Super Admin can delete Super Admin accounts', 403));
+    }
+
+    await User.findByIdAndDelete(userId);
+    
+    res.json(formatResponse(null, `Super Admin ${userToDelete.name} deleted permanently`));
+
+  } catch (error) {
+    res.status(500).json(formatResponse(null, error.message, 500));
+  }
+};
+
 // Get Super Admin Safety Status
 const getSuperAdminSafetyStatus = async (req, res) => {
   try {
@@ -208,7 +251,7 @@ const getSuperAdminSafetyStatus = async (req, res) => {
       .sort({ createdAt: 1 });
 
     const safetyStatus = {
-      isSafe: activeSuperAdmins >= 2,
+      isSafe: activeSuperAdmins >= 1,
       totalSuperAdmins,
       activeSuperAdmins,
       inactiveSuperAdmins,
@@ -231,5 +274,6 @@ module.exports = {
   resetUserPassword,
   getSuperAdminsAndAdmins,
   activateUser,
-  getSuperAdminSafetyStatus
+  getSuperAdminSafetyStatus,
+  deleteSuperAdmin
 };

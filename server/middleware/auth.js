@@ -1,10 +1,11 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { safeLog } = require('../utils/authHelpers');
 
 const auth = async (req, res, next) => {
   try {
-    console.log('🔐 Auth check for:', req.method, req.path);
-    console.log('📋 Headers:', {
+    safeLog('info', '🔐 Auth check for:', { method: req.method, path: req.path });
+    safeLog('info', '📋 Headers:', {
       'Authorization': req.header('Authorization') ? 'Token present' : 'No token',
       'Cookie': req.cookies?.authToken ? 'Cookie present' : 'No cookie'
     });
@@ -12,37 +13,39 @@ const auth = async (req, res, next) => {
     // Check for token in cookies first, then headers
     let token = req.cookies?.authToken || req.header('Authorization')?.replace('Bearer ', '');
     
-    console.log('🎫 Token extracted:', token ? `${token.substring(0, 20)}...` : 'No token found');
+    safeLog('info', '🎫 Token extracted:', { hasToken: !!token });
     
     if (!token) {
-      console.log('❌ No token provided');
+      safeLog('warn', '❌ No token provided');
       return res.status(401).json({ 
         success: false,
         message: 'Access denied. No token provided.' 
       });
     }
 
-    // Handle super admin token (for backward compatibility)
-    if (token.includes('super-admin-token')) {
-      let superAdmin = await User.findOne({ email: 'superadmin@greencrm.com' });
-      if (!superAdmin) {
-        superAdmin = await User.create({
-          name: 'Super Admin',
-          email: 'superadmin@greencrm.com',
-          password: 'super123',
-          role: 'super-admin'
-        });
-      }
-      req.user = superAdmin;
-      return next();
-    }
 
-    console.log('🔍 Verifying token with JWT_SECRET...');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-    console.log('✅ Token decoded successfully:', { userId: decoded.id });
+
+    if (!process.env.JWT_SECRET) {
+      safeLog('error', '❌ JWT_SECRET not configured');
+      return res.status(500).json({ 
+        success: false,
+        message: 'Server configuration error' 
+      });
+    }
     
-    const user = await User.findById(decoded.id).select('-password');
-    console.log('👤 User found:', user ? `${user.email} (role: ${user.role}, tenantId: ${user.tenantId})` : 'No user found');
+    safeLog('info', '🔍 Verifying token with JWT_SECRET...');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    safeLog('info', '✅ Token decoded successfully:', { userId: decoded.id });
+    
+    const user = await User.findById(decoded.id)
+      .select('-password')
+      .populate('companyId', 'name plan usage status')
+      .populate('tenantId', 'name plan usage status');
+    safeLog('info', '👤 User found:', user ? { 
+      email: user.email, 
+      role: user.role, 
+      companyId: user.companyId?._id || user.tenantId?._id 
+    } : { found: false });
     
     if (!user) {
       return res.status(401).json({ 
@@ -60,10 +63,10 @@ const auth = async (req, res, next) => {
     }
 
     req.user = user;
-    console.log('✅ Token verified for user:', user.email, 'Role:', user.role);
+    safeLog('info', '✅ Token verified for user:', { email: user.email, role: user.role });
     next();
   } catch (error) {
-    console.error('❌ Token verification failed:', error.message);
+    safeLog('error', '❌ Token verification failed:', { message: error.message });
     
     // Clear invalid cookie
     if (req.cookies?.authToken) {
@@ -78,7 +81,7 @@ const auth = async (req, res, next) => {
 };
 
 const adminAuth = (req, res, next) => {
-  if (!['admin', 'super-admin'].includes(req.user.role)) {
+  if (!req.user || !['admin', 'super-admin'].includes(req.user.role)) {
     return res.status(403).json({ 
       success: false,
       message: 'Access denied. Admin privileges required.' 
@@ -93,8 +96,14 @@ const optionalAuth = async (req, res, next) => {
     let token = req.cookies?.authToken || req.header('Authorization')?.replace('Bearer ', '');
     
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-      const user = await User.findById(decoded.id).select('-password');
+      if (!process.env.JWT_SECRET) {
+        return next();
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.id)
+        .select('-password')
+        .populate('companyId', 'name plan usage status')
+        .populate('tenantId', 'name plan usage status');
       
       if (user && user.isActive) {
         req.user = user;
@@ -102,7 +111,7 @@ const optionalAuth = async (req, res, next) => {
     }
   } catch (error) {
     // Silently fail for optional auth
-    console.log('Optional auth failed:', error.message);
+    safeLog('warn', 'Optional auth failed:', { message: error.message });
   }
   
   next();

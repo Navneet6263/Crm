@@ -116,11 +116,18 @@ const CompanyManagement = ({ darkMode }) => {
       'Are you sure you want to suspend this company? All users will be deactivated.',
       async () => {
         try {
-          await apiService.suspendCompany(companyId);
-          loadCompanies();
-          showSuccess('Company suspended successfully!');
+          console.log('⏸️ Suspending company:', companyId);
+          const response = await apiService.suspendCompany(companyId);
+          console.log('✅ Suspend response:', response);
+          
+          if (response.success) {
+            loadCompanies();
+            showSuccess('Company suspended successfully!');
+          } else {
+            throw new Error(response.message || 'Failed to suspend company');
+          }
         } catch (error) {
-          console.error('Error suspending company:', error);
+          console.error('❌ Error suspending company:', error);
           showError('Error suspending company: ' + error.message);
         }
       }
@@ -132,11 +139,18 @@ const CompanyManagement = ({ darkMode }) => {
       'Are you sure you want to activate this company? All users will be reactivated.',
       async () => {
         try {
-          await apiService.activateCompany(companyId);
-          loadCompanies();
-          showSuccess('Company activated successfully!');
+          console.log('▶️ Activating company:', companyId);
+          const response = await apiService.activateCompany(companyId);
+          console.log('✅ Activate response:', response);
+          
+          if (response.success) {
+            loadCompanies();
+            showSuccess('Company activated successfully!');
+          } else {
+            throw new Error(response.message || 'Failed to activate company');
+          }
         } catch (error) {
-          console.error('Error activating company:', error);
+          console.error('❌ Error activating company:', error);
           showError('Error activating company: ' + error.message);
         }
       }
@@ -145,14 +159,21 @@ const CompanyManagement = ({ darkMode }) => {
 
   const handleDeleteCompany = async (companyId) => {
     confirmAction(
-      'Are you sure you want to delete this company? This action cannot be undone.',
+      'Are you sure you want to delete this company? This will permanently delete all company data, users, leads, and customers. This action cannot be undone.',
       async () => {
         try {
-          await apiService.deleteCompany(companyId);
-          loadCompanies();
-          showSuccess('Company deleted successfully!');
+          console.log('🗑️ Deleting company:', companyId);
+          const response = await apiService.deleteCompany(companyId);
+          console.log('✅ Delete response:', response);
+          
+          if (response.success) {
+            loadCompanies();
+            showSuccess('Company deleted successfully!');
+          } else {
+            throw new Error(response.message || 'Failed to delete company');
+          }
         } catch (error) {
-          console.error('Error deleting company:', error);
+          console.error('❌ Error deleting company:', error);
           showError('Error deleting company: ' + error.message);
         }
       }

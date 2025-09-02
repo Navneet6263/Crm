@@ -24,10 +24,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'sales'
   },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: function() {
+      return this.role !== 'super-admin';
+    }
+  },
   tenantId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
-    required: false
+    required: function() {
+      return this.role !== 'super-admin';
+    }
   },
   phone: {
     type: String,

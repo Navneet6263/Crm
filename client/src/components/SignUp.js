@@ -258,15 +258,6 @@ const SignUp = ({ onSignUp, onBackToSignIn, onBack, darkMode = false }) => {
                 {errors.email}
               </p>
             )}
-            <p style={{ 
-              color: darkMode ? '#9ca3af' : '#6b7280', 
-              fontSize: '0.75rem', 
-              marginTop: '0.25rem', 
-              marginBottom: 0,
-              fontStyle: 'italic'
-            }}>
-              💡 Tip: Use emails with 'admin' or '@greencrm.com' for admin access
-            </p>
           </div>
 
           <div style={{ marginBottom: '1rem' }}>

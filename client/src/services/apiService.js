@@ -153,6 +153,7 @@ const apiService = {
       const data = await response.json();
       if (data.success && data.token) {
         localStorage.setItem('authToken', data.token);
+        console.log('✅ Auth check successful, user:', data.user?.email, 'Company:', data.user?.company?.name);
         return data;
       }
       
@@ -912,6 +913,7 @@ const apiService = {
 
   suspendCompany: async (companyId) => {
     try {
+      console.log('📞 API: Suspending company:', companyId);
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/companies/${companyId}/suspend`, {
         method: 'PUT',
@@ -921,20 +923,26 @@ const apiService = {
         }
       });
       
+      console.log('📞 API Response status:', response.status);
+      
       if (!response.ok) {
         const error = await response.json();
+        console.error('❌ API Error:', error);
         throw new Error(error.message || 'Failed to suspend company');
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log('✅ API Success:', result);
+      return result;
     } catch (error) {
-      console.error('Error suspending company:', error);
+      console.error('❌ Error suspending company:', error);
       throw error;
     }
   },
 
   activateCompany: async (companyId) => {
     try {
+      console.log('📞 API: Activating company:', companyId);
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/companies/${companyId}/activate`, {
         method: 'PUT',
@@ -944,20 +952,26 @@ const apiService = {
         }
       });
       
+      console.log('📞 API Response status:', response.status);
+      
       if (!response.ok) {
         const error = await response.json();
+        console.error('❌ API Error:', error);
         throw new Error(error.message || 'Failed to activate company');
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log('✅ API Success:', result);
+      return result;
     } catch (error) {
-      console.error('Error activating company:', error);
+      console.error('❌ Error activating company:', error);
       throw error;
     }
   },
 
   deleteCompany: async (companyId) => {
     try {
+      console.log('📞 API: Deleting company:', companyId);
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/companies/${companyId}`, {
         method: 'DELETE',
@@ -967,14 +981,19 @@ const apiService = {
         }
       });
       
+      console.log('📞 API Response status:', response.status);
+      
       if (!response.ok) {
         const error = await response.json();
+        console.error('❌ API Error:', error);
         throw new Error(error.message || 'Failed to delete company');
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log('✅ API Success:', result);
+      return result;
     } catch (error) {
-      console.error('Error deleting company:', error);
+      console.error('❌ Error deleting company:', error);
       throw error;
     }
   },
@@ -1248,6 +1267,169 @@ const apiService = {
       return await response.json();
     } catch (error) {
       console.error('Error creating communication:', error);
+      throw error;
+    }
+  },
+
+  // Team Management APIs
+  getTeamMembers: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/my/team`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch team members');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching team members:', error);
+      return { team: [], totalMembers: 0, limits: { current: 0, max: 5, canAdd: false } };
+    }
+  },
+
+  createTeamMember: async (memberData) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/companies/my/team`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(memberData)
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create team member');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating team member:', error);
+      throw error;
+    }
+  },
+
+  updateTeamMember: async (userId, memberData) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/companies/my/team/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(memberData)
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update team member');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating team member:', error);
+      throw error;
+    }
+  },
+
+  toggleTeamMemberStatus: async (userId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/companies/my/team/${userId}/toggle`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to toggle team member status');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error toggling team member status:', error);
+      throw error;
+    }
+  },
+
+  deleteTeamMember: async (userId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/companies/my/team/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete team member');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting team member:', error);
+      throw error;
+    }
+  },
+
+  // Company Dashboard
+  getCompanyDashboard: async (companyId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/dashboard`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch company dashboard');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching company dashboard:', error);
+      throw error;
+    }
+  },
+
+  // Update Company Plan
+  updateCompanyPlan: async (companyId, planName) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/companies/${companyId}/plan`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ planName })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update company plan');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating company plan:', error);
       throw error;
     }
   }

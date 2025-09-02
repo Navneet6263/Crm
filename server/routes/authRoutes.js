@@ -1,28 +1,26 @@
 const express = require('express');
-const { register, login, getProfile, getAllUsers, checkAuth, logout, createTeamMember } = require('../controllers/authController');
-const { auth, optionalAuth } = require('../middleware/auth');
+const { register, login, getProfile, getAllUsers, checkAuth, logout, createTeamMember, toggleUserStatus, createEmployee } = require('../controllers/authController');
+const { auth } = require('../middleware/auth');
+const { checkUserLimit } = require('../middleware/userLimit');
 
 const router = express.Router();
 
 // Public routes
-router.post('/register', register);
+router.post('/register', checkUserLimit, register);
 router.post('/login', login);
-router.get('/check-auth', checkAuth); // Auto-login check
+router.get('/check-auth', checkAuth);
 router.post('/logout', logout);
 
 // Protected routes
 router.get('/profile', auth, getProfile);
 router.get('/users', auth, getAllUsers);
-router.post('/create-team-member', auth, createTeamMember);
-
-// Health check with optional auth
-router.get('/health', optionalAuth, (req, res) => {
-  res.json({
-    success: true,
-    message: 'Auth service is running',
-    user: req.user ? req.user.name : 'Not authenticated',
-    timestamp: new Date().toISOString()
-  });
-});
+router.post('/create-team-member', auth, (req, res, next) => {
+  if (req.user && req.user.role === 'super-admin') {
+    return next();
+  }
+  return checkUserLimit(req, res, next);
+}, createTeamMember);
+router.put('/users/:userId/toggle', auth, toggleUserStatus);
+router.post('/create-employee', auth, createEmployee);
 
 module.exports = router;

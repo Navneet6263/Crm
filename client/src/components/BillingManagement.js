@@ -1,39 +1,105 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CreditCard, Calendar, Download, Eye, CheckCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react';
+import apiService from '../services/apiService';
 
 const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showCongrats, setShowCongrats] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const [currentPlan, setCurrentPlan] = useState({
-    name: 'Professional',
-    price: 2499,
-    billingCycle: 'monthly',
-    nextBilling: '2024-02-15',
-    status: 'active'
-  });
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const [companyData, setCompanyData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const plans = [
+  // Plans from backend
+  const [plans, setPlans] = useState([
     {
-      name: 'Starter',
+      value: 'basic',
+      name: 'Basic Plan',
       price: 999,
-      features: ['Up to 5 users', '500 leads', '1,000 emails/month', 'Basic support'],
-      popular: false
+      features: ['Up to 5 users', '1,000 leads', '2,000 emails/month', 'Basic support', 'Lead management'],
+      popular: false,
+      color: '#22c55e',
+      limits: { users: 5, leads: 1000, emails: 2000 }
     },
     {
-      name: 'Professional',
-      price: 2499,
-      features: ['Up to 50 users', '1,000 leads', '5,000 emails/month', 'Priority support', 'Advanced analytics'],
-      popular: true
+      value: 'professional', 
+      name: 'Professional Plan',
+      price: 2999,
+      features: ['Up to 20 users', '5,000 leads', '10,000 emails/month', 'Priority support', 'Advanced analytics', 'WhatsApp integration'],
+      popular: true,
+      color: '#3b82f6',
+      limits: { users: 20, leads: 5000, emails: 10000 }
     },
     {
-      name: 'Enterprise',
-      price: 4999,
-      features: ['Unlimited users', 'Unlimited leads', 'Unlimited emails', '24/7 support', 'Custom integrations'],
-      popular: false
+      value: 'enterprise',
+      name: 'Enterprise Plan', 
+      price: 9999,
+      features: ['Up to 50 users', '10,000 leads', 'Unlimited emails', '24/7 support', 'Custom integrations', 'API access', 'White labeling'],
+      popular: false,
+      color: '#f59e0b',
+      limits: { users: 50, leads: 10000, emails: 'unlimited' }
     }
-  ];
+  ]);
+
+  // Fetch company data and plans from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Get current user's company data
+        const teamResponse = await apiService.getTeamMembers();
+        if (teamResponse.success && teamResponse.company) {
+          const company = teamResponse.company;
+          setCompanyData(company);
+          
+          // Set current plan from company data
+          setCurrentPlan({
+            value: company.plan.name,
+            name: company.plan.name === 'basic' ? 'Basic Plan' : 
+                  company.plan.name === 'professional' ? 'Professional Plan' : 'Enterprise Plan',
+            price: company.plan.name === 'basic' ? 999 : 
+                   company.plan.name === 'professional' ? 2999 : 9999,
+            billingCycle: 'monthly',
+            nextBilling: new Date(company.plan.endDate).toISOString().split('T')[0],
+            status: company.status
+          });
+        }
+        
+        // Get plan configurations from backend
+        try {
+          const planResponse = await apiService.get('/companies/plans');
+          if (planResponse.success && planResponse.plans) {
+            const backendPlans = Object.entries(planResponse.plans).map(([key, plan]) => ({
+              value: key,
+              name: key === 'basic' ? 'Basic Plan' : 
+                    key === 'professional' ? 'Professional Plan' : 'Enterprise Plan',
+              price: key === 'basic' ? 999 : key === 'professional' ? 2999 : 9999,
+              features: plan.features || [],
+              popular: key === 'professional',
+              color: key === 'basic' ? '#22c55e' : key === 'professional' ? '#3b82f6' : '#f59e0b',
+              limits: {
+                users: plan.usersLimit === -1 ? 'unlimited' : plan.usersLimit,
+                leads: plan.leadsLimit === -1 ? 'unlimited' : plan.leadsLimit,
+                emails: plan.emailLimit === -1 ? 'unlimited' : plan.emailLimit
+              }
+            }));
+            setPlans(backendPlans);
+          }
+        } catch (error) {
+          console.log('Using default plans, backend plans not available');
+        }
+        
+      } catch (error) {
+        console.error('Error fetching billing data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   const [invoices] = useState([
     {
@@ -151,8 +217,69 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         </div>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '400px',
+          flexDirection: 'column',
+          gap: '1rem'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #f3f4f6',
+            borderTop: '4px solid #22c55e',
+            borderRadius: '50%'
+          }} className="loading-spinner" />
+          <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '1.125rem' }}>
+            Loading billing information...
+          </p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && !currentPlan && (
+        <div style={{
+          ...cardStyle,
+          padding: '3rem',
+          textAlign: 'center',
+          marginTop: '2rem'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+          <h3 style={{
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            color: darkMode ? 'white' : '#1f2937',
+            marginBottom: '0.5rem'
+          }}>
+            Unable to Load Billing Information
+          </h3>
+          <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '1.5rem' }}>
+            Please contact your administrator or try refreshing the page.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '600'
+            }}
+          >
+            Refresh Page
+          </button>
+        </div>
+      )}
+
       {/* Overview Tab */}
-      {activeTab === 'overview' && (
+      {!loading && activeTab === 'overview' && currentPlan && (
         <div style={{ display: 'grid', gap: '2rem' }}>
           {/* Current Plan */}
           <div style={{ ...cardStyle, padding: '2rem' }}>
@@ -335,14 +462,44 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
               gap: '1.5rem'
             }}>
               {[
-                { label: 'Users', current: 25, limit: 50, unit: '' },
-                { label: 'Leads', current: 450, limit: 1000, unit: '' },
-                { label: 'Customers', current: 125, limit: 500, unit: '' },
-                { label: 'Email Credits', current: 2800, limit: 5000, unit: '' },
-                { label: 'SMS Credits', current: 180, limit: 500, unit: '' },
-                { label: 'WhatsApp Messages', current: 320, limit: 1000, unit: '' }
+                { 
+                  label: 'Users', 
+                  current: companyData?.usage?.currentUsers || 0, 
+                  limit: companyData?.plan?.usersLimit === -1 ? 'unlimited' : (companyData?.plan?.usersLimit || 5), 
+                  unit: '' 
+                },
+                { 
+                  label: 'Leads', 
+                  current: companyData?.usage?.currentLeads || 0, 
+                  limit: companyData?.plan?.leadsLimit === -1 ? 'unlimited' : (companyData?.plan?.leadsLimit || 1000), 
+                  unit: '' 
+                },
+                { 
+                  label: 'Customers', 
+                  current: companyData?.usage?.currentCustomers || 0, 
+                  limit: companyData?.plan?.customersLimit === -1 ? 'unlimited' : (companyData?.plan?.customersLimit || 500), 
+                  unit: '' 
+                },
+                { 
+                  label: 'Email Credits', 
+                  current: companyData?.usage?.emailsSent || 0, 
+                  limit: companyData?.plan?.emailLimit === -1 ? 'unlimited' : (companyData?.plan?.emailLimit || 1000), 
+                  unit: '' 
+                },
+                { 
+                  label: 'SMS Credits', 
+                  current: companyData?.usage?.smsSent || 0, 
+                  limit: companyData?.plan?.smsLimit || 100, 
+                  unit: '' 
+                },
+                { 
+                  label: 'Storage Used', 
+                  current: companyData?.usage?.storageUsed || 0, 
+                  limit: companyData?.plan?.storageLimit || 1, 
+                  unit: ' GB' 
+                }
               ].map((stat, index) => {
-                const percentage = (stat.current / stat.limit) * 100;
+                const percentage = stat.limit === 'unlimited' ? 100 : (stat.current / stat.limit) * 100;
                 return (
                   <div key={index} style={{
                     padding: '1.5rem',
@@ -363,7 +520,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       color: darkMode ? 'white' : '#1f2937',
                       marginBottom: '0.5rem'
                     }}>
-                      {stat.current.toLocaleString()}{stat.unit} / {stat.limit.toLocaleString()}{stat.unit}
+                      {stat.current.toLocaleString()}{stat.unit} / {stat.limit === 'unlimited' ? '∞' : stat.limit.toLocaleString()}{stat.unit}
                     </div>
                     <div style={{
                       width: '100%',
@@ -373,9 +530,9 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       overflow: 'hidden'
                     }}>
                       <div style={{
-                        width: `${percentage}%`,
+                        width: stat.limit === 'unlimited' ? '100%' : `${percentage}%`,
                         height: '100%',
-                        background: percentage > 80 ? '#ef4444' : percentage > 60 ? '#f59e0b' : '#22c55e',
+                        background: stat.limit === 'unlimited' ? '#22c55e' : (percentage > 80 ? '#ef4444' : percentage > 60 ? '#f59e0b' : '#22c55e'),
                         borderRadius: '4px',
                         transition: 'width 0.3s ease'
                       }} />
@@ -667,7 +824,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
       )}
 
       {/* Invoices Tab */}
-      {activeTab === 'invoices' && (
+      {!loading && activeTab === 'invoices' && (
         <div style={{ ...cardStyle, padding: '2rem' }}>
           <h2 style={{
             fontSize: '1.5rem',
@@ -800,7 +957,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
       )}
 
       {/* Payment Methods Tab */}
-      {activeTab === 'payment-methods' && (
+      {!loading && activeTab === 'payment-methods' && (
         <div style={{ ...cardStyle, padding: '2rem' }}>
           <div style={{
             display: 'flex',
@@ -925,7 +1082,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
       )}
 
       {/* Usage Reports Tab */}
-      {activeTab === 'usage-reports' && (
+      {!loading && activeTab === 'usage-reports' && (
         <div style={{ display: 'grid', gap: '2rem' }}>
           {/* Monthly Usage Report */}
           <div style={{ ...cardStyle, padding: '2rem' }}>
@@ -1075,7 +1232,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {[
-                    { item: 'CRM Subscription', cost: 2499, percentage: 65 },
+                    { item: 'CRM Subscription', cost: currentPlan?.price || 2999, percentage: 65 },
                     { item: 'SMS Credits', cost: 450, percentage: 12 },
                     { item: 'Email Credits', cost: 300, percentage: 8 },
                     { item: 'WhatsApp API', cost: 580, percentage: 15 }
@@ -1327,22 +1484,50 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                     </div>
                     
                     <button 
-                      onClick={() => {
-                        if (userRole === 'super-admin') {
-                          setSelectedPlan(plan);
-                          setShowPlanModal(false);
-                          setShowCongrats(true);
-                          
-                          // Update current plan after animation
-                          setTimeout(() => {
-                            setCurrentPlan({
-                              name: plan.name,
-                              price: plan.price,
-                              billingCycle: 'monthly',
-                              nextBilling: '2024-03-15',
-                              status: 'active'
-                            });
-                          }, 2000);
+                      onClick={async () => {
+                        if (userRole === 'super-admin' || userRole === 'admin') {
+                          try {
+                            setSelectedPlan(plan);
+                            setShowPlanModal(false);
+                            setShowCongrats(true);
+                            
+                            // Update plan via backend API
+                            if (companyData?._id) {
+                              await apiService.put(`/companies/${companyData._id}/plan`, {
+                                planName: plan.value
+                              });
+                              
+                              // Update local state after successful backend update
+                              setTimeout(() => {
+                                setCurrentPlan({
+                                  value: plan.value,
+                                  name: plan.name,
+                                  price: plan.price,
+                                  billingCycle: 'monthly',
+                                  nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                  status: 'active'
+                                });
+                                
+                                // Refresh company data
+                                const refreshData = async () => {
+                                  try {
+                                    const teamResponse = await apiService.getTeamMembers();
+                                    if (teamResponse.success && teamResponse.company) {
+                                      setCompanyData(teamResponse.company);
+                                    }
+                                  } catch (error) {
+                                    console.error('Error refreshing company data:', error);
+                                  }
+                                };
+                                refreshData();
+                              }, 2000);
+                            }
+                          } catch (error) {
+                            console.error('Error updating plan:', error);
+                            alert('Failed to update plan. Please try again.');
+                            setShowCongrats(false);
+                            setSelectedPlan(null);
+                          }
                         } else {
                           alert('Please contact your administrator to upgrade your plan.');
                           setShowPlanModal(false);
@@ -1351,30 +1536,30 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       style={{
                         width: '100%',
                         padding: '0.625rem 1rem',
-                        background: currentPlan.name === plan.name 
+                        background: currentPlan.value === plan.value 
                           ? 'transparent'
                           : plan.popular 
                             ? 'linear-gradient(135deg, #22c55e, #4ade80)'
                             : 'transparent',
-                        color: currentPlan.name === plan.name
+                        color: currentPlan.value === plan.value
                           ? (darkMode ? '#9ca3af' : '#6b7280')
                           : plan.popular 
                             ? 'white'
                             : (darkMode ? '#d1d5db' : '#374151'),
-                        border: currentPlan.name === plan.name
+                        border: currentPlan.value === plan.value
                           ? `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
                           : plan.popular
                             ? 'none'
                             : `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
                         borderRadius: '8px',
-                        cursor: currentPlan.name === plan.name ? 'default' : 'pointer',
+                        cursor: currentPlan.value === plan.value ? 'default' : 'pointer',
                         fontSize: '0.875rem',
                         fontWeight: '600',
                         transition: 'all 0.2s ease'
                       }}
-                      disabled={currentPlan.name === plan.name}
+                      disabled={currentPlan.value === plan.value}
                     >
-                      {currentPlan.name === plan.name ? 'Current Plan' : 
+                      {currentPlan.value === plan.value ? 'Current Plan' : 
                        userRole === 'super-admin' ? 'Switch to This Plan' : 'Contact Admin'}
                     </button>
                   </div>

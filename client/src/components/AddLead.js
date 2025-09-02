@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, Building, Mail, Phone, DollarSign, Save, Send, X } from 'lucide-react';
 import { showToast } from './ToastNotification';
 
@@ -14,10 +14,94 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     priority: 'medium',
     requirements: '',
     assignedTo: '', // Don't auto-assign
-    status: 'new'
+    status: 'new',
+    companyId: '' // For SuperAdmin company selection
   });
 
   const [errors, setErrors] = useState({});
+  const [companies, setCompanies] = useState([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+
+  // Fetch companies for SuperAdmin and create default if needed
+  useEffect(() => {
+    if (user?.role === 'super-admin') {
+      fetchCompanies();
+    }
+  }, [user]);
+
+  const fetchCompanies = async () => {
+    try {
+      setLoadingCompanies(true);
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      
+      if (!token) {
+        // Create default company directly if no token
+        const defaultCompany = { _id: 'default-greencall', name: 'GreenCall CRM' };
+        setCompanies([defaultCompany]);
+        setFormData(prev => ({ ...prev, companyId: defaultCompany._id }));
+        showToast('success', 'Using default GreenCall CRM company');
+        return;
+      }
+      
+      // Try to get companies with minimal headers to avoid 431 error
+      let response = await fetch('/api/companies/superadmin/list', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        let companies = data.companies || [];
+        
+        // If no companies exist, create default
+        if (companies.length === 0) {
+          try {
+            const createResponse = await fetch('/api/companies/superadmin/default', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (createResponse.ok) {
+              const defaultData = await createResponse.json();
+              companies = [{ _id: defaultData.company._id, name: 'GreenCall CRM' }];
+              showToast('success', 'Default company created');
+            }
+          } catch (createError) {
+            // Fallback to local default
+            companies = [{ _id: 'default-greencall', name: 'GreenCall CRM' }];
+          }
+        }
+        
+        setCompanies(companies);
+        
+        // Auto-select first company
+        if (companies.length === 1) {
+          setFormData(prev => ({ ...prev, companyId: companies[0]._id }));
+        }
+      } else if (response.status === 431) {
+        // Handle 431 error - use fallback
+        const defaultCompany = { _id: 'default-greencall', name: 'GreenCall CRM' };
+        setCompanies([defaultCompany]);
+        setFormData(prev => ({ ...prev, companyId: defaultCompany._id }));
+        showToast('info', 'Using default company due to connection issue');
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+      // Always provide fallback
+      const defaultCompany = { _id: 'default-greencall', name: 'GreenCall CRM' };
+      setCompanies([defaultCompany]);
+      setFormData(prev => ({ ...prev, companyId: defaultCompany._id }));
+      showToast('info', 'Using default GreenCall CRM company');
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -26,6 +110,11 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     if (!formData.companyName.trim()) newErrors.companyName = 'Company name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    
+    // SuperAdmin must select a company
+    if (user?.role === 'super-admin' && !formData.companyId) {
+      newErrors.companyId = 'Please select a company';
+    }
     
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
@@ -91,6 +180,14 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       assignedTo: formData.assignedTo,
       status: 'new'
     };
+    
+    // Always add companyId for SuperAdmin
+    if (user?.role === 'super-admin') {
+      leadData.companyId = formData.companyId || null;
+    }
+    
+    console.log('📝 Final leadData:', leadData);
+    console.log('🏢 CompanyId being sent:', leadData.companyId);
 
     onSave(leadData);
   };
@@ -198,6 +295,38 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
         {/* Form */}
         <div style={{ padding: '2rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            {/* Company Selection for SuperAdmin */}
+            {user?.role === 'super-admin' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>
+                  Choose Company <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <select
+                  value={formData.companyId}
+                  onChange={(e) => handleInputChange('companyId', e.target.value)}
+                  style={errors.companyId ? errorInputStyle : inputStyle}
+                  disabled={loadingCompanies}
+                  required
+                >
+                  <option value="">Select Company (Required)</option>
+                  {companies.map(company => (
+                    <option key={company._id} value={company._id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.companyId && (
+                  <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                    {errors.companyId}
+                  </p>
+                )}
+                {loadingCompanies && (
+                  <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                    Loading companies...
+                  </p>
+                )}
+              </div>
+            )}
             {/* Contact Person */}
             <div>
               <label style={labelStyle}>

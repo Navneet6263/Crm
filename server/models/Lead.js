@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const leadSchema = new mongoose.Schema({
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company'
+  },
   contactPerson: {
     type: String,
     required: true,
@@ -94,6 +98,14 @@ const leadSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  createdBySuperAdmin: {
+    type: Boolean,
+    default: false
+  },
+  requirements: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true

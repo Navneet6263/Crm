@@ -44,58 +44,7 @@ const communicationRoutes = require('./routes/communicationRoutes');
 const { initializePassport } = require('./controllers/oauthController');
 const { createLeadAssignmentNotification, createLeadCreationNotification } = require('./controllers/notificationController');
 
-// Seed initial data
-const seedData = async () => {
-  try {
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      await User.create([
-        {
-          name: 'Super Admin',
-          email: 'superadmin@greencrm.com',
-          password: 'super123',
-          role: 'super-admin'
-        },
-        {
-          name: 'Admin',
-          email: 'admin@greencrm.com',
-          password: 'admin123',
-          role: 'admin'
-        },
-        {
-          name: 'Manager',
-          email: 'manager@greencrm.com',
-          password: 'manager123',
-          role: 'manager'
-        },
-        {
-          name: 'Sales Executive',
-          email: 'sales@greencrm.com',
-          password: 'sales123',
-          role: 'sales'
-        },
-        {
-          name: 'Support Agent',
-          email: 'support@greencrm.com',
-          password: 'support123',
-          role: 'support'
-        }
-      ]);
-      console.log('✅ Initial users created with proper credentials');
-    }
-  } catch (error) {
-    console.error('❌ Error seeding data:', error.message);
-  }
-};
 
-// Call seed function after database connection
-setTimeout(() => {
-  if (isDBConnected) {
-    seedData();
-  } else {
-    console.log('⚠️  Skipping seed data - no database connection');
-  }
-}, 2000);
 
 const app = express();
 
@@ -164,7 +113,7 @@ initializePassport(app);
 // Enhanced auth middleware with security checks
 const authenticateToken = async (req, res, next) => {
   console.log('🔐 Auth check for:', req.method, req.path);
-  console.log('📋 Headers:', req.headers.authorization ? 'Token present' : 'No token');
+  console.log('📋 Headers:', { Authorization: req.headers.authorization ? 'Token present' : 'No token', Cookie: req.headers.cookie ? 'Cookie present' : 'No cookie' });
   
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -175,7 +124,10 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
+    console.log('🎫 Token extracted:', token ? token.substring(0, 20) + '...' : 'None');
+    console.log('🔍 Verifying token with JWT_SECRET...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    console.log('✅ Token decoded successfully:', { userId: decoded.id });
     
     // Check if token is blacklisted
     const TokenBlacklist = require('./models/TokenBlacklist');
@@ -189,15 +141,21 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ message: 'Token has been revoked' });
     }
     
-    // Check if user is still active
-    const user = await User.findById(decoded.id);
+    // Get user with populated company information
+    const user = await User.findById(decoded.id)
+      .select('-password')
+      .populate('companyId', 'name plan usage status')
+      .populate('tenantId', 'name plan usage status');
+    
+    console.log('👤 User found:', user ? `${user.email} (role: ${user.role}, companyId: ${user.companyId?._id || user.tenantId?._id})` : 'Not found');
+    
     if (!user || !user.isActive) {
-      console.log('❌ User is inactive');
+      console.log('❌ User is inactive or not found');
       return res.status(401).json({ message: 'User account is inactive' });
     }
     
-    console.log('✅ Token verified for user:', decoded.email);
-    req.user = decoded;
+    console.log('✅ Token verified for user:', user.email, 'Role:', user.role);
+    req.user = user; // Use the full user object instead of just decoded token
     next();
   } catch (err) {
     console.log('❌ Token verification failed:', err.message);
@@ -424,17 +382,34 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
     
     let query = { isActive: true };
     
-    // Role-based filtering
-    if (req.user.role === 'super-admin' || req.user.role === 'admin') {
-      // Admin and super-admin can see all leads
-      console.log('🔑 Admin/Super-admin access - showing all leads');
-    } else {
+    // Company-based filtering (except super-admin)
+    if (req.user.role !== 'super-admin') {
+      if (req.user.companyId) {
+        query.companyId = req.user.companyId;
+        console.log('🏢 Company-based filtering:', req.user.companyId);
+      } else {
+        return res.status(403).json({ message: 'User not associated with any company' });
+      }
+    }
+    
+    // Role-based filtering within company
+    if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // Admin and manager can see all company leads
+      console.log('🔑 Admin/Manager access - showing all company leads');
+    } else if (req.user.role !== 'super-admin') {
       // Normal users can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
-      query.$or = [
-        { createdBy: req.user.id },
-        { assignedTo: req.user.id }
+      const existingCompanyFilter = query.companyId;
+      query.$and = [
+        { companyId: existingCompanyFilter },
+        {
+          $or: [
+            { createdBy: req.user.id },
+            { assignedTo: req.user.id }
+          ]
+        }
       ];
+      delete query.companyId; // Remove duplicate filter
     }
     
     if (status) query.status = status;
@@ -494,9 +469,27 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
       });
     }
     
+    // Check if user belongs to a company (except super-admin)
+    if (req.user.role !== 'super-admin' && !req.user.companyId) {
+      return res.status(403).json({ message: 'User not associated with any company' });
+    }
+    
+    // Check company lead limits
+    if (req.user.companyId) {
+      const company = await require('./models/Company').findById(req.user.companyId);
+      if (company && !company.canAddLead()) {
+        return res.status(400).json({ 
+          message: `Lead limit reached. Current plan allows ${company.plan.leadsLimit} leads.`,
+          currentLeads: company.usage.currentLeads,
+          maxLeads: company.plan.leadsLimit
+        });
+      }
+    }
+    
     const leadData = {
       ...req.body,
-      createdBy: req.user.email || req.user.id
+      companyId: req.user.companyId,
+      createdBy: req.user.id
     };
     
     const newLead = new Lead(leadData);
@@ -505,7 +498,14 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
     const savedLead = await newLead.save();
     console.log('✅ Lead saved successfully!');
     console.log('🆔 Lead ID:', savedLead._id);
-    console.log('📊 Lead Data:', JSON.stringify(savedLead, null, 2));
+    
+    // Update company usage
+    if (req.user.companyId) {
+      await require('./models/Company').findByIdAndUpdate(req.user.companyId, {
+        $inc: { 'usage.currentLeads': 1 }
+      });
+      console.log('📈 Company lead count updated');
+    }
     
     // Create notification for lead creation
     await createLeadCreationNotification(savedLead._id, req.user.id);
@@ -620,6 +620,15 @@ app.get('/api/customers', authenticateToken, async (req, res) => {
     
     let query = { isActive: true };
     
+    // Company-based filtering (except super-admin)
+    if (req.user.role !== 'super-admin') {
+      if (req.user.companyId) {
+        query.companyId = req.user.companyId;
+      } else {
+        return res.status(403).json({ message: 'User not associated with any company' });
+      }
+    }
+    
     if (status) query.status = status;
     if (customerType) query.customerType = customerType;
     if (assignedTo) query.assignedTo = assignedTo;
@@ -683,14 +692,42 @@ app.post('/api/customers', authenticateToken, async (req, res) => {
       });
     }
     
+    // Check if user belongs to a company (except super-admin)
+    if (req.user.role !== 'super-admin' && !req.user.companyId) {
+      return res.status(403).json({ message: 'User not associated with any company' });
+    }
+    
+    // Check company customer limits
+    if (req.user.companyId) {
+      const Company = require('./models/Company');
+      const company = await Company.findById(req.user.companyId);
+      if (company && !company.canAddCustomer()) {
+        return res.status(400).json({ 
+          message: `Customer limit reached. Current plan allows ${company.plan.customersLimit} customers.`,
+          currentCustomers: company.usage.currentCustomers,
+          maxCustomers: company.plan.customersLimit
+        });
+      }
+    }
+    
     // Get user ID - handle both _id and id properties
     const userId = req.user._id || req.user.id;
     console.log('👤 Using user ID:', userId);
     
     const customer = await Customer.create({
       ...req.body,
+      companyId: req.user.companyId,
       createdBy: userId
     });
+    
+    // Update company usage
+    if (req.user.companyId) {
+      const Company = require('./models/Company');
+      await Company.findByIdAndUpdate(req.user.companyId, {
+        $inc: { 'usage.currentCustomers': 1 }
+      });
+      console.log('📈 Company customer count updated');
+    }
     
     console.log('✅ Customer created successfully:', customer._id);
     await customer.populate('createdBy assignedTo', 'name email');
@@ -873,20 +910,15 @@ app.use('/api/communications', authenticateToken, communicationRoutes);
 app.use('/api/tasks', authenticateToken, taskRoutes);
 app.use('/api/calendar', authenticateToken, calendarRoutes);
 
-// Test notification endpoint
-app.post('/api/test-notification', authenticateToken, async (req, res) => {
-  try {
-    const { createLeadAssignmentNotification } = require('./controllers/notificationController');
-    
-    // Create a test notification
-    await createLeadAssignmentNotification('test-lead-id', req.user.id, req.user.id);
-    
-    res.json({ message: 'Test notification created successfully' });
-  } catch (error) {
-    console.error('Error creating test notification:', error);
-    res.status(500).json({ message: 'Error creating test notification', error: error.message });
-  }
-});
+
+
+// Direct routes for frontend compatibility
+const { getPlanConfigs, getMyCompanyPlan, getTeamMembers } = require('./controllers/companyController');
+
+// Plans routes
+app.get('/api/plans', authenticateToken, getPlanConfigs);
+app.get('/api/my/plan', authenticateToken, getMyCompanyPlan);
+app.get('/api/my/team', authenticateToken, getTeamMembers);
 
 // Health check
 app.get('/api/health', async (req, res) => {

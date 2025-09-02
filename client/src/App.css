@@ -129,6 +129,10 @@ p {
   animation: slideIn 0.3s ease-out;
 }
 
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
 /* Focus styles */
 button:focus,
 input:focus,

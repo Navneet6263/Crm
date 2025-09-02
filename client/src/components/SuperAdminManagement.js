@@ -24,16 +24,7 @@ const SuperAdminManagement = ({ darkMode = false }) => {
       setSafetyStatus(response.data || response);
     } catch (error) {
       console.error('Error fetching safety status:', error);
-      // Set mock data for testing
-      setSafetyStatus({
-        isSafe: false,
-        totalSuperAdmins: 5,
-        activeSuperAdmins: 5,
-        inactiveSuperAdmins: 0,
-        maxAllowed: 4,
-        canCreateMore: false,
-        safetyLevel: 'HIGH'
-      });
+      setSafetyStatus(null);
     }
   };
 
@@ -45,49 +36,7 @@ const SuperAdminManagement = ({ darkMode = false }) => {
       setSuperAdmins(response.data || response || []);
     } catch (error) {
       console.error('Error fetching super admins:', error);
-      // Set mock data for testing - based on actual database
-      setSuperAdmins([
-        {
-          _id: '1',
-          name: 'Navneet Kumar',
-          email: 'navneet@greencall.com',
-          role: 'super-admin',
-          isActive: true,
-          createdAt: '2025-08-20T08:16:55.000Z'
-        },
-        {
-          _id: '2', 
-          name: 'Navneet Kumar',
-          email: 'navneet@greencrm.com',
-          role: 'super-admin',
-          isActive: true,
-          createdAt: '2025-08-28T07:19:23.000Z'
-        },
-        {
-          _id: '3',
-          name: 'Super Admin 2',
-          email: 'superadmin2@greencrm.com', 
-          role: 'super-admin',
-          isActive: true,
-          createdAt: '2025-08-28T07:19:23.000Z'
-        },
-        {
-          _id: '4',
-          name: 'Super Admin 3',
-          email: 'superadmin3@greencrm.com',
-          role: 'super-admin', 
-          isActive: true,
-          createdAt: '2025-08-28T07:19:23.000Z'
-        },
-        {
-          _id: '5',
-          name: 'Super Admin 4',
-          email: 'superadmin4@greencrm.com',
-          role: 'super-admin',
-          isActive: true,
-          createdAt: '2025-08-28T07:19:23.000Z'
-        }
-      ]);
+      setSuperAdmins([]);
     } finally {
       setLoading(false);
     }

@@ -1,15 +1,16 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
+const Company = require('../models/Company');
+const { getCompanyInfo } = require('../utils/authHelpers');
 
 const createLead = async (req, res) => {
   try {
-    console.log('Creating lead with data:', req.body);
-    console.log('User:', {
-      id: req.user._id,
-      email: req.user.email,
-      role: req.user.role,
-      tenantId: req.user.tenantId
-    });
+    // Set default companyId if missing
+    if (!req.body.companyId && req.user.role === 'super-admin') {
+      req.body.companyId = '507f1f77bcf86cd799439011'; // Default ObjectId
+    }
+    
+    console.log('Creating lead with companyId:', req.body.companyId);
     
     // Check for duplicate email or phone
     const existingLead = await Lead.findOne({
@@ -35,21 +36,159 @@ const createLead = async (req, res) => {
       });
     }
     
+    let companyId;
+    
+    // For SuperAdmin, use the selected companyId from request
+    if (req.user.role === 'super-admin') {
+      companyId = req.body.companyId;
+      
+      // Handle fallback company ID
+      if (companyId === 'default-greencall') {
+        // Try to find or create GreenCall CRM company
+        let defaultCompany = await Company.findOne({ name: 'GreenCall CRM' });
+        if (!defaultCompany) {
+          defaultCompany = await Company.create({
+            name: 'GreenCall CRM',
+            slug: 'greencall-crm',
+            contactEmail: 'support@greencallcrm.com',
+            plan: { 
+              name: 'enterprise',
+              leadsLimit: -1,
+              usersLimit: -1,
+              customersLimit: -1,
+              storageLimit: 100,
+              emailLimit: -1,
+              smsLimit: 10000,
+              features: ['full_crm'],
+              startDate: new Date(),
+              endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+            },
+            usage: {
+              currentLeads: 0,
+              currentUsers: 0,
+              currentCustomers: 0,
+              storageUsed: 0,
+              emailsSent: 0,
+              smsSent: 0,
+              lastReset: new Date()
+            },
+            status: 'active',
+            createdBy: req.user._id
+          });
+        }
+        companyId = defaultCompany._id;
+      }
+      
+      console.log('🏢 SuperAdmin selected companyId:', companyId);
+    } else {
+      // For other users, get company info from user
+      console.log('🏢 Getting company info for user:', req.user.email);
+      const companyInfo = getCompanyInfo(req.user);
+      companyId = companyInfo?._id || companyInfo || req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
+      
+      console.log('🏢 User companyId:', companyId);
+    }
+    
+    if (!companyId) {
+      // For SuperAdmin, create default company if none exists
+      if (req.user.role === 'super-admin') {
+        let defaultCompany = await Company.findOne({ name: 'GreenCall CRM' });
+        if (!defaultCompany) {
+          defaultCompany = await Company.create({
+            name: 'GreenCall CRM',
+            slug: 'greencall-crm',
+            contactEmail: 'support@greencallcrm.com',
+            plan: { 
+              name: 'enterprise',
+              leadsLimit: -1,
+              usersLimit: -1,
+              customersLimit: -1,
+              storageLimit: 100,
+              emailLimit: -1,
+              smsLimit: 10000,
+              features: ['full_crm'],
+              startDate: new Date(),
+              endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+            },
+            usage: {
+              currentLeads: 0,
+              currentUsers: 0,
+              currentCustomers: 0,
+              storageUsed: 0,
+              emailsSent: 0,
+              smsSent: 0,
+              lastReset: new Date()
+            },
+            status: 'active',
+            createdBy: req.user._id
+          });
+        }
+        companyId = defaultCompany._id;
+      } else {
+        return res.status(400).json({ 
+          message: 'User must be associated with a company to create leads' 
+        });
+      }
+    }
+    
+    // Ensure companyId is always set
+    if (!companyId) {
+      console.log('⚠️ No companyId found, creating default...');
+      let defaultCompany = await Company.findOne({ name: 'GreenCall CRM' });
+      if (!defaultCompany) {
+        defaultCompany = await Company.create({
+          name: 'GreenCall CRM',
+          slug: 'greencall-crm',
+          contactEmail: 'support@greencallcrm.com',
+          plan: { 
+            name: 'enterprise',
+            leadsLimit: -1,
+            usersLimit: -1,
+            customersLimit: -1,
+            storageLimit: 100,
+            emailLimit: -1,
+            smsLimit: 10000,
+            features: ['full_crm'],
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          },
+          usage: {
+            currentLeads: 0,
+            currentUsers: 0,
+            currentCustomers: 0,
+            storageUsed: 0,
+            emailsSent: 0,
+            smsSent: 0,
+            lastReset: new Date()
+          },
+          status: 'active',
+          createdBy: req.user._id
+        });
+      }
+      companyId = defaultCompany._id;
+    }
+    
+    console.log('✅ Final companyId for lead:', companyId);
+    
     const leadData = {
       ...req.body,
       createdBy: req.user._id,
-      assignedTo: req.body.assignedTo && req.body.assignedTo.trim() ? req.body.assignedTo : req.user._id  // Auto-assign to creator (including super admin)
+      assignedTo: req.body.assignedTo && req.body.assignedTo.trim() ? req.body.assignedTo : req.user._id,
+      companyId: companyId,
+      tenantId: companyId
     };
     
     console.log('📝 Lead data to be saved:', {
       createdBy: leadData.createdBy,
       assignedTo: leadData.assignedTo,
-      contactPerson: leadData.contactPerson
+      contactPerson: leadData.contactPerson,
+      companyId: leadData.companyId,
+      userRole: req.user.role
     });
     
-    // Set tenantId if user has one
-    if (req.user.tenantId) {
-      leadData.tenantId = req.user.tenantId;
+    // For SuperAdmin, ensure the lead is properly tagged for visibility
+    if (req.user.role === 'super-admin') {
+      leadData.createdBySuperAdmin = true;
     }
     
     const lead = await Lead.create(leadData);
@@ -91,10 +230,17 @@ const getLeads = async (req, res) => {
     let query = { isActive: true };
     
     // Role-based filtering
-    if (req.user.role === 'super-admin' || req.user.role === 'admin') {
-      // Admin and super-admin can see all leads
-      console.log('🔑 Admin/Super-admin access - showing all leads');
-      console.log('🔑 User role:', req.user.role);
+    if (req.user.role === 'super-admin') {
+      // Super-admin can see all leads from all companies
+      console.log('🔑 Super-admin access - showing all leads from all companies');
+    } else if (req.user.role === 'admin') {
+      // Admin can see all leads from their company
+      console.log('🔑 Admin access - showing company leads');
+      const companyInfo = getCompanyInfo(req.user);
+      const userCompanyId = companyInfo?._id || companyInfo || req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
+      if (userCompanyId) {
+        query.companyId = userCompanyId;
+      }
     } else {
       // Normal users (including sales) can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');

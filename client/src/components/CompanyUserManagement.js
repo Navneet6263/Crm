@@ -1,50 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaUsers, FaUserShield, FaUserTie, FaEye, FaEyeSlash } from 'react-icons/fa';
+import apiService from '../services/apiService';
+import { showSuccess, showError, confirmAction } from '../utils/notifications';
 
 const CompanyUserManagement = ({ currentUser, darkMode }) => {
   const [users, setUsers] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [companyInfo, setCompanyInfo] = useState(null);
+  const [limits, setLimits] = useState({ current: 0, max: 5, canAdd: false });
 
-  // Mock data - replace with API calls
+  // Load team members from backend
   useEffect(() => {
-    const mockUsers = [
-      {
-        id: 1,
-        name: 'Rahul Sharma',
-        email: 'rahul@company.com',
-        role: 'manager',
-        department: 'Sales',
-        status: 'active',
-        joinDate: '2024-01-15',
-        permissions: ['view_leads', 'edit_leads', 'view_reports']
-      },
-      {
-        id: 2,
-        name: 'Priya Singh',
-        email: 'priya@company.com',
-        role: 'sales_rep',
-        department: 'Sales',
-        status: 'active',
-        joinDate: '2024-02-01',
-        permissions: ['view_leads', 'edit_own_leads']
-      }
-    ];
-    setUsers(mockUsers);
+    loadTeamMembers();
   }, []);
 
-  // Plan limits
-  const planLimits = {
-    basic: { maxUsers: 5, maxManagers: 1 },
-    professional: { maxUsers: 25, maxManagers: 5 },
-    enterprise: { maxUsers: 100, maxManagers: 20 }
+  const loadTeamMembers = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getTeamMembers();
+      if (response.success) {
+        setUsers(response.team || []);
+        setCompanyInfo(response.company);
+        setLimits(response.limits || { current: 0, max: 5, canAdd: false });
+      }
+    } catch (error) {
+      console.error('Error loading team members:', error);
+      showError('Failed to load team members: ' + error.message);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const currentPlan = currentUser?.plan || 'basic';
-  const limits = planLimits[currentPlan];
+  // Get plan info from company data or current user
+  const currentPlan = companyInfo?.plan?.name || currentUser?.company?.plan?.name || 'basic';
   const currentUserCount = users.length;
   const currentManagerCount = users.filter(u => u.role === 'manager').length;
+  
+  // Debug logging
+  console.log('🏢 Company Info:', companyInfo);
+  console.log('👤 Current User:', currentUser);
+  console.log('📊 Limits:', limits);
+  console.log('📋 Plan:', currentPlan);
 
   const roles = [
     { value: 'manager', label: 'Manager', icon: FaUserShield, color: '#667eea' },
@@ -66,40 +66,101 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
     password: ''
   });
 
-  const handleAddUser = () => {
-    if (currentUserCount >= limits.maxUsers) {
-      alert(`Your ${currentPlan} plan allows only ${limits.maxUsers} users. Please upgrade your plan.`);
+  const handleAddUser = async () => {
+    if (currentUser?.role !== 'super-admin' && !limits.canAdd) {
+      showError(`Your ${currentPlan} plan allows only ${limits.max} users. Please upgrade your plan.`);
       return;
     }
 
-    if (newUser.role === 'manager' && currentManagerCount >= limits.maxManagers) {
-      alert(`Your ${currentPlan} plan allows only ${limits.maxManagers} managers. Please upgrade your plan.`);
+    if (!newUser.name || !newUser.email || !newUser.role) {
+      showError('Please fill in all required fields');
       return;
     }
 
-    const user = {
-      id: Date.now(),
-      ...newUser,
-      status: 'active',
-      joinDate: new Date().toISOString().split('T')[0],
-      permissions: permissions[newUser.role]
-    };
+    try {
+      const response = await apiService.createTeamMember({
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        department: newUser.department
+      });
 
-    setUsers([...users, user]);
-    setNewUser({ name: '', email: '', role: 'sales_rep', department: '', password: '' });
-    setShowAddModal(false);
+      if (response.success) {
+        showSuccess(`Team member added successfully! Temporary password: ${response.user.tempPassword}`);
+        setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
+        setShowAddModal(false);
+        loadTeamMembers(); // Reload the list
+      }
+    } catch (error) {
+      console.error('Error adding user:', error);
+      showError('Failed to add team member: ' + error.message);
+    }
   };
 
   const handleDeleteUser = (userId) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      setUsers(users.filter(u => u.id !== userId));
+    confirmAction(
+      'Are you sure you want to delete this user? This action cannot be undone.',
+      async () => {
+        try {
+          await apiService.deleteTeamMember(userId);
+          showSuccess('Team member deleted successfully!');
+          loadTeamMembers(); // Reload the list
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          showError('Failed to delete team member: ' + error.message);
+        }
+      }
+    );
+  };
+
+  const toggleUserStatus = async (userId) => {
+    try {
+      await apiService.toggleTeamMemberStatus(userId);
+      showSuccess('Team member status updated successfully!');
+      loadTeamMembers(); // Reload the list
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      showError('Failed to update team member status: ' + error.message);
     }
   };
 
-  const toggleUserStatus = (userId) => {
-    setUsers(users.map(u => 
-      u.id === userId ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u
-    ));
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setNewUser({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department || '',
+      password: ''
+    });
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+
+    try {
+      const response = await apiService.updateTeamMember(editingUser._id, {
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        department: newUser.department
+      });
+
+      if (response.success) {
+        showSuccess('Team member updated successfully!');
+        setEditingUser(null);
+        setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
+        loadTeamMembers(); // Reload the list
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showError('Failed to update team member: ' + error.message);
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingUser(null);
+    setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
   };
 
   const filteredUsers = users.filter(user =>
@@ -131,14 +192,25 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
             Team Management
           </h2>
           <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-            Users: {currentUserCount}/{limits.maxUsers} | Managers: {currentManagerCount}/{limits.maxManagers}
+            Users: {limits.current}/{limits.max} | Plan: {currentPlan.toUpperCase()}
+            {companyInfo?.name && ` | Company: ${companyInfo.name}`}
           </p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
-          disabled={currentUserCount >= limits.maxUsers}
+          onClick={() => {
+            // Check permissions and limits before opening modal (skip for super-admin)
+            if (currentUser?.role !== 'super-admin' && !['admin', 'manager'].includes(currentUser?.role)) {
+              showError('You need Admin or Manager role to add team members.');
+              return;
+            }
+            if (currentUser?.role !== 'super-admin' && !limits.canAdd) {
+              showError(`Your ${currentPlan} plan allows only ${limits.max} users. Please upgrade your plan.`);
+              return;
+            }
+            setShowAddModal(true);
+          }}
           style={{
-            background: currentUserCount >= limits.maxUsers ? '#9ca3af' : '#3b82f6',
+            background: '#3b82f6',
             color: 'white',
             border: 'none',
             padding: '0.75rem 1.5rem',
@@ -146,17 +218,43 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            cursor: currentUserCount >= limits.maxUsers ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             fontSize: '0.875rem',
-            fontWeight: '500'
+            fontWeight: '500',
+            transition: 'all 0.2s ease',
+            ':hover': {
+              background: '#2563eb'
+            }
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = '#2563eb';
+            e.target.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = '#3b82f6';
+            e.target.style.transform = 'translateY(0)';
           }}
         >
           <FaPlus /> Add User
         </button>
       </div>
 
+      {/* Access Control Warning */}
+      {currentUser?.role !== 'super-admin' && !['admin', 'manager'].includes(currentUser?.role) && (
+        <div style={{
+          background: darkMode ? '#7c2d12' : '#fef3c7',
+          border: '1px solid #f59e0b',
+          color: darkMode ? '#fbbf24' : '#92400e',
+          padding: '1rem',
+          borderRadius: '8px',
+          marginBottom: '1.5rem'
+        }}>
+          🔒 You need Admin or Manager role to manage team members.
+        </div>
+      )}
+
       {/* Plan Limit Warning */}
-      {currentUserCount >= limits.maxUsers * 0.8 && (
+      {currentUser?.role !== 'super-admin' && limits.current >= limits.max * 0.8 && limits.max !== -1 && (
         <div style={{
           background: darkMode ? '#451a03' : '#fef3c7',
           border: '1px solid #f59e0b',
@@ -165,7 +263,18 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
           borderRadius: '8px',
           marginBottom: '1.5rem'
         }}>
-          ⚠️ You are approaching your user limit. It's time to upgrade your plan!
+          ⚠️ You are approaching your user limit ({limits.current}/{limits.max}). It's time to upgrade your plan!
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div style={{
+          textAlign: 'center',
+          padding: '2rem',
+          color: darkMode ? '#9ca3af' : '#6b7280'
+        }}>
+          Loading team members...
         </div>
       )}
 
@@ -207,7 +316,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
               const RoleIcon = roleInfo?.icon || FaUsers;
               
               return (
-                <tr key={user.id} style={{ borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` }}>
+                <tr key={user._id} style={{ borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` }}>
                   <td style={{ padding: '0.75rem', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem' }}>{user.name}</td>
                   <td style={{ padding: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>{user.email}</td>
                   <td style={{ padding: '0.75rem' }}>
@@ -216,39 +325,108 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                       {roleInfo?.label}
                     </span>
                   </td>
-                  <td style={{ padding: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>{user.department}</td>
+                  <td style={{ padding: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>{user.department || 'N/A'}</td>
                   <td style={{ padding: '0.75rem' }}>
                     <span style={{
                       padding: '0.25rem 0.5rem',
                       borderRadius: '9999px',
                       fontSize: '0.75rem',
-                      background: user.status === 'active' 
+                      background: user.isActive 
                         ? (darkMode ? '#065f46' : '#dcfce7')
                         : (darkMode ? '#7f1d1d' : '#fee2e2'),
-                      color: user.status === 'active'
+                      color: user.isActive
                         ? (darkMode ? '#34d399' : '#166534')
                         : (darkMode ? '#fca5a5' : '#dc2626')
                     }}>
-                      {user.status}
+                      {user.isActive ? 'active' : 'inactive'}
                     </span>
                   </td>
                   <td style={{ padding: '0.75rem' }}>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
-                        onClick={() => setEditingUser(user)}
-                        style={{ color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                        onClick={() => {
+                          if (currentUser?.role !== 'super-admin' && !['admin', 'manager'].includes(currentUser?.role)) {
+                            showError('You need Admin or Manager role to edit team members.');
+                            return;
+                          }
+                          handleEditUser(user);
+                        }}
+                        style={{ 
+                          color: '#3b82f6', 
+                          background: 'none', 
+                          border: 'none', 
+                          cursor: 'pointer', 
+                          padding: '0.5rem',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        title="Edit User"
+                        onMouseEnter={(e) => {
+                          e.target.style.background = darkMode ? '#1e40af20' : '#3b82f620';
+                          e.target.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'none';
+                          e.target.style.transform = 'scale(1)';
+                        }}
                       >
                         <FaEdit />
                       </button>
                       <button
-                        onClick={() => toggleUserStatus(user.id)}
-                        style={{ color: '#f59e0b', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                        onClick={() => {
+                          if (currentUser?.role !== 'super-admin' && !['admin', 'manager'].includes(currentUser?.role)) {
+                            showError('You need Admin or Manager role to change user status.');
+                            return;
+                          }
+                          toggleUserStatus(user._id);
+                        }}
+                        style={{ 
+                          color: '#f59e0b', 
+                          background: 'none', 
+                          border: 'none', 
+                          cursor: 'pointer', 
+                          padding: '0.5rem',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        title={user.isActive ? 'Deactivate User' : 'Activate User'}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = darkMode ? '#f59e0b20' : '#f59e0b20';
+                          e.target.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'none';
+                          e.target.style.transform = 'scale(1)';
+                        }}
                       >
-                        {user.status === 'active' ? <FaEyeSlash /> : <FaEye />}
+                        {user.isActive ? <FaEyeSlash /> : <FaEye />}
                       </button>
                       <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                        onClick={() => {
+                          if (currentUser?.role !== 'super-admin' && !['admin', 'manager'].includes(currentUser?.role)) {
+                            showError('You need Admin or Manager role to delete team members.');
+                            return;
+                          }
+                          handleDeleteUser(user._id);
+                        }}
+                        style={{ 
+                          color: '#ef4444', 
+                          background: 'none', 
+                          border: 'none', 
+                          cursor: 'pointer', 
+                          padding: '0.5rem',
+                          borderRadius: '4px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        title="Delete User"
+                        onMouseEnter={(e) => {
+                          e.target.style.background = darkMode ? '#ef444420' : '#ef444420';
+                          e.target.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = 'none';
+                          e.target.style.transform = 'scale(1)';
+                        }}
                       >
                         <FaTrash />
                       </button>
@@ -261,8 +439,8 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
         </table>
       </div>
 
-      {/* Add User Modal */}
-      {showAddModal && (
+      {/* Add/Edit User Modal */}
+      {(showAddModal || editingUser) && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -288,7 +466,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
               fontWeight: 'bold',
               marginBottom: '1.5rem',
               color: darkMode ? 'white' : '#1f2937'
-            }}>Add New User</h3>
+            }}>{editingUser ? 'Edit User' : 'Add New User'}</h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <input
@@ -348,11 +526,9 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   color: darkMode ? 'white' : '#1f2937'
                 }}
               >
-                {roles.map(role => (
-                  <option key={role.value} value={role.value}>
-                    {role.label}
-                  </option>
-                ))}
+                <option value="sales">Sales Representative</option>
+                <option value="manager">Manager</option>
+                <option value="support">Support</option>
               </select>
               
               <input
@@ -370,7 +546,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                 }}
               />
 
-              {/* Permissions Preview */}
+              {/* Role Description */}
               <div style={{
                 background: darkMode ? '#374151' : '#f9fafb',
                 padding: '1rem',
@@ -381,21 +557,18 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   color: darkMode ? 'white' : '#1f2937',
                   marginBottom: '0.5rem',
                   fontSize: '0.875rem'
-                }}>Permissions:</h4>
-                <ul style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                  {permissions[newUser.role]?.map(perm => (
-                    <li key={perm} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span style={{ width: '6px', height: '6px', background: '#10b981', borderRadius: '50%' }}></span>
-                      {perm.replace(/_/g, ' ').toUpperCase()}
-                    </li>
-                  ))}
-                </ul>
+                }}>Role Description:</h4>
+                <p style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                  {newUser.role === 'manager' && 'Can manage team members, view all leads, and access reports.'}
+                  {newUser.role === 'sales' && 'Can manage own leads, create new leads, and view basic reports.'}
+                  {newUser.role === 'support' && 'Can view leads, provide customer support, and access help desk.'}
+                </p>
               </div>
             </div>
             
             <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
               <button 
-                onClick={handleAddUser}
+                onClick={editingUser ? handleUpdateUser : handleAddUser}
                 style={{
                   flex: 1,
                   background: '#10b981',
@@ -405,13 +578,27 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '0.875rem',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#059669';
+                  e.target.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#10b981';
+                  e.target.style.transform = 'translateY(0)';
                 }}
               >
-                Add User
+                {editingUser ? 'Update User' : 'Add User'}
               </button>
               <button 
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  if (editingUser) {
+                    cancelEdit();
+                  }
+                }}
                 style={{
                   flex: 1,
                   background: 'transparent',
@@ -421,7 +608,16 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   borderRadius: '8px',
                   cursor: 'pointer',
                   fontSize: '0.875rem',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = darkMode ? '#374151' : '#f3f4f6';
+                  e.target.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'transparent';
+                  e.target.style.transform = 'translateY(0)';
                 }}
               >
                 Cancel

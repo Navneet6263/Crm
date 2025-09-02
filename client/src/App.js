@@ -510,21 +510,21 @@ const AppContent = () => {
         }
         return <CompanyManagement darkMode={darkMode} />;
       case 'team-management': 
-        if (!rbacService.hasPermission(currentUser?.role, 'manage_users')) {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You don't have permission to access Team Management</p>
-            </div>
-          );
+        if (currentUser?.role === 'super-admin' || rbacService.hasPermission(currentUser?.role, 'manage_users')) {
+          return <CompanyUserManagement currentUser={currentUser} darkMode={darkMode} />;
         }
-        return <CompanyUserManagement currentUser={currentUser} darkMode={darkMode} />;
+        return (
+          <div style={{
+            padding: '2rem',
+            textAlign: 'center',
+            background: darkMode ? '#1f2937' : 'white',
+            borderRadius: '12px',
+            margin: '2rem'
+          }}>
+            <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
+            <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You need Admin or Manager role to manage team members.</p>
+          </div>
+        );
       case 'plan-limits': 
         if (!rbacService.hasPermission(currentUser?.role, 'manage_users')) {
           return (

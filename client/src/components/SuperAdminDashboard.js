@@ -4,6 +4,615 @@ import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Cal
 import BookDemoModal from './BookDemoModal';
 import SuperAdminManagement from './SuperAdminManagement';
 
+// Employee Management Component
+const EmployeeManagement = ({ darkMode }) => {
+  const [employees, setEmployees] = useState([]);
+  const [filteredEmployees, setFilteredEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [filters, setFilters] = useState({
+    role: '',
+    status: '',
+    search: ''
+  });
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'sales'
+  });
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [employees, filters]);
+
+  const applyFilters = () => {
+    let filtered = employees;
+    
+    if (filters.role) {
+      filtered = filtered.filter(emp => emp.role === filters.role);
+    }
+    
+    if (filters.status) {
+      const isActive = filters.status === 'active';
+      filtered = filtered.filter(emp => emp.isActive === isActive);
+    }
+    
+    if (filters.search) {
+      filtered = filtered.filter(emp => 
+        emp.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+        emp.email.toLowerCase().includes(filters.search.toLowerCase())
+      );
+    }
+    
+    setFilteredEmployees(filtered);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentEmployees = filteredEmployees.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+
+  const getAccessLevel = (role) => {
+    const access = {
+      'super-admin': 'Full System Access, Manage All Companies & Users',
+      'admin': 'Company Management, All Leads & Customers, Team Management',
+      'manager': 'Team Leads, Assigned Customers, Reports',
+      'senior-manager': 'Multiple Teams, Advanced Reports, Lead Assignment',
+      'sales': 'Own Leads, Assigned Customers, Basic Reports'
+    };
+    return access[role] || 'Limited Access';
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('http://localhost:5004/api/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setEmployees(data.users || data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleEmployeeStatus = async (userId, currentStatus) => {
+    try {
+      console.log('Toggling status for user:', userId, 'Current status:', currentStatus);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:5004/api/auth/users/${userId}/toggle`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Toggle response status:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Toggle result:', result);
+        fetchEmployees(); // Refresh list
+        alert(`Employee ${currentStatus ? 'deactivated' : 'activated'} successfully!`);
+      } else {
+        const errorText = await response.text();
+        console.error('Toggle error response:', errorText);
+        alert('Failed to update employee status');
+      }
+    } catch (error) {
+      console.error('Error toggling employee status:', error);
+      alert('Failed to update employee status');
+    }
+  };
+
+  const handleAddEmployee = async (e) => {
+    e.preventDefault();
+    console.log('Sending employee data:', formData);
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('http://localhost:5004/api/auth/create-employee', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        fetchEmployees();
+        setShowAddForm(false);
+        setFormData({ name: '', email: '', password: '', role: 'sales' });
+        alert('Employee created successfully!');
+      } else {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        alert('Failed to create employee');
+      }
+    } catch (error) {
+      console.error('Error creating employee:', error);
+      alert('Failed to create employee');
+    }
+  };
+
+  const roleColors = {
+    'super-admin': '#ef4444',
+    'admin': '#f59e0b',
+    'manager': '#3b82f6',
+    'sales': '#10b981'
+  };
+
+  return (
+    <div style={{
+      background: darkMode ? '#1e293b' : 'white',
+      borderRadius: '0.5rem',
+      padding: '1.5rem',
+      boxShadow: darkMode ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+      marginBottom: '2rem'
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1.5rem'
+      }}>
+        <h2 style={{
+          fontSize: '1.25rem',
+          fontWeight: '600',
+          color: darkMode ? '#f8fafc' : '#111827',
+          margin: 0
+        }}>Employee Management ({filteredEmployees.length}/{employees.length})</h2>
+        
+        <button
+          onClick={() => setShowAddForm(true)}
+          style={{
+            padding: '0.5rem 1rem',
+            background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: '600'
+          }}
+        >
+          + Add Employee
+        </button>
+      </div>
+      
+      {/* Filters */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '1rem',
+        marginBottom: '1.5rem',
+        padding: '1rem',
+        background: darkMode ? '#374151' : '#f9fafb',
+        borderRadius: '8px'
+      }}>
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            color: darkMode ? '#d1d5db' : '#374151',
+            marginBottom: '0.25rem'
+          }}>Search</label>
+          <input
+            type="text"
+            placeholder="Name or email..."
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+              borderRadius: '4px',
+              background: darkMode ? '#1f2937' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '0.875rem'
+            }}
+          />
+        </div>
+        
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            color: darkMode ? '#d1d5db' : '#374151',
+            marginBottom: '0.25rem'
+          }}>Role</label>
+          <select
+            value={filters.role}
+            onChange={(e) => handleFilterChange('role', e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+              borderRadius: '4px',
+              background: darkMode ? '#1f2937' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '0.875rem'
+            }}
+          >
+            <option value="">All Roles</option>
+            <option value="sales">Sales</option>
+            <option value="manager">Manager</option>
+            <option value="senior-manager">Senior Manager</option>
+            <option value="admin">Admin</option>
+            <option value="super-admin">Super Admin</option>
+          </select>
+        </div>
+        
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            color: darkMode ? '#d1d5db' : '#374151',
+            marginBottom: '0.25rem'
+          }}>Status</label>
+          <select
+            value={filters.status}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+              borderRadius: '4px',
+              background: darkMode ? '#1f2937' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '0.875rem'
+            }}
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '2rem', color: darkMode ? '#cbd5e1' : '#6b7280' }}>
+          Loading employees...
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${darkMode ? '#334155' : '#e5e7eb'}`, textAlign: 'left' }}>
+                <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Name</th>
+                <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Email</th>
+                <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Role</th>
+                <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Access Level</th>
+                <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Status</th>
+                <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentEmployees.map((employee) => (
+                <tr key={employee._id} style={{ borderBottom: `1px solid ${darkMode ? '#334155' : '#e5e7eb'}` }}>
+                  <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827' }}>
+                    {employee.name}
+                  </td>
+                  <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827' }}>
+                    {employee.email}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      background: `${roleColors[employee.role] || '#6b7280'}20`,
+                      color: roleColors[employee.role] || '#6b7280'
+                    }}>
+                      {employee.role?.toUpperCase()}
+                    </span>
+                  </td>
+                  <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827', fontSize: '0.75rem' }}>
+                    {getAccessLevel(employee.role)}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      background: employee.isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: employee.isActive ? '#10b981' : '#ef4444'
+                    }}>
+                      {employee.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <button
+                      onClick={() => {
+                        console.log('Button clicked for employee:', employee._id, employee.name);
+                        toggleEmployeeStatus(employee._id, employee.isActive);
+                      }}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        border: 'none',
+                        borderRadius: '6px',
+                        background: employee.isActive ? '#ef4444' : '#10b981',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}
+                    >
+                      {employee.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {/* No Results Message */}
+      {filteredEmployees.length === 0 && employees.length > 0 && (
+        <div style={{
+          textAlign: 'center',
+          padding: '2rem',
+          color: darkMode ? '#cbd5e1' : '#6b7280'
+        }}>
+          No employees found matching current filters
+        </div>
+      )}
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginTop: '1rem',
+          padding: '1rem'
+        }}>
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            style={{
+              padding: '0.5rem 1rem',
+              background: currentPage === 1 ? (darkMode ? '#374151' : '#e5e7eb') : 'linear-gradient(135deg, #22c55e, #4ade80)',
+              color: currentPage === 1 ? (darkMode ? '#6b7280' : '#9ca3af') : 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+              fontSize: '0.875rem'
+            }}
+          >
+            Previous
+          </button>
+          
+          <span style={{
+            padding: '0.5rem 1rem',
+            color: darkMode ? '#d1d5db' : '#374151',
+            fontSize: '0.875rem'
+          }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            style={{
+              padding: '0.5rem 1rem',
+              background: currentPage === totalPages ? (darkMode ? '#374151' : '#e5e7eb') : 'linear-gradient(135deg, #22c55e, #4ade80)',
+              color: currentPage === totalPages ? (darkMode ? '#6b7280' : '#9ca3af') : 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+              fontSize: '0.875rem'
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+      
+      {/* Add Employee Modal */}
+      {showAddForm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: darkMode ? '#1f2937' : 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            width: '90%',
+            maxWidth: '500px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: '700',
+              color: darkMode ? 'white' : '#1f2937',
+              marginBottom: '1.5rem'
+            }}>Add New Employee</h3>
+            
+            <form onSubmit={handleAddEmployee}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Email *</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Password *</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Role *</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({...formData, role: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                >
+                  <option value="sales">Sales</option>
+                  <option value="manager">Manager</option>
+                  <option value="senior-manager">Senior Manager</option>
+                  <option value="admin">Admin</option>
+                  <option value="super-admin">Super Admin</option>
+                </select>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'transparent',
+                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  Create Employee
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // User Plan Manager Component
 const UserPlanManager = ({ darkMode }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -701,102 +1310,10 @@ Green CRM Team`;
         })}
       </div>
 
-      {/* Leads Management Section */}
-      <div style={{
-        background: darkMode ? '#1e293b' : 'white',
-        borderRadius: '0.5rem',
-        padding: '1.5rem',
-        boxShadow: darkMode ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-        marginBottom: '2rem'
-      }}>
-        <h2 style={{
-          fontSize: '1.25rem',
-          fontWeight: '600',
-          color: darkMode ? '#f8fafc' : '#111827',
-          marginBottom: '1.5rem'
-        }}>All Leads Management ({leadsArray.length})</h2>
-        
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: darkMode ? '#cbd5e1' : '#6b7280' }}>
-            Loading leads...
-          </div>
-        ) : leadsArray.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: darkMode ? '#cbd5e1' : '#6b7280' }}>
-            No leads found
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${darkMode ? '#334155' : '#e5e7eb'}`, textAlign: 'left' }}>
-                  <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Name</th>
-                  <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Company</th>
-                  <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Contact</th>
-                  <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Assigned To</th>
-                  <th style={{ padding: '0.75rem 1rem', color: darkMode ? '#cbd5e1' : '#6b7280', fontWeight: '500' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leadsArray.map((lead, index) => (
-                  <tr key={lead._id || index} style={{ borderBottom: `1px solid ${darkMode ? '#334155' : '#e5e7eb'}` }}>
-                    <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827' }}>
-                      {lead.contactPerson || lead.name}
-                    </td>
-                    <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827' }}>
-                      {lead.companyName || lead.company}
-                    </td>
-                    <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827' }}>
-                      {lead.email}
-                      <div style={{ fontSize: '0.75rem', color: darkMode ? '#cbd5e1' : '#6b7280' }}>{lead.phone}</div>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: '500',
-                        background: lead.status === 'closed-won' ? 'rgba(16, 185, 129, 0.1)' : 
-                                   lead.status === 'closed-lost' ? 'rgba(239, 68, 68, 0.1)' : 
-                                   'rgba(245, 158, 11, 0.1)',
-                        color: lead.status === 'closed-won' ? '#10b981' : 
-                               lead.status === 'closed-lost' ? '#ef4444' : 
-                               '#f59e0b'
-                      }}>
-                        {lead.status?.toUpperCase() || 'NEW'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem', color: darkMode ? '#f8fafc' : '#111827' }}>
-                      {lead.assignedTo || 'Unassigned'}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <select
-                        value={lead.assignedTo || ''}
-                        onChange={(e) => assignLead(lead._id, e.target.value)}
-                        style={{
-                          padding: '0.5rem',
-                          border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
-                          borderRadius: '0.25rem',
-                          background: darkMode ? '#374151' : 'white',
-                          color: darkMode ? 'white' : '#111827',
-                          fontSize: '0.75rem'
-                        }}
-                      >
-                        <option value="">Assign to...</option>
-                        <option value="admin@greencrm.com">Admin</option>
-                        <option value="manager@greencrm.com">Manager</option>
-                        <option value="sales@greencrm.com">Sales Executive</option>
-                        <option value="support@greencrm.com">Support Agent</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+
+
+      {/* Employee Management Section */}
+      <EmployeeManagement darkMode={darkMode} />
 
       {/* User Management Section */}
       <div style={{
