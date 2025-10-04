@@ -55,6 +55,24 @@ const companySchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  industry: {
+    type: String,
+    trim: true
+  },
+  companySize: {
+    type: String,
+    trim: true
+  },
+  website: {
+    type: String,
+    trim: true
+  },
+  talentId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   adminCredentials: {
     email: {
       type: String,
@@ -252,5 +270,6 @@ companySchema.statics.getPlanConfigs = function() {
 companySchema.index({ slug: 1 }, { unique: true });
 companySchema.index({ name: 1 }, { unique: true });
 companySchema.index({ 'adminCredentials.email': 1 });
+companySchema.index({ talentId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Company', companySchema);

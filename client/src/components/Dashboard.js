@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BarChart3, 
   Users, 
   TrendingUp, 
   DollarSign,
   Target,
   Calendar,
   Clock,
-  CheckCircle,
   Plus,
   ArrowRight,
   Activity,
-  Zap,
-  Server,
   UserCheck,
   Check,
   X
@@ -594,115 +590,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ ...cardStyle, padding: '1.5rem' }}>
-        <h3 style={{
-          fontSize: '1.25rem',
-          fontWeight: '600',
-          color: darkMode ? 'white' : '#1f2937',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Zap style={{ color: '#22c55e' }} size={20} />
-          Quick Actions
-        </h3>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem'
-        }}>
-          {[
-            {
-              title: 'Add New Lead',
-              description: 'Create a new lead entry',
-              icon: Plus,
-              color: '#22c55e',
-              action: () => setActiveView('add-enquiry')
-            },
-            {
-              title: 'View All Leads',
-              description: 'Browse your lead pipeline',
-              icon: Target,
-              color: '#3b82f6',
-              action: () => setActiveView('leads')
-            },
-            {
-              title: 'Analytics Dashboard',
-              description: 'View detailed reports',
-              icon: BarChart3,
-              color: '#8b5cf6',
-              action: () => setActiveView('analytics')
-            },
-            {
-              title: 'API Testing',
-              description: 'Test system integrations',
-              icon: Server,
-              color: '#f59e0b',
-              action: () => setActiveView('api-test')
-            }
-          ].map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={index}
-                onClick={action.action}
-                style={{
-                  padding: '1.5rem',
-                  background: darkMode ? '#334155' : '#f9fafb',
-                  border: `2px solid ${darkMode ? '#475569' : '#e5e7eb'}`,
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.borderColor = action.color;
-                  e.target.style.background = darkMode ? '#475569' : '#f3f4f6';
-                  e.target.style.transform = 'translateY(-2px)';
-                  e.target.style.boxShadow = `0 8px 25px ${action.color}20`;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.borderColor = darkMode ? '#475569' : '#e5e7eb';
-                  e.target.style.background = darkMode ? '#334155' : '#f9fafb';
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{
-                    padding: '0.75rem',
-                    background: action.color,
-                    borderRadius: '8px'
-                  }}>
-                    <Icon size={20} color="white" />
-                  </div>
-                  
-                  <div>
-                    <h4 style={{
-                      fontSize: '1rem',
-                      fontWeight: '600',
-                      color: darkMode ? 'white' : '#1f2937',
-                      margin: '0 0 0.25rem 0'
-                    }}>
-                      {action.title}
-                    </h4>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: darkMode ? '#9ca3af' : '#6b7280',
-                      margin: 0
-                    }}>
-                      {action.description}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Demo Requests for Super Admin */}
       {user?.role === 'super-admin' && demoRequests.length > 0 && (
@@ -759,62 +647,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
         </div>
       )}
 
-      {/* System Status */}
-      <div style={{ ...cardStyle, padding: '1.5rem', marginTop: '2rem' }}>
-        <h3 style={{
-          fontSize: '1.25rem',
-          fontWeight: '600',
-          color: darkMode ? 'white' : '#1f2937',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <CheckCircle style={{ color: '#22c55e' }} size={20} />
-          System Status
-        </h3>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem'
-        }}>
-          {[
-            { label: 'Backend Server', status: 'Running', color: '#22c55e' },
-            { label: 'Database', status: 'Connected', color: '#22c55e' },
-            { label: 'API Health', status: 'Healthy', color: '#22c55e' },
-            { label: 'Last Backup', status: '2 hours ago', color: '#3b82f6' }
-          ].map((item, index) => (
-            <div key={index} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '1rem',
-              background: darkMode ? '#374151' : '#f9fafb',
-              borderRadius: '8px'
-            }}>
-              <span style={{
-                fontSize: '0.875rem',
-                color: darkMode ? '#d1d5db' : '#374151',
-                fontWeight: '500'
-              }}>
-                {item.label}
-              </span>
-              
-              <span style={{
-                padding: '0.25rem 0.75rem',
-                background: `${item.color}20`,
-                color: item.color,
-                borderRadius: '12px',
-                fontSize: '0.75rem',
-                fontWeight: '600'
-              }}>
-                {item.status}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {isModalOpen && (
         <div style={modalOverlayStyle} onClick={() => setIsModalOpen(false)}>

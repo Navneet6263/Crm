@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Phone, MessageSquare, Mail, Shield } from 'lucide-react';
+import config from '../config';
 
 
 const OTPLogin = ({ onBack, darkMode = false }) => {
   const [step, setStep] = useState('method'); // method, phone, otp, verify
   const [selectedMethod, setSelectedMethod] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -36,13 +37,13 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
   const sendOTP = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/otp/send', {
+      const response = await fetch(`${config.api.baseUrl}/otp/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          phoneNumber,
+          email,
           method: selectedMethod
         })
       });
@@ -65,13 +66,13 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
   const verifyOTP = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/otp/verify', {
+      const response = await fetch(`${config.api.baseUrl}/otp/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          phoneNumber,
+          email,
           otp
         })
       });
@@ -178,23 +179,23 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
           </>
         )}
 
-        {/* Phone Number Input */}
+        {/* Email Input */}
         {step === 'phone' && (
           <>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h2 style={{ color: darkMode ? 'white' : '#111827' }}>
-                Enter Phone Number
+                Enter Email Address
               </h2>
               <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                We'll send OTP to this number
+                We'll send OTP to your email
               </p>
             </div>
 
             <input
-              type="tel"
-              placeholder="+91 9876543210"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              type="email"
+              placeholder="your.email@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -208,7 +209,7 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
 
             <button
               onClick={sendOTP}
-              disabled={loading || !phoneNumber}
+              disabled={loading || !email}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -233,7 +234,7 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
                 Enter OTP
               </h2>
               <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                OTP sent to {phoneNumber}
+                OTP sent to {email}
               </p>
             </div>
 

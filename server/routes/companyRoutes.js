@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { 
   createCompany, 
+  setupCompany,
   getAllCompanies, 
   updateCompanyStatus, 
   suspendCompany, 
@@ -29,6 +30,7 @@ router.use(auth);
 
 // Company Management Routes
 router.post('/', createCompany); // Create new company (Super Admin only)
+router.post('/setup', setupCompany); // Setup company after registration
 router.get('/', getAllCompanies); // Get all companies (Super Admin only)
 router.get('/plans', getPlanConfigs); // Get plan configurations
 

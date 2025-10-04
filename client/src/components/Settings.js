@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { showToast } from './ToastNotification';
+import apiService from '../services/apiService';
 
 const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
   const [activeTab, setActiveTab] = useState('profile');
@@ -22,7 +23,8 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
     profile: {
       name: currentUser?.name || '',
       email: currentUser?.email || '',
-      phone: currentUser?.phone || ''
+      phone: currentUser?.phone || '',
+      companyName: currentUser?.companyName || ''
     },
     notifications: {
       emailNotifications: true,
@@ -46,22 +48,48 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
     }
   });
 
-  // Load settings from localStorage on component mount
-  React.useEffect(() => {
+  // Load settings from database on component mount
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const response = await apiService.get('/settings/profile');
+        if (response.success) {
+          const userData = response.data;
+          setSettings(prev => ({
+            ...prev,
+            profile: {
+              name: userData.name || '',
+              email: userData.email || '',
+              phone: userData.phone || '',
+              companyName: userData.companyName || ''
+            },
+            notifications: userData.notificationPreferences || prev.notifications,
+            security: {
+              ...prev.security,
+              twoFactorAuth: userData.twoFactorEnabled || false
+            },
+            preferences: userData.appPreferences || prev.preferences
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+        // Fallback to currentUser if API fails
+        if (currentUser) {
+          setSettings(prev => ({
+            ...prev,
+            profile: {
+              name: currentUser.name || '',
+              email: currentUser.email || '',
+              phone: currentUser.phone || '',
+              companyName: currentUser.companyName || ''
+            }
+          }));
+        }
+      }
+    };
+
     if (currentUser) {
-      const savedSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
-      const savedUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      
-      setSettings(prev => ({
-        ...prev,
-        profile: {
-          name: savedUser.name || currentUser.name || '',
-          email: savedUser.email || currentUser.email || '',
-          phone: savedUser.phone || currentUser.phone || ''
-        },
-        notifications: savedSettings.notifications || prev.notifications,
-        preferences: savedSettings.preferences || prev.preferences
-      }));
+      loadUserProfile();
     }
   }, [currentUser]);
 
@@ -70,20 +98,18 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
     setSaveStatus('Saving...');
     
     try {
-      // Simulate API delay for visual feedback
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
       if (section === 'profile') {
-        const updatedUser = { 
-          ...currentUser, 
+        const response = await apiService.put('/settings/profile', {
           name: settings.profile.name,
-          email: settings.profile.email,
           phone: settings.profile.phone
-        };
-        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        });
         
-        setSaveStatus('Profile saved!');
-        showToast('success', '✅ Profile updated successfully!');
+        if (response.success) {
+          setSaveStatus('Profile saved!');
+          showToast('success', '✅ Profile updated successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to update profile');
+        }
       } else if (section === 'security') {
         if (settings.security.newPassword !== settings.security.confirmPassword) {
           setSaveStatus('Error: Passwords do not match!');
@@ -99,42 +125,54 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
           return;
         }
         
-        localStorage.setItem('userPassword', settings.security.newPassword);
+        // Change password via API
+        const response = await apiService.put('/settings/password', {
+          currentPassword: settings.security.currentPassword,
+          newPassword: settings.security.newPassword
+        });
         
-        setSettings(prev => ({
-          ...prev,
-          security: {
-            ...prev.security,
-            currentPassword: '',
-            newPassword: '',
-            confirmPassword: ''
-          }
-        }));
-        
-        setSaveStatus('Password changed!');
-        showToast('success', '✅ Password changed successfully!');
+        if (response.success) {
+          setSettings(prev => ({
+            ...prev,
+            security: {
+              ...prev.security,
+              currentPassword: '',
+              newPassword: '',
+              confirmPassword: ''
+            }
+          }));
+          
+          setSaveStatus('Password changed!');
+          showToast('success', '✅ Password changed successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to change password');
+        }
       } else if (section === 'notifications') {
-        const existingSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
-        const updatedSettings = { ...existingSettings, notifications: settings.notifications };
-        localStorage.setItem('userSettings', JSON.stringify(updatedSettings));
+        const response = await apiService.put('/settings/notifications', settings.notifications);
         
-        setSaveStatus('Notifications saved!');
-        showToast('success', '✅ Notification preferences saved successfully!');
+        if (response.success) {
+          setSaveStatus('Notifications saved!');
+          showToast('success', '✅ Notification preferences saved successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to update notifications');
+        }
       } else if (section === 'preferences') {
-        const existingSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
-        const updatedSettings = { ...existingSettings, preferences: settings.preferences };
-        localStorage.setItem('userSettings', JSON.stringify(updatedSettings));
+        const response = await apiService.put('/settings/preferences', settings.preferences);
         
-        setSaveStatus('Preferences saved!');
-        showToast('success', '✅ Preferences saved successfully!');
+        if (response.success) {
+          setSaveStatus('Preferences saved!');
+          showToast('success', '✅ Preferences saved successfully!');
+        } else {
+          throw new Error(response.message || 'Failed to update preferences');
+        }
       }
       
       setTimeout(() => setSaveStatus(''), 3000);
       
     } catch (error) {
       console.error('Error saving settings:', error);
-      setSaveStatus('Error saving settings!');
-      showToast('error', `❌ Failed to save ${section} settings`);
+      setSaveStatus(`Error: ${error.message}`);
+      showToast('error', `❌ ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -148,6 +186,20 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
         [field]: value
       }
     }));
+  };
+
+  const handle2FAToggle = async (enabled) => {
+    try {
+      const response = await apiService.put('/settings/2fa', { enabled });
+      if (response.success) {
+        handleInputChange('security', 'twoFactorAuth', enabled);
+        showToast('success', `✅ Two-factor authentication ${enabled ? 'enabled' : 'disabled'}`);
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      showToast('error', `❌ Failed to ${enabled ? 'enable' : 'disable'} 2FA`);
+    }
   };
 
   const tabs = [
@@ -287,8 +339,8 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
                   <input
                     type="email"
                     value={settings.profile.email}
-                    onChange={(e) => handleInputChange('profile', 'email', e.target.value)}
-                    style={inputStyle}
+                    disabled
+                    style={{...inputStyle, opacity: 0.6, cursor: 'not-allowed'}}
                   />
                 </div>
 
@@ -299,6 +351,17 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
                     value={settings.profile.phone}
                     onChange={(e) => handleInputChange('profile', 'phone', e.target.value)}
                     style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Company Name</label>
+                  <input
+                    type="text"
+                    value={settings.profile.companyName}
+                    disabled
+                    style={{...inputStyle, opacity: 0.6, cursor: 'not-allowed'}}
+                    placeholder="Company information from your account"
                   />
                 </div>
               </div>
@@ -470,15 +533,34 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
                 Security Settings
               </h2>
 
-              <div style={{ marginBottom: '2rem' }}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '600',
-                  color: darkMode ? 'white' : '#1f2937',
-                  marginBottom: '1rem'
+              {currentUser?.role === 'super-admin' && (
+                <div style={{
+                  padding: '1rem',
+                  background: '#fef3c7',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '8px',
+                  marginBottom: '2rem'
                 }}>
-                  Change Password
-                </h3>
+                  <p style={{
+                    color: '#92400e',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
+                    Super admin security settings are managed separately for enhanced security.
+                  </p>
+                </div>
+              )}
+
+              {currentUser?.role !== 'super-admin' && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: darkMode ? 'white' : '#1f2937',
+                    marginBottom: '1rem'
+                  }}>
+                    Change Password
+                  </h3>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                   <div>
@@ -565,7 +647,7 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
                     <input
                       type="checkbox"
                       checked={settings.security.twoFactorAuth}
-                      onChange={(e) => handleInputChange('security', 'twoFactorAuth', e.target.checked)}
+                      onChange={(e) => handle2FAToggle(e.target.checked)}
                       style={{ opacity: 0, width: 0, height: 0 }}
                     />
                     <span style={{
@@ -593,39 +675,40 @@ const Settings = ({ darkMode, toggleDarkMode, currentUser }) => {
                     </span>
                   </label>
                 </div>
-              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <button
-                  onClick={() => handleSave('security')}
-                  disabled={loading}
-                  style={{
-                    padding: '0.75rem 2rem',
-                    background: loading ? '#9ca3af' : 'linear-gradient(135deg, #22c55e, #4ade80)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    fontSize: '1rem',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <Shield size={16} />
-                  {loading ? 'Updating...' : 'Update Security'}
-                </button>
-                {saveStatus && (
-                  <span style={{
-                    color: saveStatus.includes('Error') ? '#ef4444' : '#22c55e',
-                    fontSize: '0.875rem',
-                    fontWeight: '500'
-                  }}>
-                    {saveStatus}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <button
+                    onClick={() => handleSave('security')}
+                    disabled={loading}
+                    style={{
+                      padding: '0.75rem 2rem',
+                      background: loading ? '#9ca3af' : 'linear-gradient(135deg, #22c55e, #4ade80)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <Shield size={16} />
+                    {loading ? 'Updating...' : 'Update Security'}
+                  </button>
+                  {saveStatus && (
+                    <span style={{
+                      color: saveStatus.includes('Error') ? '#ef4444' : '#22c55e',
+                      fontSize: '0.875rem',
+                      fontWeight: '500'
+                    }}>
+                      {saveStatus}
+                    </span>
+                  )}
+                </div>
               </div>
+              )}
             </div>
           )}
 

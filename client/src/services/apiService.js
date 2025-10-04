@@ -378,6 +378,8 @@ const apiService = {
   updateLead: async (leadId, leadData) => {
     try {
       const token = localStorage.getItem('authToken');
+      console.log('Updating lead:', leadId, 'with data:', leadData);
+      
       const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
         method: 'PUT',
         headers: { 
@@ -387,15 +389,20 @@ const apiService = {
         body: JSON.stringify(leadData)
       });
       
+      console.log('Update response status:', response.status);
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update lead');
+        const errorText = await response.text();
+        console.error('Update error response:', errorText);
+        throw new Error(`Failed to update lead: ${response.status} ${errorText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log('Update successful:', result);
+      return result;
     } catch (error) {
       console.error('Error updating lead:', error);
-      throw error;
+      throw new Error(`Error updating lead: ${error.message}`);
     }
   },
   

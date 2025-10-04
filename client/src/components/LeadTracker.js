@@ -84,120 +84,11 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Enhanced WebSocket for real-time updates with reconnection
+  // Optional WebSocket connection (disabled for now)
   useEffect(() => {
-    let ws;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
-    const reconnectInterval = 3000;
-    
-    const connect = () => {
-      try {
-        ws = new WebSocket('ws://localhost:8080');
-        
-        ws.onopen = () => {
-          console.log('WebSocket connected');
-          setWsConnection(ws);
-          reconnectAttempts = 0;
-          
-          // Send user identification
-          ws.send(JSON.stringify({
-            type: 'USER_CONNECT',
-            userId: user.id,
-            userName: user.name,
-            role: user.role
-          }));
-        };
-        
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('WebSocket message received:', data);
-            
-            switch (data.type) {
-              case 'LEAD_UPDATE':
-                // Update specific lead in real-time
-                if (data.leadData) {
-                  const updatedLeads = crmData.leads.map(lead => 
-                    (lead._id || lead.id) === data.leadId ? { ...lead, ...data.leadData } : lead
-                  );
-                  updateCrmData({ ...crmData, leads: updatedLeads });
-                }
-                break;
-                
-              case 'LEAD_CREATE':
-                // Add new lead in real-time
-                if (data.leadData) {
-                  updateCrmData({ 
-                    ...crmData, 
-                    leads: [...crmData.leads, data.leadData] 
-                  });
-                }
-                break;
-                
-              case 'LEAD_DELETE':
-                // Remove lead in real-time
-                const filteredLeads = crmData.leads.filter(lead => 
-                  (lead._id || lead.id) !== data.leadId
-                );
-                updateCrmData({ ...crmData, leads: filteredLeads });
-                break;
-                
-              case 'BULK_UPDATE':
-                // Handle bulk updates
-                apiService.getAllLeads().then(allLeads => {
-                  updateCrmData({ ...crmData, leads: allLeads });
-                }).catch(console.error);
-                break;
-                
-              case 'NOTIFICATION':
-                // Show real-time notifications
-                if (data.message) {
-                  // You can integrate with a toast notification system here
-                  console.log('Notification:', data.message);
-                }
-                break;
-              default:
-                break;
-            }
-          } catch (error) {
-            console.error('WebSocket message error:', error);
-          }
-        };
-        
-        ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          setWsConnection(null);
-          
-          // Attempt reconnection
-          if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            console.log(`Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
-            setTimeout(connect, reconnectInterval);
-          }
-        };
-        
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-        };
-        
-      } catch (error) {
-        console.error('WebSocket connection failed:', error);
-        if (reconnectAttempts < maxReconnectAttempts) {
-          reconnectAttempts++;
-          setTimeout(connect, reconnectInterval);
-        }
-      }
-    };
-    
-    connect();
-    
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, [user, updateCrmData, crmData]);
+    // WebSocket functionality disabled - can be enabled when WebSocket server is available
+    setWsConnection(null);
+  }, []);
 
   const handleUpdateLead = (lead) => {
     setSelectedLead(lead);
@@ -215,23 +106,15 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
   const saveUpdate = async () => {
     try {
       const updatedLead = {
-        ...selectedLead,
         status: updateData.status,
-        lastActivity: new Date().toISOString(),
-        notes: updateData.notes
+        notes: updateData.notes,
+        lastActivity: new Date().toISOString()
       };
 
+      console.log('Saving lead update:', selectedLead._id, updatedLead);
+      
       // Update via API
       await apiService.updateLead(selectedLead._id, updatedLead);
-      
-      // Send real-time update
-      if (wsConnection) {
-        wsConnection.send(JSON.stringify({
-          type: 'LEAD_UPDATE',
-          leadId: selectedLead._id,
-          data: updatedLead
-        }));
-      }
       
       // Refresh leads data
       const allLeads = await apiService.getAllLeads();
@@ -242,7 +125,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
       alert('Lead updated successfully!');
     } catch (error) {
       console.error('Error updating lead:', error);
-      alert('Error updating lead. Please try again.');
+      alert(`Error updating lead: ${error.message}`);
     }
   };
 

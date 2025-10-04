@@ -98,8 +98,7 @@ export const menuSections = [
       { id: 'settings', icon: Settings, label: 'Settings', color: '#6b7280' },
       { id: 'api-test', icon: Server, label: 'API Testing', color: '#3b82f6' },
       { id: 'connection-test', icon: Activity, label: 'Backend Connection', color: '#22c55e' },
-      { id: 'support', icon: MessageCircle, label: 'Support Center', color: '#22c55e' },
-      { id: 'support-admin', icon: MessageCircle, label: 'Support Management', color: '#ef4444', adminOnly: true }
+      { id: 'support', icon: MessageCircle, label: 'Support Center', color: '#22c55e' }
     ]
   }
 ];

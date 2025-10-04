@@ -10,6 +10,8 @@ router.post('/register', checkUserLimit, register);
 router.post('/login', login);
 router.get('/check-auth', checkAuth);
 router.post('/logout', logout);
+router.post('/forgot-password', require('../controllers/forgotPasswordController').sendResetOTP);
+router.post('/reset-password', require('../controllers/forgotPasswordController').resetPassword);
 
 // Protected routes
 router.get('/profile', auth, getProfile);

@@ -214,3 +214,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Green Call CRM** - Empowering Indian businesses with intelligent customer relationship management.
+
+“🔒 Source code available upon request (private repository).”
+navneetkumar6263101@gmail.com

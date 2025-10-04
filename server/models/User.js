@@ -66,6 +66,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  talentId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -134,10 +140,31 @@ const userSchema = new mongoose.Schema({
     default: function() {
       return this.role === 'super-admin';
     }
+  },
+  // User preferences
+  notificationPreferences: {
+    emailNotifications: { type: Boolean, default: true },
+    pushNotifications: { type: Boolean, default: true },
+    leadAlerts: { type: Boolean, default: true },
+    taskReminders: { type: Boolean, default: true },
+    weeklyReports: { type: Boolean, default: false },
+    marketingEmails: { type: Boolean, default: false }
+  },
+  appPreferences: {
+    language: { type: String, default: 'en' },
+    timezone: { type: String, default: 'Asia/Kolkata' },
+    dateFormat: { type: String, default: 'DD/MM/YYYY' },
+    currency: { type: String, default: 'INR' }
   }
 }, {
   timestamps: true
 });
+
+// Indexes
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ talentId: 1 }, { unique: true, sparse: true });
+userSchema.index({ companyId: 1 });
+userSchema.index({ tenantId: 1 });
 
 // Email uniqueness handled by schema
 

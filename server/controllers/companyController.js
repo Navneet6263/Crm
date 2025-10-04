@@ -1466,8 +1466,111 @@ const createDefaultCompany = async (req, res) => {
   }
 };
 
+// Setup company after user registration
+const setupCompany = async (req, res) => {
+  try {
+    const { companyName, industry, companySize, phone, website, talentId } = req.body;
+    const userId = req.user.id;
+
+    console.log('🏢 Setting up company for user:', req.user.email);
+
+    // Validate required fields
+    if (!companyName) {
+      return res.status(400).json({ message: 'Company name is required' });
+    }
+
+    // Generate unique slug
+    const slug = generateSlug(companyName);
+    
+    // Check if company with same name exists
+    const existingCompany = await Company.findOne({ name: companyName });
+    if (existingCompany) {
+      return res.status(409).json({ message: 'Company with this name already exists' });
+    }
+
+    // Create company with basic plan
+    const company = await Company.create({
+      name: companyName,
+      slug,
+      contactEmail: req.user.email,
+      contactPhone: phone,
+      industry,
+      companySize,
+      website,
+      talentId,
+      adminCredentials: {
+        email: req.user.email,
+        password: 'temp123', // Temporary password
+        isGenerated: false
+      },
+      plan: {
+        name: 'basic',
+        leadsLimit: 1000,
+        usersLimit: 5,
+        customersLimit: 500,
+        storageLimit: 1,
+        emailLimit: 1000,
+        smsLimit: 100,
+        features: ['basic_crm', 'lead_management', 'basic_reports'],
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      },
+      usage: {
+        currentLeads: 0,
+        currentUsers: 1,
+        currentCustomers: 0,
+        storageUsed: 0,
+        emailsSent: 0,
+        smsSent: 0,
+        lastReset: new Date()
+      },
+      status: 'active',
+      createdBy: userId
+    });
+
+    // Update user with company info and talent ID
+    await User.findByIdAndUpdate(userId, {
+      companyId: company._id,
+      tenantId: company._id,
+      talentId: talentId,
+      role: 'admin' // Make the user admin of their company
+    });
+
+    console.log('✅ Company setup completed:', {
+      companyId: company._id,
+      companyName: company.name,
+      talentId: talentId,
+      userEmail: req.user.email
+    });
+
+    res.status(201).json({
+      success: true,
+      company: {
+        id: company._id,
+        name: company.name,
+        slug: company.slug,
+        talentId: company.talentId,
+        plan: company.plan
+      },
+      user: {
+        talentId: talentId,
+        role: 'admin'
+      },
+      message: 'Company setup completed successfully!'
+    });
+
+  } catch (error) {
+    console.error('Company setup error:', error);
+    res.status(500).json({ 
+      message: 'Failed to setup company',
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   createCompany,
+  setupCompany,
   getAllCompanies,
   updateCompanyStatus,
   suspendCompany,

@@ -1561,65 +1561,80 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
               </ul>
             </div>
 
-            {/* Resources */}
+            {/* Our Partners */}
             <div>
               <h3 style={{
                 fontSize: '1.25rem',
                 fontWeight: '600',
                 color: darkMode ? '#f9fafb' : '#1f2937',
                 marginBottom: '1.5rem'
-              }}>Resources</h3>
-              <ul style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0
+              }}>Our Partners</h3>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
               }}>
-                <li style={{
-                  marginBottom: '0.75rem'
-                }}>
-                  <a href="#" style={{
-                    color: darkMode ? '#d1d5db' : '#4b5563',
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}>Documentation</a>
-                </li>
-                <li style={{
-                  marginBottom: '0.75rem'
-                }}>
-                  <a href="#" style={{
-                    color: darkMode ? '#d1d5db' : '#4b5563',
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}>API Reference</a>
-                </li>
-                <li style={{
-                  marginBottom: '0.75rem'
-                }}>
-                  <a href="#" style={{
-                    color: darkMode ? '#d1d5db' : '#4b5563',
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}>Blog</a>
-                </li>
-                <li style={{
-                  marginBottom: '0.75rem'
-                }}>
-                  <a href="#" style={{
-                    color: darkMode ? '#d1d5db' : '#4b5563',
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}>Support</a>
-                </li>
-                <li style={{
-                  marginBottom: '0.75rem'
-                }}>
-                  <a href="#" style={{
-                    color: darkMode ? '#d1d5db' : '#4b5563',
-                    textDecoration: 'none',
-                    transition: 'color 0.3s ease'
-                  }}>Community</a>
-                </li>
-              </ul>
+                <a href="#" style={{
+                  color: darkMode ? '#d1d5db' : '#4b5563',
+                  textDecoration: 'none',
+                  transition: 'color 0.3s ease',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`
+                }}>JustJob</a>
+                <a href="#" style={{
+                  color: darkMode ? '#d1d5db' : '#4b5563',
+                  textDecoration: 'none',
+                  transition: 'color 0.3s ease',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`
+                }}>Talent Foundation</a>
+                <a href="#" style={{
+                  color: darkMode ? '#d1d5db' : '#4b5563',
+                  textDecoration: 'none',
+                  transition: 'color 0.3s ease',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`
+                }}>Vision India</a>
+                <a href="#" style={{
+                  color: darkMode ? '#d1d5db' : '#4b5563',
+                  textDecoration: 'none',
+                  transition: 'color 0.3s ease',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`
+                }}>Live Skills</a>
+                <a href="#" style={{
+                  color: darkMode ? '#d1d5db' : '#4b5563',
+                  textDecoration: 'none',
+                  transition: 'color 0.3s ease',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`
+                }}>GreenCall HRMS</a>
+                <a href="#" style={{
+                  color: darkMode ? '#d1d5db' : '#4b5563',
+                  textDecoration: 'none',
+                  transition: 'color 0.3s ease',
+                  fontSize: '0.9rem',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  background: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`
+                }}>GreenCall Website</a>
+              </div>
             </div>
 
             {/* Contact */}
@@ -1635,15 +1650,23 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
               }}>
                 <div style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   gap: '0.75rem',
                   color: darkMode ? '#d1d5db' : '#4b5563',
-                  marginBottom: '0.75rem'
+                  marginBottom: '1rem'
                 }}>
                   <div style={{
-                    fontSize: '1.25rem'
-                  }}><Mail size={24} /></div>
-                  <span>hello@greencallcrm.com</span>
+                    fontSize: '1.25rem',
+                    marginTop: '0.25rem'
+                  }}><MapPin size={20} /></div>
+                  <div>
+                    <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>Address</div>
+                    <div style={{ fontSize: '0.9rem', lineHeight: '1.4' }}>
+                      A-43, Sector-67, Noida,<br/>
+                      Gautam Budhha Nagar,<br/>
+                      Uttar Pradesh-201301, India
+                    </div>
+                  </div>
                 </div>
                 <div style={{
                   display: 'flex',
@@ -1654,20 +1677,47 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
                 }}>
                   <div style={{
                     fontSize: '1.25rem'
-                  }}><Phone size={24} /></div>
-                  <span>+91 1234567890</span>
+                  }}><Mail size={20} /></div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>Email</div>
+                    <span style={{ fontSize: '0.9rem' }}>reachus@greencall.in</span>
+                  </div>
                 </div>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.75rem',
                   color: darkMode ? '#d1d5db' : '#4b5563',
-                  marginBottom: '0.75rem'
+                  marginBottom: '1rem'
                 }}>
                   <div style={{
                     fontSize: '1.25rem'
-                  }}><MapPin size={24} /></div>
-                  <span>Mumbai, Maharashtra, India</span>
+                  }}><Phone size={20} /></div>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>Phone</div>
+                    <span style={{ fontSize: '0.9rem' }}>+91 12031 01985</span>
+                  </div>
+                </div>
+                <div style={{
+                  marginTop: '1.5rem',
+                  padding: '1rem',
+                  background: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.05)',
+                  borderRadius: '8px',
+                  border: `1px solid ${darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.15)'}`
+                }}>
+                  <div style={{
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#4ade80' : '#16a34a',
+                    marginBottom: '0.5rem'
+                  }}>Connect With Us</div>
+                  <div style={{
+                    fontSize: '0.85rem',
+                    color: darkMode ? '#d1d5db' : '#4b5563',
+                    lineHeight: '1.4'
+                  }}>
+                    Follow us on social media for updates and insights
+                  </div>
                 </div>
               </div>
               <button

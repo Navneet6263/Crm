@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Smartphone } from 'lucide-react';
 import OTPLogin from './OTPLogin';
+import ForgotPassword from './ForgotPassword';
 
 
 const SignIn = ({ onSignIn, onGoToSignUp, onBack, darkMode = false }) => {
@@ -12,6 +13,7 @@ const SignIn = ({ onSignIn, onGoToSignUp, onBack, darkMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showOTPLogin, setShowOTPLogin] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,6 +42,15 @@ const SignIn = ({ onSignIn, onGoToSignUp, onBack, darkMode = false }) => {
     return (
       <OTPLogin 
         onBack={() => setShowOTPLogin(false)}
+        darkMode={darkMode}
+      />
+    );
+  }
+
+  if (showForgotPassword) {
+    return (
+      <ForgotPassword 
+        onBack={() => setShowForgotPassword(false)}
         darkMode={darkMode}
       />
     );
@@ -160,7 +171,7 @@ const SignIn = ({ onSignIn, onGoToSignUp, onBack, darkMode = false }) => {
             </div>
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
             <div style={{
               position: 'relative',
               display: 'flex',
@@ -202,6 +213,23 @@ const SignIn = ({ onSignIn, onGoToSignUp, onBack, darkMode = false }) => {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+          </div>
+
+          <div style={{ textAlign: 'right', marginBottom: '1.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#22c55e',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}
+            >
+              Forgot Password?
+            </button>
           </div>
 
           <button

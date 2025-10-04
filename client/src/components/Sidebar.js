@@ -92,8 +92,7 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
         { id: 'team-management', icon: Users, label: 'Team Management', color: '#8b5cf6', adminOnly: true },
         { id: 'plan-limits', icon: Server, label: 'Plan & Limits', color: '#f59e0b', adminOnly: true },
         { id: 'settings', icon: Settings, label: 'Settings', color: '#6b7280' },
-        { id: 'support', icon: MessageCircle, label: 'Support Center', color: '#22c55e' },
-        { id: 'support-admin', icon: MessageCircle, label: 'Support Management', color: '#ef4444', adminOnly: true }
+        { id: 'support', icon: MessageCircle, label: 'Support Center', color: '#22c55e' }
       ]
     }
   ];

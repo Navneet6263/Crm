@@ -31,8 +31,7 @@ const authRoutes = require('./routes/authRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const companyRoutes = require('./routes/companyRoutes');
-const supportRoutes = require('./routes/supportRoutes');
-const simpleSupportRoutes = require('./routes/simpleSupportRoutes');
+const enhancedSupportRoutes = require('./routes/enhancedSupportRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const otpRoutes = require('./routes/otpRoutes');
 const smsRoutes = require('./routes/smsRoutes');
@@ -86,6 +85,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
+
+// Fix for 431 Request Header Fields Too Large
+app.use((req, res, next) => {
+  req.headers = req.headers || {};
+  next();
+});
 
 // Additional CORS headers for preflight requests
 app.use((req, res, next) => {
@@ -253,14 +258,19 @@ app.post('/api/auth/register', auditLogger('USER_CREATE'), async (req, res) => {
       userRole = 'support';
     }
     
-    // Create new user
+    // Generate unique tenant ID for new users
+    const tenantId = new require('mongoose').Types.ObjectId();
+    
+    // Create new user with temporary tenant ID
     const user = new User({
       name,
       email,
       password, // Will be hashed by the pre-save middleware
       phone,
       company,
-      role: userRole
+      role: userRole,
+      companyId: tenantId, // Use same ID for both
+      tenantId: tenantId
     });
     
     await user.save();
@@ -279,7 +289,8 @@ app.post('/api/auth/register', auditLogger('USER_CREATE'), async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        needsCompanySetup: true // Flag to show company setup page
       }
     });
   } catch (error) {
@@ -887,15 +898,49 @@ app.put('/api/demo-requests/:id/reject', authenticateToken, async (req, res) => 
   }
 });
 
+app.delete('/api/demo-requests/:id', authenticateToken, async (req, res) => {
+  try {
+    const demoRequest = await DemoRequest.findByIdAndDelete(req.params.id);
+    
+    if (!demoRequest) {
+      return res.status(404).json({ message: 'Demo request not found' });
+    }
+    
+    res.json({ message: 'Demo request deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting demo request', error: error.message });
+  }
+});
+
 // Other Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/companies', companyRoutes);
-app.use('/api/support', supportRoutes);
-app.use('/api/simple-support', simpleSupportRoutes);
+app.use('/api/support', enhancedSupportRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api/sms', smsRoutes);
+app.use('/api/settings', require('./routes/settingsRoutes'));
+const demoRequestRoutes = require('./routes/demoRequestRoutes');
+// Apply auth to protected demo routes
+app.get('/api/demo-requests', authenticateToken, demoRequestRoutes);
+app.put('/api/demo-requests/:id/approve', authenticateToken, async (req, res) => {
+  const { approveDemoRequest } = require('./controllers/demoRequestController');
+  await approveDemoRequest(req, res);
+});
+app.put('/api/demo-requests/:id/reject', authenticateToken, async (req, res) => {
+  const { rejectDemoRequest } = require('./controllers/demoRequestController');
+  await rejectDemoRequest(req, res);
+});
+app.delete('/api/demo-requests/:id', authenticateToken, async (req, res) => {
+  const { deleteDemoRequest } = require('./controllers/demoRequestController');
+  await deleteDemoRequest(req, res);
+});
+// Public route for creating demo requests
+app.post('/api/demo-requests', async (req, res) => {
+  const { createDemoRequest } = require('./controllers/demoRequestController');
+  await createDemoRequest(req, res);
+});
 // OAuth Routes - Register with proper paths
 app.use('/api/auth', require('./routes/oauth'));
 app.use('/api/notifications', authenticateToken, notificationRoutes);

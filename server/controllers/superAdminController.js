@@ -14,10 +14,10 @@ const createSuperAdmin = async (req, res) => {
       return res.status(403).json(formatResponse(null, 'Unauthorized: Only main Super Admin can create new Super Admins', 403));
     }
 
-    // Check if we already have 2 Super Admins (strict limit)
+    // Check if we already have 4 Super Admins (strict limit)
     const superAdminCount = await User.countDocuments({ role: 'super-admin', isActive: true });
-    if (superAdminCount >= 2) {
-      return res.status(400).json(formatResponse(null, 'Maximum 2 Super Admins allowed for security', 400));
+    if (superAdminCount >= 4) {
+      return res.status(400).json(formatResponse(null, 'Maximum 4 Super Admins allowed for security', 400));
     }
 
     const { name, email, password } = req.body;

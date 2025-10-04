@@ -1003,55 +1003,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
     }
   };
 
-  const sendApprovalEmail = (request) => {
-    const googleMeetLink = 'https://meet.google.com/uqk-sjqx-vde';
-    const meetingId = 'uqk-sjqx-vde'; // Generate meeting ID from the Google Meet link
-    
-    const demoDateTime = new Date(request.date + ' ' + request.time).toLocaleString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    const subject = `🎉 Demo Request Approved - ${request.company} | Green CRM`;
-    
-    const emailBody = `Dear ${request.name},
 
-Congratulations! 🎉
-
-Your demo request has been APPROVED!
-
-📋 Demo Details:
-• Company: ${request.company}
-• Date & Time: ${demoDateTime}
-• Attendees: ${request.employees} employees
-
-🔗 Google Meet Link:
-${googleMeetLink}
-
-📞 Meeting ID: ${meetingId}
-
-📝 What to expect:
-• Complete CRM walkthrough
-• Feature demonstration
-• Q&A session
-• Pricing discussion
-
-⏰ Please join the meeting 5 minutes early.
-
-Looking forward to showing you how Green CRM can transform your business!
-
-Best regards,
-Green CRM Team`;
-    
-    const emailUrl = `mailto:${request.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
-    window.open(emailUrl);
-    
-    navigator.clipboard.writeText(googleMeetLink).catch(() => {});
-  };
 
   const handleApprove = async (id) => {
     if (!id) {
@@ -1062,17 +1014,12 @@ Green CRM Team`;
     
     console.log('✅ Approving demo request:', id);
     
-    const request = demoRequests.find(req => (req.id || req._id) === id);
-    
     try {
-      await apiService.approveDemoRequest(id);
-      
-      if (request) {
-        sendApprovalEmail(request);
-      }
+      const result = await apiService.approveDemoRequest(id);
+      console.log('✅ Demo request approved successfully:', result);
       
       fetchDemoRequests();
-      alert('✅ Demo approved! Email sent with Google Meet link!');
+      alert('✅ Demo approved! Email with Google Meet link has been sent!');
     } catch (error) {
       console.error('Error approving demo request via API:', error);
       const localRequests = JSON.parse(localStorage.getItem('demoRequests') || '[]');
@@ -1081,11 +1028,7 @@ Green CRM Team`;
       );
       localStorage.setItem('demoRequests', JSON.stringify(updatedRequests));
       setDemoRequests(updatedRequests);
-      
-      if (request) {
-        sendApprovalEmail(request);
-      }
-      alert('✅ Demo approved! Email sent with Google Meet link!');
+      alert('✅ Demo approved locally!');
     }
   };
 

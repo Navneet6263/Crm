@@ -22,6 +22,8 @@ import GreenCallLogin from './components/GreenCallLogin';
 import SignUp from './components/SignUp';
 import SignIn from './components/SignIn';
 import CustomerLogin from './components/CustomerLogin';
+import CompanySetup from './components/CompanySetup';
+import AccessDenied from './components/AccessDenied';
 import SimpleAddLead from './components/AddLead';
 import AIChatWidget from './components/AIChatWidget';
 
@@ -31,8 +33,7 @@ import ProfessionalDashboard from './components/Dashboard';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 
 // Lazy loaded components
-const AdminSupportDashboard = lazy(() => import('./components/AdminSupportDashboard'));
-const SimpleCustomerSupport = lazy(() => import('./components/SimpleCustomerSupport'));
+const EnhancedSupportCenter = lazy(() => import('./components/EnhancedSupportCenter'));
 const CustomerManagement = lazy(() => import('./components/CustomerManagement'));
 const MyLeads = lazy(() => import('./components/ProfessionalMyLeads'));
 const RoleBasedDashboard = lazy(() => import('./components/RoleBasedDashboard'));
@@ -96,6 +97,7 @@ const AppContent = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showAddLead, setShowAddLead] = useState(false);
+  const [showCompanySetup, setShowCompanySetup] = useState(false);
 
   // Global search term and results
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
@@ -298,28 +300,50 @@ const AppContent = () => {
       localStorage.setItem('authToken', token);
       setCurrentUser(user);
       setIsLoggedIn(true);
-      setActiveView('dashboard');
       
-      showToast('success', `Welcome ${user.name}! Account created successfully.`);
+      // Show company setup page after registration
+      setShowCompanySetup(true);
+      
+      showToast('success', `Welcome ${user.name}! Please setup your company details.`);
     } catch (error) {
       console.error('Signup error:', error);
       throw error; // Re-throw to trigger error handling in SignUp component
     }
   };
 
+  const handleCompanySetupComplete = (companyData) => {
+    // Generate unique talent ID
+    const talentId = `TID${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    
+    // Update user with company info and talent ID
+    const updatedUser = {
+      ...currentUser,
+      companyId: companyData.id,
+      talentId: talentId,
+      companySetupComplete: true
+    };
+    
+    setCurrentUser(updatedUser);
+    setShowCompanySetup(false);
+    setActiveView('dashboard');
+    
+    showToast('success', `Company setup complete! Your Talent ID: ${talentId}`);
+  };
+
   const handleLogout = async () => {
+    // Step 1: Clear local state immediately
+    localStorage.removeItem('authToken');
+    setCurrentUser(null);
+    setIsLoggedIn(false);
+    setActiveView('landing');
+    showToast('info', 'You have been logged out');
+
+    // Step 2: Backend logout (background, optional)
     try {
-      // Call backend logout to clear session
       await apiService.logout();
-      console.log('✅ Logout successful');
+      console.log('✅ Backend logout successful');
     } catch (error) {
-      console.log('Logout request failed:', error.message);
-    } finally {
-      // Always clear local state
-      setCurrentUser(null);
-      setIsLoggedIn(false);
-      setActiveView('landing');
-      showToast('info', 'You have been logged out');
+      console.log('⚠️ Backend logout failed:', error.message);
     }
   };
 
@@ -394,89 +418,30 @@ const AppContent = () => {
       case 'lead-tracker': return <LeadTracker crmData={crmData} updateCrmData={updateCrmData} user={currentUser} darkMode={darkMode} />;
       case 'lead-scoring': 
         if (!rbacService.hasPermission(currentUser?.role, 'view_lead_scoring')) {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You don't have permission to access Lead Scoring</p>
-            </div>
-          );
+          return <AccessDenied darkMode={darkMode} message="You don't have permission to access Lead Scoring" />;
         }
         console.log('🔍 Lead Scoring - Leads Data:', crmData.leads?.length || 0, 'leads');
         return <AILeadScoring leads={crmData.leads || []} darkMode={darkMode} />;
       case 'auto-assignment': 
         if (!rbacService.hasPermission(currentUser?.role, 'view_auto_assignment')) {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You don't have permission to access Auto Assignment</p>
-            </div>
-          );
+          return <AccessDenied darkMode={darkMode} message="You don't have permission to access Auto Assignment" />;
         }
         return <AutoAssignment crmData={crmData} updateCrmData={updateCrmData} darkMode={darkMode} />;
       case 'duplicate-detection': 
         if (!rbacService.hasPermission(currentUser?.role, 'view_duplicate_detection')) {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You don't have permission to access Duplicate Detection</p>
-            </div>
-          );
+          return <AccessDenied darkMode={darkMode} message="You don't have permission to access Duplicate Detection" />;
         }
         return <DuplicateDetection crmData={crmData} updateCrmData={updateCrmData} darkMode={darkMode} />;
       case 'data-table': return <ProfessionalDataTable crmData={crmData} updateCrmData={updateCrmData} darkMode={darkMode} />;
       case 'sales-pipeline': return <SalesPipeline crmData={crmData} updateCrmData={updateCrmData} darkMode={darkMode} />;
       case 'posts': return <Posts darkMode={darkMode} />;
       case 'support': return (
-        <SimpleCustomerSupport 
+        <EnhancedSupportCenter 
           darkMode={darkMode} 
           currentUser={currentUser} 
-          onSubmit={(ticketData) => {
-            // In a real app, this would send the ticket to an API
-            showToast('success', 'Support request submitted successfully!');
-          }} 
         />
       );
-      case 'support-admin': 
-        console.log('🔍 Support Admin Access Check:', {
-          userRole: currentUser?.role,
-          hasPermission: rbacService.hasPermission(currentUser?.role, 'manage_users')
-        });
-        if (currentUser?.role === 'super-admin') {
-          return <AdminSupportDashboard darkMode={darkMode} currentUser={currentUser} />;
-        }
-        if (!rbacService.hasPermission(currentUser?.role, 'manage_users')) {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You don't have permission to access Support Management</p>
-            </div>
-          );
-        }
-        return <AdminSupportDashboard darkMode={darkMode} currentUser={currentUser} />;
+
       case 'analytics': return <AnalyticsDashboard darkMode={darkMode} />;
       case 'tasks': return <TaskKanban darkMode={darkMode} />;
       case 'communication': return <CommunicationHub darkMode={darkMode} lead={null} onClose={() => changeView('dashboard')} />;
@@ -495,50 +460,17 @@ const AppContent = () => {
       );
       case 'company-management':
         if (currentUser?.role !== 'super-admin') {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>Only Super Admin can access Company Management</p>
-            </div>
-          );
+          return <AccessDenied darkMode={darkMode} message="Only Super Admin can access Company Management" />;
         }
         return <CompanyManagement darkMode={darkMode} />;
       case 'team-management': 
         if (currentUser?.role === 'super-admin' || rbacService.hasPermission(currentUser?.role, 'manage_users')) {
           return <CompanyUserManagement currentUser={currentUser} darkMode={darkMode} />;
         }
-        return (
-          <div style={{
-            padding: '2rem',
-            textAlign: 'center',
-            background: darkMode ? '#1f2937' : 'white',
-            borderRadius: '12px',
-            margin: '2rem'
-          }}>
-            <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-            <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You need Admin or Manager role to manage team members.</p>
-          </div>
-        );
+        return <AccessDenied darkMode={darkMode} message="You need Admin or Manager role to manage team members." />;
       case 'plan-limits': 
         if (!rbacService.hasPermission(currentUser?.role, 'manage_users')) {
-          return (
-            <div style={{
-              padding: '2rem',
-              textAlign: 'center',
-              background: darkMode ? '#1f2937' : 'white',
-              borderRadius: '12px',
-              margin: '2rem'
-            }}>
-              <h2 style={{ color: '#ef4444', marginBottom: '1rem' }}>🚫 Access Denied</h2>
-              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>You don't have permission to access Plan & Limits</p>
-            </div>
-          );
+          return <AccessDenied darkMode={darkMode} message="You don't have permission to access Plan & Limits" />;
         }
         return <PlanLimitsDisplay currentPlan={currentUser?.plan || 'basic'} usage={{
           users: crmData.users?.length || 0,
@@ -590,6 +522,17 @@ const AppContent = () => {
           />
         )}
       </div>
+    );
+  }
+
+  // Show company setup if user just registered
+  if (showCompanySetup) {
+    return (
+      <CompanySetup
+        user={currentUser}
+        onComplete={handleCompanySetupComplete}
+        darkMode={darkMode}
+      />
     );
   }
 
