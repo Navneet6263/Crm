@@ -51,7 +51,7 @@ const BulkUpload = ({ darkMode, onClose, onUploadComplete }) => {
         'Email': 'john@techsolutions.com',
         'Phone': '9876543210',
         'Industry': 'Technology',
-        'Lead Source': 'website',
+        'Lead Source': 'google',
         'Estimated Value': '150000',
         'Priority': 'high',
         'Requirements': 'Need CRM software for 50 users'

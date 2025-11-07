@@ -435,10 +435,27 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
                 style={inputStyle}
               >
                 <option value="website">Website</option>
-                <option value="social-media">Social Media</option>
+                <option value="google">Google</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="twitter">Twitter</option>
+                <option value="youtube">YouTube</option>
                 <option value="referral">Referral</option>
                 <option value="cold-call">Cold Call</option>
                 <option value="email-campaign">Email Campaign</option>
+                <option value="trade-show">Trade Show</option>
+                <option value="advertisement">Advertisement</option>
+                <option value="direct-mail">Direct Mail</option>
+                <option value="partner">Partner</option>
+                <option value="webinar">Webinar</option>
+                <option value="content-marketing">Content Marketing</option>
+                <option value="seo">SEO</option>
+                <option value="ppc">PPC</option>
+                <option value="social-media">Social Media</option>
+                <option value="word-of-mouth">Word of Mouth</option>
+                <option value="existing-customer">Existing Customer</option>
+                <option value="walk-in">Walk-in</option>
                 <option value="other">Other</option>
               </select>
               {formData.leadSource === 'other' && (

@@ -32,6 +32,31 @@ const leadSchema = new mongoose.Schema({
   },
   leadSource: {
     type: String,
+    enum: [
+      'website',
+      'google',
+      'facebook',
+      'instagram', 
+      'linkedin',
+      'twitter',
+      'youtube',
+      'referral',
+      'cold-call',
+      'email-campaign',
+      'trade-show',
+      'advertisement',
+      'direct-mail',
+      'partner',
+      'webinar',
+      'content-marketing',
+      'seo',
+      'ppc',
+      'social-media',
+      'word-of-mouth',
+      'existing-customer',
+      'walk-in',
+      'other'
+    ],
     default: 'website'
   },
   customLeadSource: {
