@@ -62,7 +62,18 @@ const auth = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    // Ensure consistent user object structure
+    req.user = {
+      _id: user._id,
+      id: user._id, // For backward compatibility
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      companyId: user.companyId,
+      tenantId: user.tenantId || user.companyId,
+      company: user.companyId || user.tenantId
+    };
     safeLog('info', '✅ Token verified for user:', { email: user.email, role: user.role });
     next();
   } catch (error) {

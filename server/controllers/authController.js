@@ -506,8 +506,18 @@ const toggleUserStatus = async (req, res) => {
 // Create employee (SuperAdmin only)
 const createEmployee = async (req, res) => {
   try {
+    console.log('🔄 === CREATE EMPLOYEE REQUEST ===');
+    console.log('📝 Request body:', req.body);
+    console.log('👤 User info:', {
+      id: req.user._id || req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+      companyId: req.user.companyId
+    });
+
     // Only super-admin can create employees
     if (req.user.role !== 'super-admin') {
+      console.log('❌ Access denied - not super admin');
       return res.status(403).json({ message: 'Only super-admin can create employees' });
     }
 
@@ -515,12 +525,14 @@ const createEmployee = async (req, res) => {
 
     // Validate required fields
     if (!name || !email || !password || !role) {
+      console.log('❌ Missing required fields:', { name: !!name, email: !!email, password: !!password, role: !!role });
       return res.status(400).json({ message: 'All fields are required' });
     }
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
+      console.log('❌ User already exists:', email);
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
@@ -549,26 +561,39 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Associate all users (including super-admin) with default company
+    // Associate users with default company based on role
     const userData = { 
       name, 
       email, 
       password, 
       role, 
-      isActive: true,
-      tenantId: defaultCompany._id,
-      companyId: defaultCompany._id
+      isActive: true
     };
+    
+    // Only set companyId and tenantId for non-super-admin users
+    if (role !== 'super-admin') {
+      userData.tenantId = defaultCompany._id;
+      userData.companyId = defaultCompany._id;
+      console.log('🏢 Setting company IDs for non-super-admin user:', {
+        role: role,
+        companyId: defaultCompany._id
+      });
+    } else {
+      console.log('👑 Super-admin user - no company association required');
+    }
 
     console.log('📝 Creating user with data:', {
       name: userData.name,
       email: userData.email,
       role: userData.role,
       isActive: userData.isActive,
-      hasCompanyId: !!userData.companyId
+      hasCompanyId: !!userData.companyId,
+      hasTenantId: !!userData.tenantId
     });
     
+    console.log('💾 Attempting to save user to database...');
     const user = await User.create(userData);
+    console.log('💾 User.create() completed successfully');
     
     console.log('✅ User created successfully:', {
       id: user._id,
@@ -579,6 +604,17 @@ const createEmployee = async (req, res) => {
       companyId: user.companyId,
       tenantId: user.tenantId
     });
+    
+    // Verify user was actually saved
+    const savedUser = await User.findById(user._id);
+    console.log('🔍 Verification - User found in DB:', !!savedUser);
+    if (savedUser) {
+      console.log('🔍 Saved user details:', {
+        id: savedUser._id,
+        email: savedUser.email,
+        role: savedUser.role
+      });
+    }
 
     // Update current SuperAdmin user to have companyId if they don't have one
     if (req.user.role === 'super-admin' && !req.user.companyId) {
@@ -589,6 +625,7 @@ const createEmployee = async (req, res) => {
       console.log('✅ Updated SuperAdmin user with default company ID');
     }
 
+    console.log('📤 Sending success response...');
     res.status(201).json({
       success: true,
       message: `Employee created successfully with role: ${user.role.toUpperCase()}`,
@@ -610,8 +647,13 @@ const createEmployee = async (req, res) => {
                     user.role === 'sales' ? ['view_own_leads', 'create_leads'] : ['view_only']
       }
     });
+    console.log('✅ === CREATE EMPLOYEE COMPLETED ===');
   } catch (error) {
-    console.error('Create employee error:', error);
+    console.error('❌ === CREATE EMPLOYEE ERROR ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('=== END ERROR ===');
     res.status(500).json({ message: error.message });
   }
 };

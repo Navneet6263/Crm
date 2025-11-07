@@ -23,5 +23,11 @@ router.route('/:id')
   .delete(deleteCustomer);
 
 router.post('/:id/notes', addNote);
+// Remove auth middleware for bulk upload as it has its own auth handling
+const bulkUploadRouter = express.Router();
+bulkUploadRouter.post('/bulk-upload', require('../controllers/bulkUploadController').handleBulkAuth, require('../controllers/bulkUploadController').bulkUploadCustomers);
+
+// Mount bulk upload without auth middleware
+router.use('/', bulkUploadRouter);
 
 module.exports = router;

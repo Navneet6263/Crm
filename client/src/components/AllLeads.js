@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Mail, Phone, Building, Calendar, Star, User, CheckCircle, Clock, Target, Trash2 } from 'lucide-react';
+import { Users, Mail, Phone, Building, Calendar, Star, User, CheckCircle, Clock, Target, Trash2, Upload } from 'lucide-react';
 import apiService from '../services/apiService';
+import BulkUpload from './BulkUpload';
 
 const AllLeads = ({ darkMode = false, crmData = {} }) => {
   const [leads, setLeads] = useState([]);
@@ -10,6 +11,7 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   // Get current user from localStorage
   useEffect(() => {
@@ -183,15 +185,38 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
             </h1>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <p style={{
-              fontSize: '18px',
-              color: darkMode ? '#d1d5db' : '#6b7280',
-              margin: 0
-            }}>
-              {currentUser && ['admin', 'super-admin'].includes(currentUser.role) 
-                ? 'Select a lead to assign to team members' 
-                : 'All leads in the system'}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <p style={{
+                fontSize: '18px',
+                color: darkMode ? '#d1d5db' : '#6b7280',
+                margin: 0
+              }}>
+                {currentUser && ['admin', 'super-admin'].includes(currentUser.role) 
+                  ? 'Select a lead to assign to team members' 
+                  : 'All leads in the system'}
+              </p>
+              
+              {/* Bulk Upload Button */}
+              <button
+                onClick={() => setShowBulkUpload(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#22c55e',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                <Upload size={16} />
+                Bulk Upload
+              </button>
+            </div>
             
             {/* Search Bar */}
             <div style={{ position: 'relative', width: '300px' }}>
@@ -563,6 +588,28 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
           );
         }))}
         </div>
+        
+        {/* Bulk Upload Modal */}
+        {showBulkUpload && (
+          <BulkUpload
+            darkMode={darkMode}
+            onClose={() => setShowBulkUpload(false)}
+            onUploadComplete={() => {
+              setShowBulkUpload(false);
+              // Refresh leads after upload
+              const fetchLeads = async () => {
+                try {
+                  const leadsResponse = await apiService.getLeads();
+                  const leadsData = leadsResponse.leads || leadsResponse || [];
+                  setLeads(Array.isArray(leadsData) ? leadsData : []);
+                } catch (error) {
+                  console.error('Error refreshing leads:', error);
+                }
+              };
+              fetchLeads();
+            }}
+          />
+        )}
       </div>
     </div>
   );

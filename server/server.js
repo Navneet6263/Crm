@@ -47,6 +47,13 @@ const { createLeadAssignmentNotification, createLeadCreationNotification } = req
 
 const app = express();
 
+// Increase header size limits for Node.js
+app.use((req, res, next) => {
+  req.connection.server.maxHeadersCount = 0;
+  req.connection.server.headersTimeout = 0;
+  next();
+});
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -71,6 +78,8 @@ app.use('/api', apiLimiter);
 app.use(cors({
   origin: [
     'https://crm-two-ashy.vercel.app',
+    'https://your-frontend-domain.vercel.app',
+    'https://your-frontend-domain.netlify.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001'
@@ -82,12 +91,14 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 200
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
 // Fix for 431 Request Header Fields Too Large
 app.use((req, res, next) => {
+  // Increase header size limits
+  req.connection.server.maxHeadersCount = 0;
   req.headers = req.headers || {};
   next();
 });
@@ -161,7 +172,18 @@ const authenticateToken = async (req, res, next) => {
     }
     
     console.log('✅ Token verified for user:', user.email, 'Role:', user.role);
-    req.user = user; // Use the full user object instead of just decoded token
+    // Ensure consistent user object structure
+    req.user = {
+      _id: user._id,
+      id: user._id, // For backward compatibility
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      companyId: user.companyId,
+      tenantId: user.tenantId || user.companyId,
+      company: user.companyId || user.tenantId
+    };
     next();
   } catch (err) {
     console.log('❌ Token verification failed:', err.message);
@@ -229,120 +251,7 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
   }
 });
 
-app.post('/api/auth/register', auditLogger('USER_CREATE'), async (req, res) => {
-  try {
-    console.log('📝 REGISTER REQUEST:', req.body);
-    const { name, email, password, company, phone, role, superAdminKey } = req.body;
-    
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      console.log('❌ User already exists:', email);
-      return res.status(400).json({ message: 'Email already exists! This email is already registered.' });
-    }
-    
-    // Determine role based on email if not provided
-    let userRole = role || 'sales';
-    
-    // Auto-assign admin role based on email domain
-    const emailLower = email.toLowerCase();
-    if (emailLower.includes('@greencrm.com') || emailLower.includes('admin')) {
-      userRole = 'admin';
-    }
-    if (emailLower.includes('superadmin') || emailLower.includes('@greencrm.admin')) {
-      // Check super admin limit
-      const superAdminCount = await User.countDocuments({ role: 'super-admin' });
-      const maxSuperAdmins = parseInt(process.env.MAX_SUPER_ADMINS) || 4;
-      
-      if (superAdminCount >= maxSuperAdmins) {
-        console.log('❌ Super Admin limit reached:', superAdminCount, '/', maxSuperAdmins);
-        return res.status(403).json({ 
-          message: `Super Admin limit reached! Only ${maxSuperAdmins} Super Admins allowed. Contact system administrator.`,
-          currentSuperAdmins: superAdminCount,
-          maxAllowed: maxSuperAdmins
-        });
-      }
-      
-      // Check for creation key (optional extra security)
-      if (!superAdminKey || superAdminKey !== process.env.SUPER_ADMIN_CREATION_KEY) {
-        console.log('❌ Invalid super admin key provided');
-        return res.status(403).json({ 
-          message: 'Super Admin creation requires authorization key. Contact system administrator.' 
-        });
-      }
-      
-      userRole = 'super-admin';
-      console.log('✅ Super Admin creation authorized:', superAdminCount + 1, '/', maxSuperAdmins);
-    }
-    if (emailLower.includes('manager')) {
-      userRole = 'manager';
-    }
-    if (emailLower.includes('support')) {
-      userRole = 'support';
-    }
-    
-    // Manual role assignment security check
-    if (role === 'super-admin') {
-      const superAdminCount = await User.countDocuments({ role: 'super-admin' });
-      const maxSuperAdmins = parseInt(process.env.MAX_SUPER_ADMINS) || 4;
-      
-      if (superAdminCount >= maxSuperAdmins) {
-        return res.status(403).json({ 
-          message: `Super Admin limit reached! Only ${maxSuperAdmins} Super Admins allowed.`,
-          currentSuperAdmins: superAdminCount,
-          maxAllowed: maxSuperAdmins
-        });
-      }
-      
-      if (!superAdminKey || superAdminKey !== process.env.SUPER_ADMIN_CREATION_KEY) {
-        return res.status(403).json({ 
-          message: 'Super Admin creation requires authorization key. Contact system administrator.' 
-        });
-      }
-      
-      userRole = 'super-admin';
-    }
-    
-    // Generate unique tenant ID for new users
-    const tenantId = new require('mongoose').Types.ObjectId();
-    
-    // Create new user with temporary tenant ID
-    const user = new User({
-      name,
-      email,
-      password, // Will be hashed by the pre-save middleware
-      phone,
-      company,
-      role: userRole,
-      companyId: tenantId, // Use same ID for both
-      tenantId: tenantId
-    });
-    
-    await user.save();
-    console.log('✅ User created successfully with role:', userRole);
-    
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '7d' }
-    );
-    
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        needsCompanySetup: true // Flag to show company setup page
-      }
-    });
-  } catch (error) {
-    console.error('❌ Registration error:', error);
-    res.status(500).json({ message: 'Registration failed', error: error.message });
-  }
-});
+// Duplicate register route removed - handled in authRoutes
 
 app.get('/api/auth/verify', authenticateToken, checkTokenBlacklist, (req, res) => {
   res.json({ user: req.user });
@@ -1007,9 +916,21 @@ app.delete('/api/demo-requests/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Other Routes
+// Test route for header size
+app.post('/api/test-headers', (req, res) => {
+  console.log('Headers received:', Object.keys(req.headers).length);
+  res.json({ message: 'Headers OK', headerCount: Object.keys(req.headers).length });
+});
+
+// Bulk Upload Routes
+const { bulkUploadLeads, bulkUploadCustomers, handleBulkAuth } = require('./controllers/bulkUploadController');
+app.post('/api/leads/bulk-upload', handleBulkAuth, bulkUploadLeads);
+app.post('/api/customers/bulk-upload', handleBulkAuth, bulkUploadCustomers);
+
+// Auth Routes - Use proper middleware
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
+app.use('/api/customers', customerRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/support', enhancedSupportRoutes);
 app.use('/api/data', dataRoutes);
