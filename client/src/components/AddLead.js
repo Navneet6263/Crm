@@ -10,6 +10,8 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     companyName: '',
     industry: '',
     leadSource: 'website',
+    customLeadSource: '',
+    followUpDate: '',
     estimatedValue: '',
     priority: 'medium',
     requirements: '',
@@ -174,6 +176,8 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       phone: formData.phone,
       industry: formData.industry,
       leadSource: formData.leadSource,
+      customLeadSource: formData.leadSource === 'other' ? formData.customLeadSource : '',
+      followUpDate: formData.followUpDate || null,
       estimatedValue: formData.estimatedValue ? parseInt(formData.estimatedValue) : 0,
       priority: formData.priority,
       requirements: formData.requirements,
@@ -437,6 +441,27 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
                 <option value="email-campaign">Email Campaign</option>
                 <option value="other">Other</option>
               </select>
+              {formData.leadSource === 'other' && (
+                <input
+                  type="text"
+                  placeholder="Specify other source"
+                  value={formData.customLeadSource || ''}
+                  onChange={(e) => handleInputChange('customLeadSource', e.target.value)}
+                  style={{ ...inputStyle, marginTop: '0.5rem' }}
+                />
+              )}
+            </div>
+
+            {/* Follow-up Date */}
+            <div>
+              <label style={labelStyle}>Follow-up Date</label>
+              <input
+                type="date"
+                value={formData.followUpDate || ''}
+                onChange={(e) => handleInputChange('followUpDate', e.target.value)}
+                style={inputStyle}
+                min={new Date().toISOString().split('T')[0]}
+              />
             </div>
 
             {/* Estimated Value */}

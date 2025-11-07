@@ -32,8 +32,9 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
   useEffect(() => {
     if (crmData?.leads) {
       const leadsArray = Array.isArray(crmData.leads) ? crmData.leads : (crmData.leads?.leads || []);
-      setLeads(leadsArray.map(lead => ({
+      setLeads(leadsArray.map((lead, index) => ({
         ...lead,
+        id: lead.id || lead._id || `lead-${index}`,
         status: lead.leadStatus || lead.status || 'new'
       })));
     }
@@ -64,8 +65,8 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
     if (source.droppableId === destination.droppableId) return;
 
     const updatedLeads = leads.map(lead => {
-      const leadId = lead.id || `lead-${leads.indexOf(lead)}-${Date.now()}`;
-      return leadId.toString() === draggableId 
+      const leadId = lead.id || lead._id;
+      return leadId === draggableId 
         ? { ...lead, status: destination.droppableId }
         : lead;
     });
@@ -275,8 +276,9 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
       </div>
 
       {/* Kanban Board */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div style={pipelineStyle}>
+      {leads.length > 0 && (
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div style={pipelineStyle}>
           {stages.map(stage => {
             const stageLeads = getLeadsByStage(stage.id);
             
@@ -319,11 +321,11 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
                       }}
                     >
                       {stageLeads.map((lead, index) => {
-                        const leadId = lead.id || `lead-${index}-${Date.now()}`;
+                        const leadId = lead.id || lead._id || `lead-${stage.id}-${index}`;
                         return (
                         <Draggable
-                          key={leadId.toString()}
-                          draggableId={leadId.toString()}
+                          key={leadId}
+                          draggableId={leadId}
                           index={index}
                         >
                           {(provided, snapshot) => (
@@ -402,7 +404,7 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                   <User size={12} />
-                                  {lead.assignedTo || 'Unassigned'}
+                                  {typeof lead.assignedTo === 'object' ? lead.assignedTo?.name || 'Unassigned' : lead.assignedTo || 'Unassigned'}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                   <Clock size={12} />
@@ -460,8 +462,9 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
               </div>
             );
           })}
-        </div>
-      </DragDropContext>
+          </div>
+        </DragDropContext>
+      )}
     </div>
   );
 };

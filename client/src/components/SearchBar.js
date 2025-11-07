@@ -98,7 +98,10 @@ const SearchBar = ({
             maxHeight: '300px',
             overflowY: 'auto',
             zIndex: 50,
-            boxShadow: darkMode ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.1)'
+            boxShadow: darkMode ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.1)',
+            listStyle: 'none',
+            margin: 0,
+            padding: 0
           }}>
             {searchResults.map((item, idx) => (
               <li
@@ -109,32 +112,104 @@ const SearchBar = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '0.5rem 1rem',
+                  padding: '0.75rem 1rem',
                   cursor: 'pointer',
                   background: idx === focusedIndex ? (darkMode ? '#374151' : '#f3f4f6') : 'transparent',
-                  color: darkMode ? '#f9fafb' : '#111827'
+                  color: darkMode ? '#f9fafb' : '#111827',
+                  borderBottom: idx < searchResults.length - 1 ? `1px solid ${darkMode ? '#374151' : '#f3f4f6'}` : 'none',
+                  transition: 'background-color 0.2s ease'
                 }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {item.icon && <item.icon size={16} />}
-                  {item.name}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                  {item.icon && <item.icon size={18} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />}
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#f9fafb' : '#111827'
+                    }}>
+                      {item.name}
+                    </div>
+                    {item.subtitle && (
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: darkMode ? '#9ca3af' : '#6b7280',
+                        marginTop: '0.125rem'
+                      }}>
+                        {item.subtitle}
+                      </div>
+                    )}
+                  </div>
                   <span style={{
                     fontSize: '0.75rem',
-                    padding: '0 0.35rem',
-                    borderRadius: '4px',
-                    background: darkMode ? '#111827' : '#e5e7eb',
-                    color: darkMode ? '#9ca3af' : '#6b7280'
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '12px',
+                    background: getTypeColor(item.type, darkMode).bg,
+                    color: getTypeColor(item.type, darkMode).text,
+                    fontWeight: '500'
                   }}>
                     {item.type}
                   </span>
-                </span>
-                <ChevronRight size={16} />
+                </div>
+                <ChevronRight size={16} style={{ color: darkMode ? '#6b7280' : '#9ca3af', marginLeft: '0.5rem' }} />
               </li>
             ))}
           </ul>
         )}
+        
+        {/* No results message */}
+        {searchTerm.trim() !== '' && searchResults.length === 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '105%',
+            left: 0,
+            width: '100%',
+            background: darkMode ? '#1f2937' : 'white',
+            border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+            borderRadius: '12px',
+            padding: '1rem',
+            zIndex: 50,
+            boxShadow: darkMode ? '0 4px 14px rgba(0,0,0,0.4)' : '0 4px 14px rgba(0,0,0,0.1)',
+            textAlign: 'center',
+            color: darkMode ? '#9ca3af' : '#6b7280',
+            fontSize: '0.875rem'
+          }}>
+            No results found for "{searchTerm}"
+          </div>
+        )}
       </div>
   );
+};
+
+// Helper function to get type-specific colors
+const getTypeColor = (type, darkMode) => {
+  const colors = {
+    'Lead': {
+      bg: darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)',
+      text: '#22c55e'
+    },
+    'Customer': {
+      bg: darkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
+      text: '#3b82f6'
+    },
+    'Employee': {
+      bg: darkMode ? 'rgba(168, 85, 247, 0.2)' : 'rgba(168, 85, 247, 0.1)',
+      text: '#a855f7'
+    },
+    'Section': {
+      bg: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)',
+      text: '#f59e0b'
+    },
+    'Action': {
+      bg: darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)',
+      text: '#ef4444'
+    }
+  };
+  
+  return colors[type] || {
+    bg: darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(156, 163, 175, 0.1)',
+    text: darkMode ? '#9ca3af' : '#6b7280'
+  };
 };
 
 export default SearchBar;

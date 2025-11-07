@@ -432,12 +432,50 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                     <span>{lead.companyName || lead.company}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Mail size={14} />
-                    <span>{lead.email}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`mailto:${lead.email}`, '_blank');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        borderRadius: '4px',
+                        color: darkMode ? '#60a5fa' : '#3b82f6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title={`Send email to ${lead.email}`}
+                    >
+                      <Mail size={14} />
+                      <span>{lead.email}</span>
+                    </button>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Phone size={14} />
-                    <span>{lead.phone}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`tel:${lead.phone}`, '_self');
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        borderRadius: '4px',
+                        color: darkMode ? '#34d399' : '#22c55e',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title={`Call ${lead.phone}`}
+                    >
+                      <Phone size={14} />
+                      <span>{lead.phone}</span>
+                    </button>
                   </div>
                 </div>
                 

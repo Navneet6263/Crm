@@ -99,7 +99,7 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
 
   const hasAccess = (item) => {
     if (item.superAdminOnly && userRole !== 'super-admin') return false;
-    if (item.adminOnly && !['super-admin', 'admin'].includes(userRole)) return false;
+    if (item.adminOnly && !['super-admin', 'admin', 'manager', 'senior-manager'].includes(userRole)) return false;
     return true;
   };
 
@@ -346,7 +346,10 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
                 switch (userRole) {
                   case 'super-admin': return '#ef444420';
                   case 'admin': return '#8b5cf620';
+                  case 'manager': return '#3b82f620';
+                  case 'senior-manager': return '#f59e0b20';
                   case 'sales-manager': return '#3b82f620';
+                  case 'sales': return '#22c55e20';
                   case 'sales-rep': return '#22c55e20';
                   default: return '#6b728020';
                 }
@@ -358,7 +361,10 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
                   switch (userRole) {
                     case 'super-admin': return '#ef4444';
                     case 'admin': return '#8b5cf6';
+                    case 'manager': return '#3b82f6';
+                    case 'senior-manager': return '#f59e0b';
                     case 'sales-manager': return '#3b82f6';
+                    case 'sales': return '#22c55e';
                     case 'sales-rep': return '#22c55e';
                     default: return '#6b7280';
                   }
@@ -376,7 +382,10 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
                   switch (userRole) {
                     case 'super-admin': return 'Super Admin';
                     case 'admin': return 'Admin';
+                    case 'manager': return 'Manager';
+                    case 'senior-manager': return 'Senior Manager';
                     case 'sales-manager': return 'Sales Manager';
+                    case 'sales': return 'Sales';
                     case 'sales-rep': return 'Sales Rep';
                     default: return 'User';
                   }

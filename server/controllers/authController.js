@@ -68,7 +68,7 @@ const register = async (req, res) => {
     }
 
     const user = await User.create(userData);
-    const token = generateToken(user._id);
+    const token = generateToken(user._id, false, user.role);
 
     res.status(201).json({
       success: true,
@@ -77,10 +77,16 @@ const register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        roleDisplay: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
         tenantId: user.tenantId
       },
       token,
-      message: 'User created successfully'
+      message: `User created successfully with role: ${user.role.toUpperCase()}`,
+      roleInfo: {
+        role: user.role,
+        displayName: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
+        createdBy: req.user ? req.user.role : 'system'
+      }
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -99,10 +105,18 @@ const login = async (req, res) => {
     const user = await User.findOne({ email })
       .populate('companyId', 'name plan usage status')
       .populate('tenantId', 'name plan usage status');
+    
+    console.log('🔍 User found:', user ? {
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      hasPassword: !!user.password
+    } : 'No user found');
+    
     if (user && (await user.comparePassword(password))) {
       // Generate token with longer expiry if rememberMe is true
       const tokenExpiry = rememberMe ? '30d' : '7d';
-      const token = generateToken(user._id, rememberMe);
+      const token = generateToken(user._id, rememberMe, user.role);
       safeLog('info', '🎫 Login token generated for:', { email: user.email });
       
       // Update last login
@@ -240,7 +254,7 @@ const checkAuth = async (req, res) => {
         } : null,
         lastLogin: user.lastLogin
       },
-      token
+      token: generateToken(user._id, false, user.role)
     });
   } catch (error) {
     res.status(401).json({ 
@@ -546,7 +560,25 @@ const createEmployee = async (req, res) => {
       companyId: defaultCompany._id
     };
 
+    console.log('📝 Creating user with data:', {
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      isActive: userData.isActive,
+      hasCompanyId: !!userData.companyId
+    });
+    
     const user = await User.create(userData);
+    
+    console.log('✅ User created successfully:', {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
+      companyId: user.companyId,
+      tenantId: user.tenantId
+    });
 
     // Update current SuperAdmin user to have companyId if they don't have one
     if (req.user.role === 'super-admin' && !req.user.companyId) {
@@ -559,14 +591,23 @@ const createEmployee = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Employee created successfully',
+      message: `Employee created successfully with role: ${user.role.toUpperCase()}`,
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        roleDisplay: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
         isActive: user.isActive,
         companyId: user.companyId
+      },
+      roleInfo: {
+        role: user.role,
+        displayName: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
+        permissions: user.role === 'super-admin' ? ['all'] : 
+                    user.role === 'admin' ? ['manage_company', 'view_all_leads', 'create_users'] :
+                    user.role === 'manager' ? ['view_team_leads', 'assign_leads'] :
+                    user.role === 'sales' ? ['view_own_leads', 'create_leads'] : ['view_only']
       }
     });
   } catch (error) {
@@ -575,4 +616,113 @@ const createEmployee = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getProfile, getAllUsers, checkAuth, logout, createTeamMember, toggleUserStatus, createEmployee };
+// Delete user (SuperAdmin only)
+const deleteUser = async (req, res) => {
+  try {
+    console.log('Delete user request:', {
+      userId: req.params.userId,
+      requestedBy: req.user.email,
+      role: req.user.role
+    });
+    
+    // Only super-admin can delete users
+    if (req.user.role !== 'super-admin') {
+      console.log('Access denied - not super admin');
+      return res.status(403).json({ message: 'Only super-admin can delete users' });
+    }
+
+    const { userId } = req.params;
+    
+    // Prevent self-deletion
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ message: 'Cannot delete your own account' });
+    }
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      console.log('User not found:', userId);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log('Deleting user:', user.email);
+
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+
+    console.log('User deleted successfully:', user.email);
+
+    res.json({
+      success: true,
+      message: `User ${user.name} deleted successfully`
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Update user (SuperAdmin only)
+const updateUser = async (req, res) => {
+  try {
+    console.log('Update user request:', {
+      userId: req.params.userId,
+      requestedBy: req.user.email,
+      role: req.user.role,
+      updateData: req.body
+    });
+    
+    // Only super-admin can update users
+    if (req.user.role !== 'super-admin') {
+      console.log('Access denied - not super admin');
+      return res.status(403).json({ message: 'Only super-admin can update users' });
+    }
+
+    const { userId } = req.params;
+    const { name, email, role, password } = req.body;
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      console.log('User not found:', userId);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if email is already taken by another user
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (role) user.role = role;
+    if (password) {
+      user.password = password; // Will be hashed by pre-save middleware
+    }
+
+    await user.save();
+
+    console.log('User updated successfully:', user.email);
+
+    res.json({
+      success: true,
+      message: 'User updated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive
+      }
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { register, login, getProfile, getAllUsers, checkAuth, logout, createTeamMember, toggleUserStatus, createEmployee, deleteUser, updateUser };

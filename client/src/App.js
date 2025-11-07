@@ -111,35 +111,109 @@ const AppContent = () => {
 
   // Update search results whenever term changes
   useEffect(() => {
-    if (!globalSearchTerm) {
+    if (!globalSearchTerm || globalSearchTerm.trim().length < 1) {
       setSearchResults([]);
       return;
     }
-    const lower = globalSearchTerm.toLowerCase();
+    
+    const lower = globalSearchTerm.toLowerCase().trim();
     const results = [];
 
-    // pages
+    // Always show pages first - they should always be available
     menuSections.forEach(section => {
       section.items.forEach(item => {
-        if (item.label.toLowerCase().includes(lower) && rbacService.hasPermission(currentUser?.role, item.id)) {
-          results.push({ id: item.id, name: item.label, type: 'Page', icon: item.icon });
+        if (item.label.toLowerCase().includes(lower)) {
+          // Check permissions
+          const hasPermission = !item.adminOnly && !item.superAdminOnly || 
+                               (item.adminOnly && ['admin', 'manager', 'senior-manager', 'super-admin'].includes(currentUser?.role)) ||
+                               (item.superAdminOnly && currentUser?.role === 'super-admin');
+          
+          if (hasPermission) {
+            results.push({ 
+              id: item.id, 
+              name: item.label, 
+              type: 'Page', 
+              icon: item.icon,
+              subtitle: section.title 
+            });
+          }
         }
       });
     });
 
-    // leads
-    crmData.leads?.forEach(l => {
-      if (l.name && l.name.toLowerCase().includes(lower)) {
-        results.push({ id: l.id, name: l.name, type: 'Lead' });
+    // Search leads
+    if (crmData.leads && Array.isArray(crmData.leads)) {
+      crmData.leads.forEach(lead => {
+        const searchableFields = [
+          lead.name,
+          lead.contactPerson, 
+          lead.email,
+          lead.phone,
+          lead.company,
+          lead.companyName,
+          lead.source
+        ].filter(Boolean);
+        
+        const matches = searchableFields.some(field => 
+          String(field).toLowerCase().includes(lower)
+        );
+        
+        if (matches) {
+          results.push({ 
+            id: `lead-${lead.id}`, 
+            name: lead.name || lead.contactPerson || 'Unknown Lead',
+            type: 'Lead',
+            subtitle: lead.company || lead.companyName || lead.email || 'Lead'
+          });
+        }
+      });
+    }
+
+    // Search customers
+    if (crmData.customers && Array.isArray(crmData.customers)) {
+      crmData.customers.forEach(customer => {
+        const searchableFields = [
+          customer.name,
+          customer.contactPerson,
+          customer.email, 
+          customer.phone,
+          customer.company,
+          customer.companyName
+        ].filter(Boolean);
+        
+        const matches = searchableFields.some(field => 
+          String(field).toLowerCase().includes(lower)
+        );
+        
+        if (matches) {
+          results.push({ 
+            id: `customer-${customer.id}`, 
+            name: customer.name || customer.contactPerson || 'Unknown Customer',
+            type: 'Customer',
+            subtitle: customer.company || customer.companyName || customer.email || 'Customer'
+          });
+        }
+      });
+    }
+
+    // Add common search suggestions
+    const suggestions = [
+      { id: 'add-enquiry', name: 'Add New Lead', type: 'Action', subtitle: 'Create a new lead' },
+      { id: 'analytics', name: 'View Analytics', type: 'Action', subtitle: 'Dashboard analytics' },
+      { id: 'leads', name: 'All Leads', type: 'Action', subtitle: 'View all leads' },
+      { id: 'customers', name: 'Customers', type: 'Action', subtitle: 'Manage customers' },
+      { id: 'settings', name: 'Settings', type: 'Action', subtitle: 'System settings' }
+    ];
+    
+    suggestions.forEach(suggestion => {
+      if (suggestion.name.toLowerCase().includes(lower) && 
+          !results.some(r => r.id === suggestion.id)) {
+        results.push(suggestion);
       }
     });
-    // customers
-    crmData.customers?.forEach(c => {
-      if (c.name && c.name.toLowerCase().includes(lower)) {
-        results.push({ id: c.id, name: c.name, type: 'Customer' });
-      }
-    });
-    setSearchResults(results);
+
+    console.log('Search results for "' + globalSearchTerm + '":', results);
+    setSearchResults(results.slice(0, 8));
   }, [globalSearchTerm, crmData, currentUser]);
 
   const changeView = (view) => {
@@ -168,7 +242,7 @@ const AppContent = () => {
           const user = {
             id: payload.id || payload.userId,
             email: payload.email,
-            role: payload.role,
+            role: payload.role || 'user', // Default to 'user' if role not in token
             name: payload.name || payload.email?.split('@')[0] || 'User'
           };
           setCurrentUser(user);
@@ -355,14 +429,19 @@ const AppContent = () => {
 
   const handleAddLead = async (leadData) => {
     try {
-      await apiService.createLead(leadData);
+      console.log('📝 Creating lead with data:', leadData);
+      const newLead = await apiService.createLead(leadData);
+      console.log('✅ Lead created successfully:', newLead);
+      
+      // Refresh leads data
       const allLeads = await apiService.getAllLeads();
       updateCrmData({ leads: allLeads });
       setShowAddLead(false);
       showToast('success', '✅ Lead added successfully!');
     } catch (error) {
-      console.error('Error adding lead:', error);
-      showToast('error', '❌ Failed to add lead');
+      console.error('❌ Error adding lead:', error);
+      const errorMessage = error.message || 'Failed to add lead';
+      showToast('error', `❌ ${errorMessage}`);
       throw error;
     }
   };
@@ -392,8 +471,8 @@ const AppContent = () => {
   const renderView = () => {
     switch(activeView) {
       case 'dashboard': 
-        if (currentUser?.role === 'super-admin' || currentUser?.role === 'admin') {
-          return <SuperAdminDashboard darkMode={darkMode} currentUser={currentUser} />;
+        if (currentUser?.role === 'super-admin' || currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.role === 'senior-manager') {
+          return <SuperAdminDashboard darkMode={darkMode} currentUser={currentUser} onNavigate={changeView} />;
         }
         return (
           <ProfessionalDashboard 
@@ -570,7 +649,17 @@ const AppContent = () => {
                 setSearchTerm={setGlobalSearchTerm}
                 searchResults={searchResults}
                 onNavigate={(id) => {
-                  changeView(id);
+                  // Handle different types of navigation
+                  if (id.startsWith('lead-')) {
+                    // Navigate to leads page and highlight specific lead
+                    changeView('leads');
+                  } else if (id.startsWith('customer-')) {
+                    // Navigate to customers page and highlight specific customer
+                    changeView('customers');
+                  } else {
+                    // Regular page navigation
+                    changeView(id);
+                  }
                   setGlobalSearchTerm('');
                 }}
               />

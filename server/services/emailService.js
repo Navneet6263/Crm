@@ -1,17 +1,11 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const emailService = {
   sendOTPEmail: async (email, otp) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    return await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
       to: email,
       subject: 'Green CRM - OTP Verification',
       html: `
@@ -19,14 +13,12 @@ const emailService = {
         <p>Your verification code is: <strong>${otp}</strong></p>
         <p>Valid for 10 minutes only.</p>
       `
-    };
-    
-    return await transporter.sendMail(mailOptions);
+    });
   },
 
   sendLeadNotification: async (email, leadData) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    return await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
       to: email,
       subject: '🎯 New Lead Assigned',
       html: `
@@ -35,14 +27,12 @@ const emailService = {
         <p><strong>Company:</strong> ${leadData.companyName}</p>
         <p><strong>Phone:</strong> ${leadData.phone}</p>
       `
-    };
-    
-    return await transporter.sendMail(mailOptions);
+    });
   },
 
   sendTicketCreatedEmail: async (email, ticketData) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    return await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
       to: email,
       subject: `🎫 Support Ticket Created - ${ticketData.ticketId}`,
       html: `
@@ -65,9 +55,7 @@ const emailService = {
           <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
         </div>
       `
-    };
-    
-    return await transporter.sendMail(mailOptions);
+    });
   },
 
   sendTicketReplyEmail: async (email, replyData) => {
@@ -141,8 +129,8 @@ const emailService = {
   },
 
   sendPasswordResetOTP: async (email, otp) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    return await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
       to: email,
       subject: '🔐 Password Reset OTP',
       html: `
@@ -150,14 +138,12 @@ const emailService = {
         <p>Your password reset OTP is: <strong>${otp}</strong></p>
         <p>Valid for 10 minutes only.</p>
       `
-    };
-    
-    return await transporter.sendMail(mailOptions);
+    });
   },
 
   sendPasswordResetSuccess: async (email) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    return await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
       to: email,
       subject: '✅ Password Reset Successful',
       html: `
@@ -165,20 +151,16 @@ const emailService = {
         <p>Your password has been successfully reset.</p>
         <p>If you didn't make this change, please contact support immediately.</p>
       `
-    };
-    
-    return await transporter.sendMail(mailOptions);
+    });
   },
 
   sendEmail: async ({ to, subject, html }) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    return await resend.emails.send({
+      from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
       to,
       subject,
       html
-    };
-    
-    return await transporter.sendMail(mailOptions);
+    });
   }
 };
 

@@ -46,6 +46,40 @@ const rolePermissions = {
     'manage_duplicate_detection',
     'export_data'
   ],
+  'manager': [
+    'view_all_leads',
+    'edit_team_leads',
+    'view_team_analytics',
+    'view_settings',
+    'view_all_customers',
+    'view_lead_scoring',
+    'view_auto_assignment',
+    'view_duplicate_detection',
+    'manage_users'
+  ],
+  'senior-manager': [
+    'view_all_leads',
+    'edit_all_leads',
+    'view_analytics',
+    'view_settings',
+    'view_all_customers',
+    'edit_all_customers',
+    'view_lead_scoring',
+    'manage_lead_scoring',
+    'view_auto_assignment',
+    'manage_auto_assignment',
+    'view_duplicate_detection',
+    'manage_duplicate_detection',
+    'manage_users',
+    'export_data'
+  ],
+  'sales': [
+    'view_own_leads',
+    'edit_own_leads',
+    'view_own_analytics',
+    'view_settings',
+    'view_assigned_customers'
+  ],
   'sales-manager': [
     'view_all_leads',
     'edit_team_leads',
@@ -114,23 +148,23 @@ export const canAccessView = (userRole, view) => {
 export const filterDataByRole = (userRole, userId, data, dataType) => {
   if (!data) return [];
   
-  // Super admin and admin can see all data
-  if (userRole === 'super-admin' || userRole === 'admin') {
+  // Super admin, admin, senior-manager can see all data
+  if (userRole === 'super-admin' || userRole === 'admin' || userRole === 'senior-manager') {
     return data;
   }
   
   switch(dataType) {
     case 'leads':
-      // Sales manager can see all leads
-      if (userRole === 'sales-manager') {
+      // Manager and sales-manager can see all leads
+      if (userRole === 'manager' || userRole === 'sales-manager') {
         return data;
       }
       // Sales rep can only see assigned leads
       return data.filter(lead => lead.assignedTo === userId);
       
     case 'customers':
-      // Sales manager can see all customers
-      if (userRole === 'sales-manager') {
+      // Manager and sales-manager can see all customers
+      if (userRole === 'manager' || userRole === 'sales-manager') {
         return data;
       }
       // Sales rep can only see assigned customers

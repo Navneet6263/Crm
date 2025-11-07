@@ -5,6 +5,21 @@ const { getCompanyInfo } = require('../utils/authHelpers');
 
 const createLead = async (req, res) => {
   try {
+    console.log('🔄 === LEAD CREATION START ===');
+    console.log('📝 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('👤 User info:', {
+      id: req.user._id || req.user.id,
+      email: req.user.email,
+      role: req.user.role,
+      companyId: req.user.companyId
+    });
+    
+    // Validate user object
+    if (!req.user || (!req.user._id && !req.user.id)) {
+      console.log('❌ Invalid user object');
+      return res.status(401).json({ message: 'Invalid user authentication' });
+    }
+    
     // Set default companyId if missing
     if (!req.body.companyId && req.user.role === 'super-admin') {
       req.body.companyId = '507f1f77bcf86cd799439011'; // Default ObjectId
@@ -170,13 +185,21 @@ const createLead = async (req, res) => {
     
     console.log('✅ Final companyId for lead:', companyId);
     
+    // Get user ID - handle both _id and id properties
+    const userId = req.user._id || req.user.id;
+    
     const leadData = {
       ...req.body,
-      createdBy: req.user._id,
-      assignedTo: req.body.assignedTo && req.body.assignedTo.trim() ? req.body.assignedTo : req.user._id,
+      createdBy: userId,
       companyId: companyId,
       tenantId: companyId
     };
+    
+    // Handle assignedTo field - only set if it's a valid non-empty string
+    if (req.body.assignedTo && req.body.assignedTo.trim()) {
+      leadData.assignedTo = req.body.assignedTo;
+    }
+    // Don't set assignedTo if it's empty - let it remain undefined
     
     console.log('📝 Lead data to be saved:', {
       createdBy: leadData.createdBy,
@@ -191,6 +214,13 @@ const createLead = async (req, res) => {
       leadData.createdBySuperAdmin = true;
     }
     
+    console.log('📝 Final lead data before save:', {
+      createdBy: leadData.createdBy,
+      assignedTo: leadData.assignedTo,
+      companyId: leadData.companyId,
+      contactPerson: leadData.contactPerson
+    });
+    
     const lead = await Lead.create(leadData);
     
     await lead.populate('createdBy assignedTo', 'name email');
@@ -204,7 +234,7 @@ const createLead = async (req, res) => {
       const mockLead = {
         _id: Date.now().toString(),
         ...req.body,
-        createdBy: req.user._id,
+        createdBy: userId,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -245,8 +275,8 @@ const getLeads = async (req, res) => {
       // Normal users (including sales) can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
       query.$or = [
-        { createdBy: req.user._id },
-        { assignedTo: req.user._id }
+        { createdBy: req.user._id || req.user.id },
+        { assignedTo: req.user._id || req.user.id }
       ];
     }
     
@@ -315,9 +345,25 @@ const getLeadById = async (req, res) => {
 
 const updateLead = async (req, res) => {
   try {
+    console.log('🔄 Updating lead:', req.params.id, 'with data:', req.body);
+    
+    // Clean the request body to prevent validation errors
+    const updateData = { ...req.body };
+    
+    // Handle notes field - if it's a string, don't update it directly
+    if (typeof updateData.notes === 'string') {
+      console.log('⚠️ Notes field is string, removing from update data');
+      delete updateData.notes;
+    }
+    
+    // Handle assignedTo field - only set if it's a valid non-empty string
+    if (updateData.assignedTo === '') {
+      delete updateData.assignedTo;
+    }
+    
     const lead = await Lead.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     ).populate('createdBy assignedTo', 'name email role');
     
@@ -326,17 +372,19 @@ const updateLead = async (req, res) => {
     }
     
     // Log assignment activity
-    if (req.body.assignedTo) {
+    if (req.body.assignedTo && req.body.assignedTo !== '') {
       lead.activities.push({
         type: 'status_change',
         description: `Lead assigned to ${lead.assignedTo?.name || 'user'}`,
-        createdBy: req.user._id
+        createdBy: req.user._id || req.user.id
       });
       await lead.save();
     }
     
+    console.log('✅ Lead updated successfully');
     res.json(lead);
   } catch (error) {
+    console.error('❌ Error updating lead:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -379,9 +427,10 @@ const addNote = async (req, res) => {
       return res.status(404).json({ message: 'Lead not found' });
     }
 
+    const userId = req.user._id || req.user.id;
     lead.notes.push({
       content: req.body.content,
-      createdBy: req.user._id
+      createdBy: userId
     });
 
     await lead.save();
@@ -397,7 +446,7 @@ const assignLead = async (req, res) => {
   try {
     const { leadId, assignedTo } = req.body;
     
-    console.log('Assigning lead:', { leadId, assignedTo, userRole: req.user.role });
+    console.log('🔄 Assigning lead:', { leadId, assignedTo, userRole: req.user.role, assignedBy: req.user.name });
     
     // Only admin, manager, and super-admin can assign leads
     if (!['admin', 'manager', 'super-admin'].includes(req.user.role)) {
@@ -412,9 +461,14 @@ const assignLead = async (req, res) => {
     
     const lead = await Lead.findByIdAndUpdate(
       leadId,
-      { assignedTo },
+      { 
+        assignedTo,
+        status: 'assigned', // Update status to assigned
+        assignedAt: new Date(),
+        assignedBy: req.user._id || req.user.id
+      },
       { new: true, runValidators: true }
-    ).populate('createdBy assignedTo', 'name email role');
+    ).populate('createdBy assignedTo assignedBy', 'name email role');
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
@@ -422,16 +476,37 @@ const assignLead = async (req, res) => {
     
     // Add activity log
     lead.activities.push({
-      type: 'status_change',
-      description: `Lead assigned to ${lead.assignedTo?.name || 'user'} by ${req.user.name}`,
-      createdBy: req.user._id
+      type: 'assignment',
+      description: `Lead assigned to ${assignedUser.name} (${assignedUser.role}) by ${req.user.name}`,
+      createdBy: req.user._id || req.user.id,
+      timestamp: new Date()
     });
     await lead.save();
     
-    console.log('Lead assigned successfully:', lead._id);
-    res.json({ message: 'Lead assigned successfully', lead });
+    // Create notification for assigned user
+    const { createLeadAssignmentNotification } = require('./notificationController');
+    await createLeadAssignmentNotification(leadId, assignedTo, req.user._id || req.user.id);
+    
+    console.log('✅ Lead assigned successfully:', {
+      leadId: lead._id,
+      assignedTo: assignedUser.name,
+      assignedBy: req.user.name,
+      status: lead.status
+    });
+    
+    res.json({ 
+      success: true,
+      message: `Lead assigned successfully to ${assignedUser.name} (${assignedUser.role})`, 
+      lead,
+      assignment: {
+        assignedTo: assignedUser.name,
+        assignedToRole: assignedUser.role,
+        assignedBy: req.user.name,
+        assignedAt: new Date()
+      }
+    });
   } catch (error) {
-    console.error('Error assigning lead:', error);
+    console.error('❌ Error assigning lead:', error);
     res.status(400).json({ message: error.message });
   }
 };
@@ -448,9 +523,10 @@ const getMyLeads = async (req, res) => {
     let query = { isActive: true };
     
     // All users (including super admin) get leads created by them or assigned to them
+    const userId = req.user._id || req.user.id;
     query.$or = [
-      { createdBy: req.user._id },  // Leads created by this user
-      { assignedTo: req.user._id }  // Leads assigned to this user
+      { createdBy: userId },  // Leads created by this user
+      { assignedTo: userId }  // Leads assigned to this user
     ];
     
     console.log('🔍 Query:', JSON.stringify(query, null, 2));

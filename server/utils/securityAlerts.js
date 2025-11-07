@@ -1,16 +1,10 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const User = require('../models/User');
 const { formatResponse, sanitizeInput } = require('./helpers');
 const { securityLogger } = require('./logger');
 
-// Email transporter (configure with your SMTP)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.ALERT_EMAIL || process.env.EMAIL_USER,
-    pass: process.env.ALERT_EMAIL_PASSWORD || process.env.EMAIL_PASS
-  }
-});
+// Resend email service
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Known IPs/devices storage (use database in production)
 const knownDevices = new Map();
@@ -60,8 +54,8 @@ const sendSecurityAlert = async (alertData) => {
 const sendEmailAlert = async (superAdmins, alertData) => {
   try {
     const emailPromises = superAdmins.map(admin => {
-      const mailOptions = {
-        from: process.env.ALERT_EMAIL || process.env.EMAIL_USER,
+      return resend.emails.send({
+        from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
         to: admin.email,
         subject: `🚨 CRM Security Alert: ${alertData.type}`,
         html: `
@@ -83,9 +77,7 @@ const sendEmailAlert = async (superAdmins, alertData) => {
             </div>
           </div>
         `
-      };
-      
-      return transporter.sendMail(mailOptions);
+      });
     });
     
     await Promise.all(emailPromises);

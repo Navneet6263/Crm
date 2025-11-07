@@ -86,7 +86,8 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
       });
 
       if (response.success) {
-        showSuccess(`Team member added successfully! Temporary password: ${response.user.tempPassword}`);
+        const roleDisplay = response.roleInfo?.displayName || response.user.roleDisplay || response.user.role;
+        showSuccess(`✅ Team member added successfully with role: ${roleDisplay}! ${response.user.tempPassword ? 'Temporary password: ' + response.user.tempPassword : ''}`);
         setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
         setShowAddModal(false);
         loadTeamMembers(); // Reload the list

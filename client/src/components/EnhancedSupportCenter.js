@@ -31,16 +31,11 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
     companyName: ''
   });
   const [replyMessage, setReplyMessage] = useState('');
-  const [notifications, setNotifications] = useState([]);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     fetchTickets();
     fetchStats();
-    if (currentUser) {
-      fetchNotifications();
-    }
-  }, [filters, currentUser]);
+  }, [filters]);
 
   const fetchStats = async () => {
     try {
@@ -56,20 +51,27 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
     }
   };
 
-  const fetchNotifications = async () => {
-    try {
-      const data = await supportService.getNotifications();
-      setNotifications(data);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
+
 
   const fetchTickets = async () => {
     try {
       setLoading(true);
       const response = await supportService.getAllTickets(filters);
-      setTickets(response.tickets || []);
+      let ticketList = response.tickets || [];
+      
+      // Apply client-side search if search term exists
+      if (filters.search && filters.search.trim()) {
+        const searchTerm = filters.search.toLowerCase();
+        ticketList = ticketList.filter(ticket => 
+          ticket.title?.toLowerCase().includes(searchTerm) ||
+          ticket.description?.toLowerCase().includes(searchTerm) ||
+          ticket.customerName?.toLowerCase().includes(searchTerm) ||
+          ticket.customerEmail?.toLowerCase().includes(searchTerm) ||
+          ticket.ticketId?.toString().includes(searchTerm)
+        );
+      }
+      
+      setTickets(ticketList);
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
@@ -142,14 +144,7 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
     }
   };
 
-  const markNotificationRead = async (notificationId) => {
-    try {
-      await supportService.markNotificationRead(notificationId);
-      fetchNotifications();
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
+
 
   const updateTicketStatus = async (ticketId, status) => {
     try {
@@ -182,32 +177,32 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
   };
 
   return (
-    <div className="enhanced-support-center">
+    <div className={`enhanced-support-center ${darkMode ? 'dark' : ''}`} style={{
+      backgroundColor: darkMode ? '#1f2937' : '#f9fafb',
+      color: darkMode ? '#ffffff' : '#000000',
+      minHeight: '100vh'
+    }}>
       {/* Stats Cards */}
       <div className="stats-section">
-        <div className="stat-card">
-          <div className="stat-icon">📊</div>
+        <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
             <h3>{stats.total}</h3>
             <p>Total Tickets</p>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon">🔓</div>
+        <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
             <h3>{stats.open}</h3>
             <p>Open Tickets</p>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon">⏳</div>
+        <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
             <h3>{stats.inProgress}</h3>
             <p>In Progress</p>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon">✅</div>
+        <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
             <h3>{stats.resolved}</h3>
             <p>Resolved</p>
@@ -215,66 +210,51 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
         </div>
       </div>
 
-      <div className="support-header">
-        <h2>🎧 Enhanced Support Center</h2>
+      <div className={`support-header ${darkMode ? 'dark' : ''}`} style={{
+        backgroundColor: darkMode ? '#374151' : 'white',
+        color: darkMode ? '#ffffff' : '#1f2937'
+      }}>
+        <h2 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Support Center</h2>
         <div className="header-actions">
-          {currentUser && (
-            <div className="notification-bell" onClick={() => setShowNotifications(!showNotifications)}>
-              🔔
-              {notifications.filter(n => !n.isRead).length > 0 && (
-                <span className="notification-count">
-                  {notifications.filter(n => !n.isRead).length}
-                </span>
-              )}
-            </div>
-          )}
           <button 
-            className="btn-primary"
+            className={`btn-primary ${darkMode ? 'dark' : ''}`}
             onClick={() => setShowCreateForm(true)}
+            style={{
+              backgroundColor: darkMode ? '#2563eb' : '#3b82f6',
+              color: '#ffffff'
+            }}
           >
-            + New Ticket
+            New Ticket
           </button>
         </div>
       </div>
 
-      {showNotifications && (
-        <div className="notifications-dropdown">
-          <h4>Notifications</h4>
-          {notifications.length === 0 ? (
-            <p>No notifications</p>
-          ) : (
-            notifications.map(notification => (
-              <div 
-                key={notification._id}
-                className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
-                onClick={() => {
-                  markNotificationRead(notification._id);
-                  fetchTicketDetails(notification.ticketId);
-                  setShowNotifications(false);
-                }}
-              >
-                <div className="notification-content">
-                  <strong>#{notification.ticketNumber}</strong>
-                  <p>{notification.message}</p>
-                  <small>{new Date(notification.createdAt).toLocaleString()}</small>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
-      <div className="filters-section">
+
+      <div className="filters-section" style={{
+        backgroundColor: darkMode ? '#374151' : 'white',
+        color: darkMode ? '#ffffff' : '#000000'
+      }}>
         <input
           type="text"
           placeholder="Search tickets..."
           value={filters.search}
           onChange={(e) => setFilters({...filters, search: e.target.value})}
+          style={{
+            backgroundColor: darkMode ? '#1f2937' : 'white',
+            color: darkMode ? '#ffffff' : '#000000',
+            border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+          }}
         />
         
         <select
           value={filters.status}
           onChange={(e) => setFilters({...filters, status: e.target.value})}
+          style={{
+            backgroundColor: darkMode ? '#1f2937' : 'white',
+            color: darkMode ? '#ffffff' : '#000000',
+            border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+          }}
         >
           <option value="">All Status</option>
           <option value="open">Open</option>
@@ -286,6 +266,11 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
         <select
           value={filters.priority}
           onChange={(e) => setFilters({...filters, priority: e.target.value})}
+          style={{
+            backgroundColor: darkMode ? '#1f2937' : 'white',
+            color: darkMode ? '#ffffff' : '#000000',
+            border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+          }}
         >
           <option value="">All Priority</option>
           <option value="low">Low</option>
@@ -297,6 +282,11 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
         <select
           value={filters.category}
           onChange={(e) => setFilters({...filters, category: e.target.value})}
+          style={{
+            backgroundColor: darkMode ? '#1f2937' : 'white',
+            color: darkMode ? '#ffffff' : '#000000',
+            border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+          }}
         >
           <option value="">All Categories</option>
           <option value="general">General</option>
@@ -307,8 +297,11 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
       </div>
 
       <div className="support-main">
-        <div className="tickets-section">
-          <h3>Support Tickets</h3>
+        <div className="tickets-section" style={{
+          backgroundColor: darkMode ? '#374151' : 'white',
+          color: darkMode ? '#ffffff' : '#000000'
+        }}>
+          <h3 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Support Tickets</h3>
           {loading ? (
             <div className="loading">Loading tickets...</div>
           ) : (
@@ -323,6 +316,13 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                     key={ticket._id}
                     className={`ticket-item ${selectedTicket?._id === ticket._id ? 'selected' : ''}`}
                     onClick={() => fetchTicketDetails(ticket._id)}
+                    style={{
+                      backgroundColor: selectedTicket?._id === ticket._id 
+                        ? (darkMode ? '#4b5563' : '#eff6ff')
+                        : (darkMode ? '#1f2937' : 'white'),
+                      color: darkMode ? '#ffffff' : '#000000',
+                      border: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
+                    }}
                   >
                     <div className="ticket-header">
                       <span className="ticket-id">#{ticket.ticketId}</span>
@@ -333,7 +333,7 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                         {ticket.priority}
                       </span>
                     </div>
-                    <h4>{ticket.title}</h4>
+                    <h4 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>{ticket.title}</h4>
                     <div className="ticket-meta">
                       <span 
                         className="status-badge"
@@ -353,14 +353,24 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
         </div>
 
         {selectedTicket && (
-          <div className="ticket-details">
-            <div className="ticket-details-header">
-              <h3>#{selectedTicket.ticketId} - {selectedTicket.title}</h3>
+          <div className="ticket-details" style={{
+            backgroundColor: darkMode ? '#374151' : 'white',
+            color: darkMode ? '#ffffff' : '#000000'
+          }}>
+            <div className="ticket-details-header" style={{
+              borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
+            }}>
+              <h3 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>#{selectedTicket.ticketId} - {selectedTicket.title}</h3>
               <div className="ticket-actions">
                 {currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
                   <select 
                     value={selectedTicket.status}
                     onChange={(e) => updateTicketStatus(selectedTicket._id, e.target.value)}
+                    style={{
+                      backgroundColor: darkMode ? '#1f2937' : 'white',
+                      color: darkMode ? '#ffffff' : '#000000',
+                      border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+                    }}
                   >
                     <option value="open">Open</option>
                     <option value="in-progress">In Progress</option>
@@ -368,7 +378,7 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                     <option value="closed">Closed</option>
                   </select>
                 )}
-                {selectedTicket.canCustomerDelete && (
+                {(currentUser && ['admin', 'super-admin'].includes(currentUser.role)) && (
                   <button 
                     className="btn-danger"
                     onClick={() => deleteTicket(selectedTicket._id)}
@@ -380,13 +390,13 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
             </div>
 
             <div className="ticket-info">
-              <div className="info-row">
-                <strong>Customer:</strong> {selectedTicket.customerName}
+              <div className="info-row" style={{ color: darkMode ? '#ffffff' : '#000000' }}>
+                <strong>Customer:</strong> {selectedTicket.customerName || 'N/A'}
               </div>
-              <div className="info-row">
-                <strong>Email:</strong> {selectedTicket.customerEmail}
+              <div className="info-row" style={{ color: darkMode ? '#ffffff' : '#000000' }}>
+                <strong>Email:</strong> {selectedTicket.customerEmail || 'N/A'}
               </div>
-              <div className="info-row">
+              <div className="info-row" style={{ color: darkMode ? '#ffffff' : '#000000' }}>
                 <strong>Priority:</strong> 
                 <span 
                   className="priority-badge"
@@ -395,7 +405,7 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                   {selectedTicket.priority}
                 </span>
               </div>
-              <div className="info-row">
+              <div className="info-row" style={{ color: darkMode ? '#ffffff' : '#000000' }}>
                 <strong>Status:</strong> 
                 <span 
                   className="status-badge"
@@ -407,22 +417,29 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
             </div>
 
             <div className="ticket-description">
-              <h4>Description</h4>
-              <p>{selectedTicket.description}</p>
+              <h4 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Description</h4>
+              <p style={{ color: darkMode ? '#ffffff' : '#000000' }}>{selectedTicket.description}</p>
             </div>
 
             <div className="ticket-replies">
-              <h4>Conversation</h4>
+              <h4 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Conversation</h4>
               <div className="replies-list">
                 {selectedTicket.replies?.map((reply, index) => (
-                  <div key={index} className={`reply ${reply.isStaff ? 'staff-reply' : 'customer-reply'}`}>
+                  <div key={index} className={`reply ${reply.isStaff ? 'staff-reply' : 'customer-reply'}`} style={{
+                    backgroundColor: reply.isStaff 
+                      ? (darkMode ? '#1e3a8a' : '#f0f9ff')
+                      : (darkMode ? '#374151' : '#f9fafb'),
+                    color: darkMode ? '#ffffff' : '#000000'
+                  }}>
                     <div className="reply-header">
-                      <strong>{reply.repliedBy}</strong>
-                      <span className="reply-date">
+                      <strong style={{ color: darkMode ? '#ffffff' : '#000000' }}>
+                        {typeof reply.repliedBy === 'object' ? reply.repliedBy?.name || 'User' : reply.repliedBy}
+                      </strong>
+                      <span className="reply-date" style={{ color: darkMode ? '#d1d5db' : '#6b7280' }}>
                         {new Date(reply.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    <p>{reply.message}</p>
+                    <p style={{ color: darkMode ? '#ffffff' : '#000000' }}>{reply.message}</p>
                   </div>
                 ))}
               </div>
@@ -434,8 +451,16 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                   placeholder="Type your reply..."
                   rows={3}
                   required
+                  style={{
+                    backgroundColor: darkMode ? '#1f2937' : 'white',
+                    color: darkMode ? '#ffffff' : '#000000',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+                  }}
                 />
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" style={{
+                  backgroundColor: darkMode ? '#2563eb' : '#3b82f6',
+                  color: '#ffffff'
+                }}>
                   Send Reply
                 </button>
               </form>
@@ -446,9 +471,14 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
 
       {showCreateForm && (
         <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Create New Ticket</h3>
+          <div className="modal" style={{
+            backgroundColor: darkMode ? '#374151' : 'white',
+            color: darkMode ? '#ffffff' : '#000000'
+          }}>
+            <div className="modal-header" style={{
+              borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
+            }}>
+              <h3 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Create New Ticket</h3>
               <button 
                 className="close-btn"
                 onClick={() => setShowCreateForm(false)}
@@ -464,6 +494,11 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                   value={ticketForm.title}
                   onChange={(e) => setTicketForm({...ticketForm, title: e.target.value})}
                   required
+                  style={{
+                    backgroundColor: darkMode ? '#1f2937' : 'white',
+                    color: darkMode ? '#ffffff' : '#000000',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+                  }}
                 />
               </div>
               
@@ -474,6 +509,11 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                   onChange={(e) => setTicketForm({...ticketForm, description: e.target.value})}
                   rows={4}
                   required
+                  style={{
+                    backgroundColor: darkMode ? '#1f2937' : 'white',
+                    color: darkMode ? '#ffffff' : '#000000',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+                  }}
                 />
               </div>
 

@@ -26,77 +26,179 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react';
+import apiService from '../services/apiService';
 
 const AnalyticsDashboard = ({ darkMode }) => {
   const [timeRange, setTimeRange] = useState('month');
   const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-
-  // Sample data - in a real app, this would come from your API
-  const leadConversionData = [
-    { name: 'Jan', leads: 65, conversions: 42, rate: 64 },
-    { name: 'Feb', leads: 78, conversions: 50, rate: 64 },
-    { name: 'Mar', leads: 90, conversions: 63, rate: 70 },
-    { name: 'Apr', leads: 81, conversions: 53, rate: 65 },
-    { name: 'May', leads: 95, conversions: 67, rate: 71 },
-    { name: 'Jun', leads: 110, conversions: 80, rate: 73 },
-    { name: 'Jul', leads: 100, conversions: 75, rate: 75 },
-  ];
-
-  const salesPerformanceData = [
-    { name: 'Jan', target: 500000, actual: 425000 },
-    { name: 'Feb', target: 500000, actual: 480000 },
-    { name: 'Mar', target: 550000, actual: 570000 },
-    { name: 'Apr', target: 550000, actual: 540000 },
-    { name: 'May', target: 600000, actual: 650000 },
-    { name: 'Jun', target: 600000, actual: 700000 },
-    { name: 'Jul', target: 650000, actual: 710000 },
-  ];
-
-  const leadSourceData = [
-    { name: 'Website', value: 35 },
-    { name: 'Referral', value: 25 },
-    { name: 'Social Media', value: 20 },
-    { name: 'Email', value: 15 },
-    { name: 'Other', value: 5 },
-  ];
+  const [analyticsData, setAnalyticsData] = useState({
+    leadConversion: [],
+    salesPerformance: [],
+    leadSources: [],
+    kpis: [],
+    recentActivities: []
+  });
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-  const customerGrowthData = [
-    { name: 'Jan', customers: 120 },
-    { name: 'Feb', customers: 135 },
-    { name: 'Mar', customers: 148 },
-    { name: 'Apr', customers: 156 },
-    { name: 'May', customers: 170 },
-    { name: 'Jun', customers: 185 },
-    { name: 'Jul', customers: 200 },
-  ];
+  const fetchAnalyticsData = async () => {
+    setIsLoading(true);
+    try {
+      // Try to fetch from dedicated analytics endpoints first
+      try {
+        const [analytics, leadAnalytics, salesAnalytics, kpiData] = await Promise.all([
+          apiService.getAnalytics(timeRange),
+          apiService.getLeadAnalytics(timeRange),
+          apiService.getSalesAnalytics(timeRange),
+          apiService.getKPIData(timeRange)
+        ]);
 
-  const kpiData = [
-    { title: 'Total Leads', value: '583', change: '+12%', icon: Users, color: '#3b82f6' },
-    { title: 'Conversion Rate', value: '68%', change: '+5%', icon: TrendingUp, color: '#10b981' },
-    { title: 'Avg Deal Size', value: '₹42,500', change: '+8%', icon: DollarSign, color: '#f59e0b' },
-    { title: 'Sales Cycle', value: '18 days', change: '-3 days', icon: Clock, color: '#8b5cf6' },
-  ];
+        setAnalyticsData({
+          leadConversion: leadAnalytics.conversionData || [],
+          salesPerformance: salesAnalytics.performanceData || [],
+          leadSources: analytics.leadSources || [],
+          kpis: kpiData.kpis || [],
+          recentActivities: analytics.recentActivities || []
+        });
+      } catch (analyticsError) {
+        console.log('Analytics endpoints not available, processing raw data:', analyticsError.message);
+        
+        // Fallback to processing raw data
+        const [leads, customers, communications] = await Promise.all([
+          apiService.getLeads(),
+          apiService.getCustomers(),
+          apiService.getCommunications()
+        ]);
 
-  const recentActivities = [
-    { type: 'call', title: 'Call with Rajesh Kumar', time: '10:30 AM', status: 'completed' },
-    { type: 'email', title: 'Proposal sent to Healthcare Solutions', time: '09:15 AM', status: 'completed' },
-    { type: 'meeting', title: 'Demo meeting with Digital Marketing Hub', time: '02:00 PM', status: 'upcoming' },
-    { type: 'call', title: 'Follow-up call with Amit Patel', time: '04:30 PM', status: 'upcoming' },
-  ];
+        const processedData = processAnalyticsData(leads, customers, communications, timeRange);
+        setAnalyticsData(processedData);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processAnalyticsData = (leads, customers, communications, range) => {
+    const now = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Lead conversion data
+    const leadConversion = months.slice(0, 7).map((month, index) => {
+      const monthLeads = leads.filter(lead => {
+        const leadDate = new Date(lead.createdAt || lead.dateCreated);
+        return leadDate.getMonth() === index;
+      });
+      const conversions = monthLeads.filter(lead => lead.status === 'converted' || lead.status === 'closed').length;
+      const rate = monthLeads.length > 0 ? Math.round((conversions / monthLeads.length) * 100) : 0;
+      
+      return {
+        name: month,
+        leads: monthLeads.length,
+        conversions,
+        rate
+      };
+    });
+
+    // Sales performance data
+    const salesPerformance = months.slice(0, 7).map((month, index) => {
+      const monthLeads = leads.filter(lead => {
+        const leadDate = new Date(lead.createdAt || lead.dateCreated);
+        return leadDate.getMonth() === index && (lead.status === 'converted' || lead.status === 'closed');
+      });
+      const actual = monthLeads.reduce((sum, lead) => sum + (parseFloat(lead.value) || 0), 0);
+      const target = actual * 1.2; // Set target 20% higher than actual
+      
+      return {
+        name: month,
+        target: Math.round(target),
+        actual: Math.round(actual)
+      };
+    });
+
+    // Lead source distribution
+    const sourceCount = {};
+    leads.forEach(lead => {
+      const source = lead.source || 'Other';
+      sourceCount[source] = (sourceCount[source] || 0) + 1;
+    });
+    
+    const leadSources = Object.entries(sourceCount).map(([name, value]) => ({ name, value }));
+
+    // KPI calculations
+    const totalLeads = leads.length;
+    const convertedLeads = leads.filter(lead => lead.status === 'converted' || lead.status === 'closed').length;
+    const conversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+    const avgDealSize = convertedLeads > 0 ? 
+      Math.round(leads.filter(lead => lead.status === 'converted' || lead.status === 'closed')
+        .reduce((sum, lead) => sum + (parseFloat(lead.value) || 0), 0) / convertedLeads) : 0;
+    
+    const kpis = [
+      { title: 'Total Leads', value: totalLeads.toString(), change: '+12%', icon: Users, color: '#3b82f6' },
+      { title: 'Conversion Rate', value: `${conversionRate}%`, change: '+5%', icon: TrendingUp, color: '#10b981' },
+      { title: 'Avg Deal Size', value: `₹${avgDealSize.toLocaleString()}`, change: '+8%', icon: DollarSign, color: '#f59e0b' },
+      { title: 'Total Customers', value: customers.length.toString(), change: '+15%', icon: Clock, color: '#8b5cf6' },
+    ];
+
+    // Recent activities from communications
+    const recentActivities = (communications.communications || []).slice(0, 4).map(comm => ({
+      type: comm.type || 'call',
+      title: comm.subject || comm.title || 'Communication',
+      time: new Date(comm.createdAt || comm.date).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      status: comm.status || 'completed'
+    }));
+
+    return {
+      leadConversion,
+      salesPerformance,
+      leadSources,
+      kpis,
+      recentActivities
+    };
+  };
 
   const refreshData = () => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    fetchAnalyticsData();
+  };
+
+  const exportAnalyticsData = () => {
+    try {
+      const csvData = [
+        ['Metric', 'Value', 'Change'],
+        ...analyticsData.kpis.map(kpi => [kpi.title, kpi.value, kpi.change]),
+        [''],
+        ['Month', 'Leads', 'Conversions', 'Rate'],
+        ...analyticsData.leadConversion.map(item => [item.name, item.leads, item.conversions, `${item.rate}%`]),
+        [''],
+        ['Month', 'Target', 'Actual'],
+        ...analyticsData.salesPerformance.map(item => [item.name, `₹${item.target}`, `₹${item.actual}`]),
+        [''],
+        ['Source', 'Count'],
+        ...analyticsData.leadSources.map(item => [item.name, item.value])
+      ];
+
+      const csvContent = csvData.map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `analytics-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+    }
   };
 
   useEffect(() => {
-    refreshData();
+    fetchAnalyticsData();
   }, [timeRange]);
 
   const containerStyle = {
@@ -178,7 +280,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
               Refresh
             </button>
             <button
-              onClick={() => {}}
+              onClick={exportAnalyticsData}
               style={{
                 padding: '0.75rem',
                 background: 'linear-gradient(135deg, #667eea, #764ba2)',
@@ -192,7 +294,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
               }}
             >
               <Download size={16} />
-              Export
+              Export CSV
             </button>
           </div>
         </div>
@@ -242,7 +344,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
         gap: '1.5rem',
         marginBottom: '2rem'
       }}>
-        {kpiData.map((kpi, index) => {
+        {analyticsData.kpis.map((kpi, index) => {
           const Icon = kpi.icon;
           return (
             <div key={index} style={{ ...cardStyle, padding: '1.5rem' }}>
@@ -299,7 +401,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
           <div style={{ height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={leadConversionData}
+                data={analyticsData.leadConversion}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
@@ -335,7 +437,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
           <div style={{ height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={salesPerformanceData}
+                data={analyticsData.salesPerformance}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
@@ -379,7 +481,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={leadSourceData}
+                  data={analyticsData.leadSources}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -388,7 +490,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
                   dataKey="value"
                   label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                 >
-                  {leadSourceData.map((entry, index) => (
+                  {analyticsData.leadSources.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -417,7 +519,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
             Recent Activities
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {recentActivities.map((activity, index) => (
+            {analyticsData.recentActivities.map((activity, index) => (
               <div key={index} style={{
                 display: 'flex',
                 alignItems: 'center',

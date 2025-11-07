@@ -1439,6 +1439,222 @@ const apiService = {
       console.error('Error updating company plan:', error);
       throw error;
     }
+  },
+
+  // Analytics APIs
+  getAnalytics: async (timeRange = 'month') => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/analytics?timeRange=${timeRange}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      throw error;
+    }
+  },
+
+  getLeadAnalytics: async (timeRange = 'month') => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/analytics/leads?timeRange=${timeRange}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch lead analytics');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching lead analytics:', error);
+      throw error;
+    }
+  },
+
+  getSalesAnalytics: async (timeRange = 'month') => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/analytics/sales?timeRange=${timeRange}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch sales analytics');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching sales analytics:', error);
+      throw error;
+    }
+  },
+
+  getKPIData: async (timeRange = 'month') => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/analytics/kpis?timeRange=${timeRange}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch KPI data');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching KPI data:', error);
+      throw error;
+    }
+  },
+
+  // AI & Analytics APIs
+  getAILeadScoring: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/ai/lead-scoring`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch AI lead scoring');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching AI lead scoring:', error);
+      throw error;
+    }
+  },
+
+  getAIInsights: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/ai/insights`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch AI insights');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching AI insights:', error);
+      throw error;
+    }
+  },
+
+  getSalesAnalytics: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/ai/sales-analytics`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch sales analytics');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching sales analytics:', error);
+      throw error;
+    }
+  },
+
+  getAIRecommendations: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/ai/recommendations`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch AI recommendations');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching AI recommendations:', error);
+      throw error;
+    }
+  },
+
+  // Duplicate Detection APIs
+  detectDuplicates: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/duplicates`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to detect duplicates');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error detecting duplicates:', error);
+      throw error;
+    }
+  },
+
+  mergeDuplicateLeads: async (primaryId, duplicateIds, mergedData) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/merge`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ primaryId, duplicateIds, mergedData })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to merge duplicate leads');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error merging duplicate leads:', error);
+      throw error;
+    }
   }
 
 };

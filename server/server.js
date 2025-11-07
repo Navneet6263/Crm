@@ -121,10 +121,11 @@ const authenticateToken = async (req, res, next) => {
   console.log('📋 Headers:', { Authorization: req.headers.authorization ? 'Token present' : 'No token', Cookie: req.headers.cookie ? 'Cookie present' : 'No cookie' });
   
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    console.log('❌ No token provided');
+  let token = authHeader && authHeader.split(' ')[1];
+  
+  // Handle malformed tokens
+  if (!token || token === 'null' || token === 'undefined') {
+    console.log('❌ No valid token provided');
     return res.status(401).json({ message: 'Access token required' });
   }
 
@@ -231,7 +232,7 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
 app.post('/api/auth/register', auditLogger('USER_CREATE'), async (req, res) => {
   try {
     console.log('📝 REGISTER REQUEST:', req.body);
-    const { name, email, password, company, phone, role } = req.body;
+    const { name, email, password, company, phone, role, superAdminKey } = req.body;
     
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -249,13 +250,57 @@ app.post('/api/auth/register', auditLogger('USER_CREATE'), async (req, res) => {
       userRole = 'admin';
     }
     if (emailLower.includes('superadmin') || emailLower.includes('@greencrm.admin')) {
+      // Check super admin limit
+      const superAdminCount = await User.countDocuments({ role: 'super-admin' });
+      const maxSuperAdmins = parseInt(process.env.MAX_SUPER_ADMINS) || 4;
+      
+      if (superAdminCount >= maxSuperAdmins) {
+        console.log('❌ Super Admin limit reached:', superAdminCount, '/', maxSuperAdmins);
+        return res.status(403).json({ 
+          message: `Super Admin limit reached! Only ${maxSuperAdmins} Super Admins allowed. Contact system administrator.`,
+          currentSuperAdmins: superAdminCount,
+          maxAllowed: maxSuperAdmins
+        });
+      }
+      
+      // Check for creation key (optional extra security)
+      if (!superAdminKey || superAdminKey !== process.env.SUPER_ADMIN_CREATION_KEY) {
+        console.log('❌ Invalid super admin key provided');
+        return res.status(403).json({ 
+          message: 'Super Admin creation requires authorization key. Contact system administrator.' 
+        });
+      }
+      
       userRole = 'super-admin';
+      console.log('✅ Super Admin creation authorized:', superAdminCount + 1, '/', maxSuperAdmins);
     }
     if (emailLower.includes('manager')) {
       userRole = 'manager';
     }
     if (emailLower.includes('support')) {
       userRole = 'support';
+    }
+    
+    // Manual role assignment security check
+    if (role === 'super-admin') {
+      const superAdminCount = await User.countDocuments({ role: 'super-admin' });
+      const maxSuperAdmins = parseInt(process.env.MAX_SUPER_ADMINS) || 4;
+      
+      if (superAdminCount >= maxSuperAdmins) {
+        return res.status(403).json({ 
+          message: `Super Admin limit reached! Only ${maxSuperAdmins} Super Admins allowed.`,
+          currentSuperAdmins: superAdminCount,
+          maxAllowed: maxSuperAdmins
+        });
+      }
+      
+      if (!superAdminKey || superAdminKey !== process.env.SUPER_ADMIN_CREATION_KEY) {
+        return res.status(403).json({ 
+          message: 'Super Admin creation requires authorization key. Contact system administrator.' 
+        });
+      }
+      
+      userRole = 'super-admin';
     }
     
     // Generate unique tenant ID for new users
@@ -379,6 +424,25 @@ app.get('/api/auth/users', authenticateToken, async (req, res) => {
   }
 });
 
+// Check super admin status and limits
+app.get('/api/auth/super-admin-status', async (req, res) => {
+  try {
+    const superAdminCount = await User.countDocuments({ role: 'super-admin' });
+    const maxSuperAdmins = parseInt(process.env.MAX_SUPER_ADMINS) || 4;
+    const canCreateMore = superAdminCount < maxSuperAdmins;
+    
+    res.json({
+      currentSuperAdmins: superAdminCount,
+      maxAllowed: maxSuperAdmins,
+      canCreateMore,
+      remaining: maxSuperAdmins - superAdminCount
+    });
+  } catch (error) {
+    console.error('Error checking super admin status:', error);
+    res.status(500).json({ message: 'Error checking super admin status', error: error.message });
+  }
+});
+
 // Lead Routes - Get all leads endpoint
 app.get('/api/leads', authenticateToken, async (req, res) => {
   try {
@@ -497,11 +561,23 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
       }
     }
     
+    // Get user ID - handle both _id and id properties
+    const userId = req.user._id || req.user.id;
+    
     const leadData = {
       ...req.body,
       companyId: req.user.companyId,
-      createdBy: req.user.id
+      createdBy: userId
     };
+    
+    // Handle assignedTo field - only set if it's a valid non-empty string
+    if (req.body.assignedTo && req.body.assignedTo.trim()) {
+      leadData.assignedTo = req.body.assignedTo;
+    }
+    // Remove empty assignedTo to prevent validation errors
+    if (leadData.assignedTo === '') {
+      delete leadData.assignedTo;
+    }
     
     const newLead = new Lead(leadData);
     
@@ -519,7 +595,7 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
     }
     
     // Create notification for lead creation
-    await createLeadCreationNotification(savedLead._id, req.user.id);
+    await createLeadCreationNotification(savedLead._id, userId);
     
     console.log('=== END LEAD CREATION ===\n');
     
@@ -541,12 +617,31 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
 
 app.put('/api/leads/:id', authenticateToken, async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    console.log('🔄 Server: Updating lead:', req.params.id, 'with data:', req.body);
+    
+    // Clean the request body to prevent validation errors
+    const updateData = { ...req.body };
+    
+    // Handle notes field - if it's a string, don't update it directly
+    if (typeof updateData.notes === 'string') {
+      console.log('⚠️ Notes field is string, removing from update data');
+      delete updateData.notes;
+    }
+    
+    // Handle assignedTo field - only set if it's a valid non-empty string
+    if (updateData.assignedTo === '') {
+      delete updateData.assignedTo;
+    }
+    
+    const lead = await Lead.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
     }
+    
+    console.log('✅ Server: Lead updated successfully');
     res.json(lead);
   } catch (error) {
+    console.error('❌ Server: Error updating lead:', error);
     res.status(500).json({ message: 'Error updating lead', error: error.message });
   }
 });
@@ -590,7 +685,7 @@ app.post('/api/leads/assign', authenticateToken, async (req, res) => {
       { 
         assignedTo: assignedUser._id,
         assignedAt: new Date(),
-        assignedBy: req.user.id
+        assignedBy: req.user._id || req.user.id
       },
       { new: true }
     ).populate('createdBy assignedTo', 'name email role');
@@ -600,7 +695,7 @@ app.post('/api/leads/assign', authenticateToken, async (req, res) => {
     }
     
     // Create notification for lead assignment
-    await createLeadAssignmentNotification(leadId, assignedUser._id, req.user.id);
+    await createLeadAssignmentNotification(leadId, assignedUser._id, req.user._id || req.user.id);
     console.log('📧 Notification sent to:', assignedUser.email);
     
     console.log('✅ Lead assigned successfully:', leadId, 'to', assignedUser.email);
@@ -861,7 +956,7 @@ app.put('/api/demo-requests/:id/approve', authenticateToken, async (req, res) =>
       { 
         status: 'approved',
         processedAt: new Date(),
-        processedBy: req.user.id
+        processedBy: req.user._id || req.user.id
       },
       { new: true }
     ).populate('processedBy', 'name email');
@@ -883,7 +978,7 @@ app.put('/api/demo-requests/:id/reject', authenticateToken, async (req, res) => 
       { 
         status: 'rejected',
         processedAt: new Date(),
-        processedBy: req.user.id
+        processedBy: req.user._id || req.user.id
       },
       { new: true }
     ).populate('processedBy', 'name email');
@@ -954,6 +1049,9 @@ app.use('/api/super-admin', authenticateToken, require('./routes/superAdminRoute
 app.use('/api/communications', authenticateToken, communicationRoutes);
 app.use('/api/tasks', authenticateToken, taskRoutes);
 app.use('/api/calendar', authenticateToken, calendarRoutes);
+
+// AI Routes
+app.use('/api/ai', require('./routes/ai'));
 
 
 

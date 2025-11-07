@@ -177,6 +177,7 @@ userSchema.pre('save', async function(next) {
     return next();
   }
   
+  // Always hash password for new users
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
@@ -184,7 +185,18 @@ userSchema.pre('save', async function(next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  try {
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+    console.log('🔑 Password comparison:', {
+      email: this.email,
+      isMatch: isMatch,
+      hasPassword: !!this.password
+    });
+    return isMatch;
+  } catch (error) {
+    console.error('Password comparison error:', error);
+    return false;
+  }
 };
 
 module.exports = mongoose.model('User', userSchema);

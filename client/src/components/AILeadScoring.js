@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, Zap, TrendingUp, Target, Star, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import apiService from '../services/apiService';
 
 const AILeadScoring = ({ leads = [], darkMode }) => {
   const [scoredLeads, setScoredLeads] = useState([]);
@@ -11,65 +12,80 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
     let score = 0;
     let factors = [];
 
-    // Company Size Factor (30%)
-    const estimatedValue = lead.estimatedValue || 0;
-    if (estimatedValue > 500000) {
-      score += 30;
-      factors.push({ factor: 'High Value Deal', impact: '+30', color: '#22c55e' });
-    } else if (estimatedValue > 100000) {
+    // Email quality (20 points)
+    if (lead.email && lead.email.includes('@')) {
       score += 20;
-      factors.push({ factor: 'Medium Value Deal', impact: '+20', color: '#f59e0b' });
-    } else {
-      score += 10;
-      factors.push({ factor: 'Standard Deal', impact: '+10', color: '#6b7280' });
+      factors.push({ factor: 'Valid Email', impact: '+20', color: '#22c55e' });
     }
-
-    // Industry Factor (20%)
-    const highValueIndustries = ['technology', 'finance', 'healthcare'];
-    if (highValueIndustries.includes(lead.industry?.toLowerCase())) {
-      score += 20;
-      factors.push({ factor: 'High-Value Industry', impact: '+20', color: '#22c55e' });
-    } else {
-      score += 10;
-      factors.push({ factor: 'Standard Industry', impact: '+10', color: '#6b7280' });
-    }
-
-    // Lead Source Factor (15%)
-    const leadSource = lead.leadSource?.toLowerCase() || '';
-    if (leadSource.includes('referral')) {
+    
+    // Phone number (15 points)
+    if (lead.phone && lead.phone.length >= 10) {
       score += 15;
-      factors.push({ factor: 'Referral Source', impact: '+15', color: '#22c55e' });
-    } else if (leadSource.includes('website')) {
-      score += 10;
-      factors.push({ factor: 'Website Source', impact: '+10', color: '#f59e0b' });
-    } else {
-      score += 5;
-      factors.push({ factor: 'Other Source', impact: '+5', color: '#6b7280' });
+      factors.push({ factor: 'Phone Available', impact: '+15', color: '#22c55e' });
     }
-
-    // Engagement Factor (20%)
-    const hasEmail = lead.email && lead.email.includes('@');
-    const hasPhone = lead.phone && lead.phone.length > 8;
-    if (hasEmail && hasPhone) {
+    
+    // Company information (25 points)
+    if (lead.companyName && lead.companyName.trim()) {
+      score += 25;
+      factors.push({ factor: 'Company Info', impact: '+25', color: '#22c55e' });
+    }
+    
+    // Source quality (20 points)
+    const highValueSources = ['website', 'referral', 'linkedin', 'social media'];
+    if (lead.leadSource && highValueSources.includes(lead.leadSource.toLowerCase())) {
       score += 20;
-      factors.push({ factor: 'Complete Contact Info', impact: '+20', color: '#22c55e' });
-    } else if (hasEmail || hasPhone) {
+      factors.push({ factor: 'High-Value Source', impact: '+20', color: '#22c55e' });
+    } else if (lead.leadSource) {
       score += 10;
-      factors.push({ factor: 'Partial Contact Info', impact: '+10', color: '#f59e0b' });
+      factors.push({ factor: 'Standard Source', impact: '+10', color: '#f59e0b' });
     }
-
-    // Recency Factor (15%)
-    const createdDate = new Date(lead.createdDate || Date.now());
+    
+    // Status engagement (20 points max)
+    if (lead.status === 'qualified') {
+      score += 20;
+      factors.push({ factor: 'Qualified Lead', impact: '+20', color: '#22c55e' });
+    } else if (lead.status === 'contacted') {
+      score += 15;
+      factors.push({ factor: 'Contacted', impact: '+15', color: '#f59e0b' });
+    } else if (lead.status === 'assigned') {
+      score += 10;
+      factors.push({ factor: 'Assigned', impact: '+10', color: '#f59e0b' });
+    } else if (lead.status === 'new') {
+      score += 5;
+      factors.push({ factor: 'New Lead', impact: '+5', color: '#6b7280' });
+    }
+    
+    // Industry bonus (15 points)
+    const highValueIndustries = ['technology', 'finance', 'healthcare', 'software', 'it services'];
+    if (lead.industry && highValueIndustries.includes(lead.industry.toLowerCase())) {
+      score += 15;
+      factors.push({ factor: 'High-Value Industry', impact: '+15', color: '#22c55e' });
+    } else if (lead.industry) {
+      score += 5;
+      factors.push({ factor: 'Industry Info', impact: '+5', color: '#f59e0b' });
+    }
+    
+    // Estimated value bonus (20 points max)
+    if (lead.estimatedValue > 100000) {
+      score += 20;
+      factors.push({ factor: 'High Value Deal', impact: '+20', color: '#22c55e' });
+    } else if (lead.estimatedValue > 50000) {
+      score += 15;
+      factors.push({ factor: 'Medium Value Deal', impact: '+15', color: '#f59e0b' });
+    } else if (lead.estimatedValue > 10000) {
+      score += 10;
+      factors.push({ factor: 'Standard Deal', impact: '+10', color: '#f59e0b' });
+    }
+    
+    // Recency bonus (10 points)
+    const createdDate = new Date(lead.createdAt || lead.createdDate || Date.now());
     const daysSinceCreated = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysSinceCreated <= 7) {
-      score += 15;
-      factors.push({ factor: 'Fresh Lead', impact: '+15', color: '#22c55e' });
-    } else if (daysSinceCreated <= 30) {
+    if (daysSinceCreated <= 1) {
       score += 10;
-      factors.push({ factor: 'Recent Lead', impact: '+10', color: '#f59e0b' });
-    } else {
+      factors.push({ factor: 'Fresh Lead (Today)', impact: '+10', color: '#22c55e' });
+    } else if (daysSinceCreated <= 7) {
       score += 5;
-      factors.push({ factor: 'Older Lead', impact: '+5', color: '#ef4444' });
+      factors.push({ factor: 'Recent Lead', impact: '+5', color: '#f59e0b' });
     }
 
     // Normalize score to 0-100
@@ -78,7 +94,7 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
     return {
       score: finalScore,
       factors,
-      priority: finalScore >= 80 ? 'High' : finalScore >= 60 ? 'Medium' : 'Low',
+      priority: finalScore >= 70 ? 'High' : finalScore >= 40 ? 'Medium' : 'Low',
       recommendation: getRecommendation(finalScore)
     };
   };
@@ -111,17 +127,40 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
   const analyzeLeads = async () => {
     setIsAnalyzing(true);
     
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Try backend AI analysis first
+      const aiData = await apiService.getAILeadScoring();
+      if (aiData.success && aiData.scoredLeads) {
+        setScoredLeads(aiData.scoredLeads);
+        setIsAnalyzing(false);
+        return;
+      }
+    } catch (error) {
+      console.log('Using local AI analysis');
+    }
     
-    const analyzed = leads.map(lead => ({
-      ...lead,
-      aiAnalysis: calculateAIScore(lead)
-    }));
+    // Fallback to local analysis
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Sort by AI score (highest first)
-    analyzed.sort((a, b) => b.aiAnalysis.score - a.aiAnalysis.score);
+    const analyzed = leads.map(lead => {
+      const aiAnalysis = calculateAIScore(lead);
+      return {
+        ...lead,
+        aiAnalysis: aiAnalysis || {
+          score: 0,
+          factors: [],
+          priority: 'Low',
+          recommendation: {
+            action: 'Review Required',
+            message: 'Lead needs manual review.',
+            icon: AlertCircle,
+            color: '#6b7280'
+          }
+        }
+      };
+    });
     
+    analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
     setScoredLeads(analyzed);
     setIsAnalyzing(false);
   };
@@ -129,13 +168,67 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
   useEffect(() => {
     const initializeComponent = async () => {
       setIsLoading(true);
-      // Small delay to ensure component is mounted
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      if (leads && leads.length > 0) {
-        await analyzeLeads();
+      try {
+        if (!leads || leads.length === 0) {
+          setScoredLeads([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Try to get AI scoring from backend first
+        const aiData = await apiService.getAILeadScoring();
+        if (aiData.success && aiData.scoredLeads && aiData.scoredLeads.length > 0) {
+          setScoredLeads(aiData.scoredLeads);
+        } else {
+          // Fallback to local analysis
+          const analyzed = leads.map(lead => {
+            const aiAnalysis = calculateAIScore(lead);
+            return {
+              ...lead,
+              aiAnalysis: aiAnalysis || {
+                score: 0,
+                factors: [],
+                priority: 'Low',
+                recommendation: {
+                  action: 'Review Required',
+                  message: 'Lead needs manual review.',
+                  icon: AlertCircle,
+                  color: '#6b7280'
+                }
+              }
+            };
+          });
+          analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
+          setScoredLeads(analyzed);
+        }
+      } catch (error) {
+        console.log('AI backend not available, using local analysis');
+        if (leads && leads.length > 0) {
+          const analyzed = leads.map(lead => {
+            const aiAnalysis = calculateAIScore(lead);
+            return {
+              ...lead,
+              aiAnalysis: aiAnalysis || {
+                score: 0,
+                factors: [],
+                priority: 'Low',
+                recommendation: {
+                  action: 'Review Required',
+                  message: 'Lead needs manual review.',
+                  icon: AlertCircle,
+                  color: '#6b7280'
+                }
+              }
+            };
+          });
+          analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
+          setScoredLeads(analyzed);
+        } else {
+          setScoredLeads([]);
+        }
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     
     initializeComponent();
@@ -293,25 +386,25 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
             {[
               { 
                 label: 'High Priority', 
-                value: scoredLeads.filter(l => l.aiAnalysis.priority === 'High').length,
+                value: scoredLeads.filter(l => l.aiAnalysis?.priority === 'High').length,
                 icon: Zap, 
                 color: '#22c55e' 
               },
               { 
                 label: 'Medium Priority', 
-                value: scoredLeads.filter(l => l.aiAnalysis.priority === 'Medium').length,
+                value: scoredLeads.filter(l => l.aiAnalysis?.priority === 'Medium').length,
                 icon: Target, 
                 color: '#f59e0b' 
               },
               { 
                 label: 'Low Priority', 
-                value: scoredLeads.filter(l => l.aiAnalysis.priority === 'Low').length,
+                value: scoredLeads.filter(l => l.aiAnalysis?.priority === 'Low').length,
                 icon: Clock, 
                 color: '#ef4444' 
               },
               { 
                 label: 'Avg Score', 
-                value: Math.round(scoredLeads.reduce((sum, l) => sum + l.aiAnalysis.score, 0) / scoredLeads.length),
+                value: Math.round(scoredLeads.reduce((sum, l) => sum + (l.aiAnalysis?.score || 0), 0) / scoredLeads.length),
                 icon: TrendingUp, 
                 color: '#8b5cf6' 
               }
@@ -350,9 +443,21 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
             gap: '1.5rem'
           }}>
             {scoredLeads.map(lead => {
-              const analysis = lead.aiAnalysis;
+              const analysis = lead.aiAnalysis || {
+                score: 0,
+                factors: [],
+                priority: 'Low',
+                recommendation: {
+                  action: 'Review Required',
+                  message: 'Lead needs manual review.',
+                  icon: 'AlertCircle',
+                  color: '#6b7280'
+                }
+              };
               const priorityColor = getPriorityColor(analysis.priority);
-              const RecommendationIcon = analysis.recommendation.icon;
+              const RecommendationIcon = analysis.recommendation.icon === 'Zap' ? Zap : 
+                                       analysis.recommendation.icon === 'Clock' ? Clock : 
+                                       analysis.recommendation.icon === 'Target' ? Target : AlertCircle;
               
               return (
                 <div key={lead._id || lead.id} style={{ ...cardStyle, padding: '1.5rem' }}>
@@ -386,7 +491,7 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                       width: '60px',
                       height: '60px',
                       borderRadius: '50%',
-                      background: `conic-gradient(${getScoreColor(analysis.score)} ${analysis.score * 3.6}deg, ${darkMode ? '#374151' : '#e5e7eb'} 0deg)`,
+                      background: `conic-gradient(${getScoreColor(analysis.score || 0)} ${(analysis.score || 0) * 3.6}deg, ${darkMode ? '#374151' : '#e5e7eb'} 0deg)`,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
@@ -401,9 +506,9 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                         justifyContent: 'center',
                         fontSize: '0.875rem',
                         fontWeight: '700',
-                        color: getScoreColor(analysis.score)
+                        color: getScoreColor(analysis.score || 0)
                       }}>
-                        {analysis.score}
+                        {analysis.score || 0}
                       </div>
                     </div>
                   </div>
@@ -419,7 +524,7 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                       color: priorityColor.text,
                       border: `1px solid ${priorityColor.border}`
                     }}>
-                      {analysis.priority} Priority
+                      {analysis.priority || 'Low'} Priority
                     </span>
                   </div>
 
@@ -443,9 +548,9 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                       <span style={{
                         fontSize: '0.875rem',
                         fontWeight: '600',
-                        color: analysis.recommendation.color
+                        color: analysis.recommendation?.color || '#6b7280'
                       }}>
-                        {analysis.recommendation.action}
+                        {analysis.recommendation?.action || 'Review Required'}
                       </span>
                     </div>
                     <p style={{
@@ -453,7 +558,7 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                       color: darkMode ? '#d1d5db' : '#374151',
                       margin: 0
                     }}>
-                      {analysis.recommendation.message}
+                      {analysis.recommendation?.message || 'Lead needs manual review.'}
                     </p>
                   </div>
 
@@ -468,7 +573,7 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                       Scoring Factors:
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      {analysis.factors.slice(0, 3).map((factor, index) => (
+                      {(analysis.factors || []).slice(0, 3).map((factor, index) => (
                         <div key={index} style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -478,14 +583,14 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
                             fontSize: '0.75rem',
                             color: darkMode ? '#9ca3af' : '#6b7280'
                           }}>
-                            {factor.factor}
+                            {factor.factor || 'Unknown Factor'}
                           </span>
                           <span style={{
                             fontSize: '0.75rem',
                             fontWeight: '600',
-                            color: factor.color
+                            color: factor.color || '#6b7280'
                           }}>
-                            {factor.impact}
+                            {factor.impact || '+0'}
                           </span>
                         </div>
                       ))}

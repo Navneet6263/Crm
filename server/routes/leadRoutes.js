@@ -10,6 +10,7 @@ const {
   getMyLeads
 } = require('../controllers/leadController');
 const { auth } = require('../middleware/auth');
+const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.route('/')
   .post(createLead);
 
 router.get('/my-leads', getMyLeads);
-router.post('/assign', assignLead);
+router.post('/assign', handleLeadAssignmentNotification, assignLead);
 
 router.route('/:id')
   .get(getLeadById)

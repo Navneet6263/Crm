@@ -15,6 +15,7 @@ import {
   Building
 } from 'lucide-react';
 import { showToast } from './ToastNotification';
+import apiService from '../services/apiService';
 
 const ProfessionalDuplicateDetection = ({ darkMode, crmData, updateCrmData }) => {
   const [duplicates, setDuplicates] = useState([]);
@@ -24,121 +25,195 @@ const ProfessionalDuplicateDetection = ({ darkMode, crmData, updateCrmData }) =>
   const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
-    // Sample duplicate data
-    const sampleDuplicates = [
-      {
-        id: 1,
-        type: 'email',
-        field: 'email',
-        value: 'rajesh@techsolutions.com',
-        records: [
-          {
-            id: 101,
-            contactPerson: 'Rajesh Kumar',
-            companyName: 'Tech Solutions Pvt Ltd',
-            email: 'rajesh@techsolutions.com',
-            phone: '+91 9876543210',
-            createdDate: '2024-12-15T10:30:00Z',
-            source: 'Website'
-          },
-          {
-            id: 102,
-            contactPerson: 'Rajesh K.',
-            companyName: 'Tech Solutions Private Limited',
-            email: 'rajesh@techsolutions.com',
-            phone: '+91 9876543210',
-            createdDate: '2024-12-18T14:20:00Z',
-            source: 'Manual Entry'
-          }
-        ],
-        confidence: 95,
-        status: 'pending'
-      },
-      {
-        id: 2,
-        type: 'phone',
-        field: 'phone',
-        value: '+91 9876543211',
-        records: [
-          {
-            id: 103,
-            contactPerson: 'Priya Sharma',
-            companyName: 'Digital Marketing Hub',
-            email: 'priya@digitalmarketing.com',
-            phone: '+91 9876543211',
-            createdDate: '2024-12-10T09:15:00Z',
-            source: 'Social Media'
-          },
-          {
-            id: 104,
-            contactPerson: 'Priya S.',
-            companyName: 'Digital Marketing Hub',
-            email: 'priya.sharma@digitalmarketing.com',
-            phone: '+91 9876543211',
-            createdDate: '2024-12-12T16:45:00Z',
-            source: 'Referral'
-          }
-        ],
-        confidence: 88,
-        status: 'pending'
-      },
-      {
-        id: 3,
-        type: 'company',
-        field: 'companyName',
-        value: 'Healthcare Solutions',
-        records: [
-          {
-            id: 105,
-            contactPerson: 'Amit Patel',
-            companyName: 'Healthcare Solutions',
-            email: 'amit@healthcare.com',
-            phone: '+91 9876543212',
-            createdDate: '2024-12-05T11:45:00Z',
-            source: 'Trade Show'
-          },
-          {
-            id: 106,
-            contactPerson: 'Dr. Amit Patel',
-            companyName: 'Healthcare Solutions Pvt Ltd',
-            email: 'dr.amit@healthcaresolutions.com',
-            phone: '+91 9876543212',
-            createdDate: '2024-12-08T13:30:00Z',
-            source: 'Cold Call'
-          }
-        ],
-        confidence: 82,
-        status: 'pending'
-      }
-    ];
+    fetchDuplicates();
+  }, []);
 
-    setDuplicates(sampleDuplicates);
-  }, [crmData]);
+  const fetchDuplicates = async () => {
+    try {
+      const leads = await apiService.getLeads();
+      const detectedDuplicates = detectDuplicates(leads);
+      setDuplicates(detectedDuplicates);
+    } catch (error) {
+      console.error('Error fetching leads for duplicate detection:', error);
+      showToast('error', 'Failed to load data for duplicate detection');
+    }
+  };
+
+  const detectDuplicates = (leads) => {
+    const duplicateGroups = [];
+    const processed = new Set();
+    let groupId = 1;
+
+    leads.forEach((lead, index) => {
+      if (processed.has(lead.id)) return;
+
+      const duplicates = leads.filter((otherLead, otherIndex) => {
+        if (index === otherIndex || processed.has(otherLead.id)) return false;
+        return calculateSimilarity(lead, otherLead) > 0.7;
+      });
+
+      if (duplicates.length > 0) {
+        const allRecords = [lead, ...duplicates];
+        allRecords.forEach(record => processed.add(record.id));
+
+        const { type, field, value, confidence } = analyzeDuplicateGroup(allRecords);
+
+        duplicateGroups.push({
+          id: groupId++,
+          type,
+          field,
+          value,
+          records: allRecords.map(record => ({
+            id: record.id,
+            contactPerson: record.name || record.contactPerson || 'Unknown',
+            companyName: record.company || record.companyName || 'Unknown Company',
+            email: record.email || '',
+            phone: record.phone || '',
+            createdDate: record.createdAt || record.dateCreated || new Date().toISOString(),
+            source: record.source || 'Unknown'
+          })),
+          confidence,
+          status: 'pending'
+        });
+      }
+    });
+
+    return duplicateGroups;
+  };
+
+  const calculateSimilarity = (lead1, lead2) => {
+    let score = 0;
+    let factors = 0;
+
+    if (lead1.email && lead2.email) {
+      factors++;
+      if (lead1.email.toLowerCase() === lead2.email.toLowerCase()) {
+        score += 0.4;
+      }
+    }
+
+    if (lead1.phone && lead2.phone) {
+      factors++;
+      const phone1 = lead1.phone.replace(/\D/g, '');
+      const phone2 = lead2.phone.replace(/\D/g, '');
+      if (phone1 === phone2) {
+        score += 0.3;
+      }
+    }
+
+    if (lead1.name && lead2.name) {
+      factors++;
+      const nameSimilarity = stringSimilarity(lead1.name, lead2.name);
+      if (nameSimilarity > 0.8) {
+        score += 0.2;
+      }
+    }
+
+    if (lead1.company && lead2.company) {
+      factors++;
+      const companySimilarity = stringSimilarity(lead1.company, lead2.company);
+      if (companySimilarity > 0.8) {
+        score += 0.1;
+      }
+    }
+
+    return factors > 0 ? score : 0;
+  };
+
+  const stringSimilarity = (str1, str2) => {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    if (longer.length === 0) return 1.0;
+    return (longer.length - editDistance(longer, shorter)) / longer.length;
+  };
+
+  const editDistance = (str1, str2) => {
+    const matrix = [];
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[str2.length][str1.length];
+  };
+
+  const analyzeDuplicateGroup = (records) => {
+    const emails = records.map(r => r.email).filter(Boolean);
+    const uniqueEmails = [...new Set(emails)];
+    if (uniqueEmails.length === 1 && emails.length > 1) {
+      return { type: 'email', field: 'email', value: uniqueEmails[0], confidence: 95 };
+    }
+
+    const phones = records.map(r => r.phone?.replace(/\D/g, '')).filter(Boolean);
+    const uniquePhones = [...new Set(phones)];
+    if (uniquePhones.length === 1 && phones.length > 1) {
+      return { type: 'phone', field: 'phone', value: records.find(r => r.phone)?.phone || '', confidence: 90 };
+    }
+
+    const companies = records.map(r => r.company || r.companyName).filter(Boolean);
+    if (companies.length > 1) {
+      return { type: 'company', field: 'companyName', value: companies[0], confidence: 80 };
+    }
+
+    return { type: 'name', field: 'name', value: records[0]?.name || 'Similar Names', confidence: 75 };
+  };
 
   const scanForDuplicates = async () => {
     setIsScanning(true);
     showToast('info', '🔍 Scanning for duplicates...');
     
-    // Simulate scanning process
-    setTimeout(() => {
-      setIsScanning(false);
+    try {
+      await fetchDuplicates();
       showToast('success', `✅ Scan complete! Found ${duplicates.length} potential duplicates`);
-    }, 3000);
+    } catch (error) {
+      showToast('error', 'Failed to scan for duplicates');
+    } finally {
+      setIsScanning(false);
+    }
   };
 
-  const mergeDuplicates = (duplicateGroup) => {
-    // Keep the oldest record and merge data
-    const sortedRecords = duplicateGroup.records.sort((a, b) => 
-      new Date(a.createdDate) - new Date(b.createdDate)
-    );
-    
-    const primaryRecord = sortedRecords[0];
-    const duplicateIds = sortedRecords.slice(1).map(r => r.id);
-    
-    // Remove from duplicates list
-    setDuplicates(prev => prev.filter(d => d.id !== duplicateGroup.id));
-    
-    showToast('success', `✅ Merged ${duplicateGroup.records.length} duplicate records`);
+  const mergeDuplicates = async (duplicateGroup) => {
+    try {
+      const sortedRecords = duplicateGroup.records.sort((a, b) => 
+        new Date(a.createdDate) - new Date(b.createdDate)
+      );
+      
+      const primaryRecord = sortedRecords[0];
+      const duplicateIds = sortedRecords.slice(1).map(r => r.id);
+      
+      const mergedData = {
+        name: primaryRecord.contactPerson,
+        email: primaryRecord.email || sortedRecords.find(r => r.email)?.email,
+        phone: primaryRecord.phone || sortedRecords.find(r => r.phone)?.phone,
+        company: primaryRecord.companyName
+      };
+      
+      await apiService.updateLead(primaryRecord.id, mergedData);
+      
+      for (const duplicateId of duplicateIds) {
+        await apiService.deleteLead(duplicateId);
+      }
+      
+      setDuplicates(prev => prev.filter(d => d.id !== duplicateGroup.id));
+      showToast('success', `✅ Merged ${duplicateGroup.records.length} duplicate records`);
+    } catch (error) {
+      console.error('Error merging duplicates:', error);
+      showToast('error', 'Failed to merge duplicate records');
+    }
   };
 
   const ignoreDuplicate = (duplicateId) => {
@@ -148,20 +223,25 @@ const ProfessionalDuplicateDetection = ({ darkMode, crmData, updateCrmData }) =>
     showToast('info', '👁️ Duplicate marked as ignored');
   };
 
-  const deleteDuplicate = (duplicateGroup, recordId) => {
-    const updatedRecords = duplicateGroup.records.filter(r => r.id !== recordId);
-    
-    if (updatedRecords.length < 2) {
-      // Remove the duplicate group if less than 2 records remain
-      setDuplicates(prev => prev.filter(d => d.id !== duplicateGroup.id));
-    } else {
-      // Update the duplicate group
-      setDuplicates(prev => prev.map(d => 
-        d.id === duplicateGroup.id ? { ...d, records: updatedRecords } : d
-      ));
+  const deleteDuplicate = async (duplicateGroup, recordId) => {
+    try {
+      await apiService.deleteLead(recordId);
+      
+      const updatedRecords = duplicateGroup.records.filter(r => r.id !== recordId);
+      
+      if (updatedRecords.length < 2) {
+        setDuplicates(prev => prev.filter(d => d.id !== duplicateGroup.id));
+      } else {
+        setDuplicates(prev => prev.map(d => 
+          d.id === duplicateGroup.id ? { ...d, records: updatedRecords } : d
+        ));
+      }
+      
+      showToast('success', '🗑️ Record deleted successfully');
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      showToast('error', 'Failed to delete record');
     }
-    
-    showToast('success', '🗑️ Record deleted successfully');
   };
 
   const getConfidenceColor = (confidence) => {

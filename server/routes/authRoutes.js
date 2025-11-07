@@ -23,6 +23,8 @@ router.post('/create-team-member', auth, (req, res, next) => {
   return checkUserLimit(req, res, next);
 }, createTeamMember);
 router.put('/users/:userId/toggle', auth, toggleUserStatus);
+router.delete('/users/:userId', auth, require('../controllers/authController').deleteUser);
+router.put('/users/:userId', auth, require('../controllers/authController').updateUser);
 router.post('/create-employee', auth, createEmployee);
 
 module.exports = router;

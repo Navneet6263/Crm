@@ -32,7 +32,14 @@ const leadSchema = new mongoose.Schema({
   },
   leadSource: {
     type: String,
-    default: 'Website'
+    default: 'website'
+  },
+  customLeadSource: {
+    type: String,
+    trim: true
+  },
+  followUpDate: {
+    type: Date
   },
   status: {
     type: String,
@@ -47,17 +54,19 @@ const leadSchema = new mongoose.Schema({
     default: 0
   },
   assignedTo: {
-    type: String,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   assignedAt: {
     type: Date
   },
   assignedBy: {
-    type: String
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   createdBy: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true
   },
   tenantId: {
@@ -79,7 +88,7 @@ const leadSchema = new mongoose.Schema({
   activities: [{
     type: {
       type: String,
-      enum: ['call', 'email', 'meeting', 'note', 'status_change']
+      enum: ['call', 'email', 'meeting', 'note', 'status_change', 'assignment']
     },
     description: String,
     createdBy: {

@@ -70,7 +70,7 @@ const NotificationSystem = ({ darkMode }) => {
       case 'call_scheduled': return '#10b981';
       case 'email_sent': return '#8b5cf6';
       case 'follow_up_due': return '#ef4444';
-      case 'lead_assigned': return '#06b6d4';
+      case 'lead_assigned': return '#22c55e'; // Green for assignments
       case 'task_due': return '#f97316';
       default: return '#6b7280';
     }
@@ -255,6 +255,18 @@ const NotificationSystem = ({ darkMode }) => {
                           margin: '0 0 0.25rem 0'
                         }}>
                           {notification.title}
+                          {notification.type === 'lead_assigned' && (
+                            <span style={{
+                              marginLeft: '0.5rem',
+                              fontSize: '0.75rem',
+                              background: '#22c55e',
+                              color: 'white',
+                              padding: '0.125rem 0.375rem',
+                              borderRadius: '0.25rem'
+                            }}>
+                              NEW ASSIGNMENT
+                            </span>
+                          )}
                         </p>
                         <p style={{
                           fontSize: '0.75rem',

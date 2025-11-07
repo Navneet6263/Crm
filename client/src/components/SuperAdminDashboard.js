@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/apiService';
-import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield, Settings, Plus, Eye, UserCheck, UserX } from 'lucide-react';
 import BookDemoModal from './BookDemoModal';
 import SuperAdminManagement from './SuperAdminManagement';
 
 // Employee Management Component
-const EmployeeManagement = ({ darkMode }) => {
+const EmployeeManagement = ({ darkMode, currentUser }) => {
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Auto-hide success message
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
@@ -40,8 +52,11 @@ const EmployeeManagement = ({ darkMode }) => {
     }
     
     if (filters.status) {
-      const isActive = filters.status === 'active';
-      filtered = filtered.filter(emp => emp.isActive === isActive);
+      if (filters.status === 'active') {
+        filtered = filtered.filter(emp => emp.isActive === true);
+      } else if (filters.status === 'inactive') {
+        filtered = filtered.filter(emp => emp.isActive === false);
+      }
     }
     
     if (filters.search) {
@@ -88,10 +103,16 @@ const EmployeeManagement = ({ darkMode }) => {
       
       if (response.ok) {
         const data = await response.json();
-        setEmployees(data.users || data || []);
+        const employeesList = data.users || data || [];
+        console.log('📊 Fetched employees:', employeesList.length, 'users');
+        setEmployees(employeesList);
+      } else {
+        console.error('Failed to fetch employees:', response.status);
+        setEmployees([]);
       }
     } catch (error) {
       console.error('Error fetching employees:', error);
+      setEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -114,16 +135,28 @@ const EmployeeManagement = ({ darkMode }) => {
       if (response.ok) {
         const result = await response.json();
         console.log('Toggle result:', result);
-        fetchEmployees(); // Refresh list
-        alert(`Employee ${currentStatus ? 'deactivated' : 'activated'} successfully!`);
+        
+        // Update local state immediately for better UX
+        setEmployees(prevEmployees => 
+          prevEmployees.map(emp => 
+            emp._id === userId 
+              ? { ...emp, isActive: !currentStatus }
+              : emp
+          )
+        );
+        
+        setSuccessMessage(`Employee ${currentStatus ? 'deactivated' : 'activated'} successfully!`);
+        
+        // Refresh from server to ensure consistency
+        setTimeout(() => fetchEmployees(), 500);
       } else {
-        const errorText = await response.text();
-        console.error('Toggle error response:', errorText);
-        alert('Failed to update employee status');
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Toggle error response:', errorData);
+        alert(`Failed to update employee status: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error toggling employee status:', error);
-      alert('Failed to update employee status');
+      alert(`Failed to update employee status: ${error.message}`);
     }
   };
 
@@ -145,18 +178,131 @@ const EmployeeManagement = ({ darkMode }) => {
       console.log('Response status:', response.status);
       
       if (response.ok) {
-        fetchEmployees();
+        const result = await response.json();
+        console.log('✅ Employee created:', result);
+        
+        // Refresh employee list
+        await fetchEmployees();
+        
+        // Reset form
         setShowAddForm(false);
         setFormData({ name: '', email: '', password: '', role: 'sales' });
-        alert('Employee created successfully!');
+        setSuccessMessage(`Employee "${formData.name}" created successfully!`);
       } else {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        alert('Failed to create employee');
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Error creating employee:', errorData);
+        alert(`Failed to create employee: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error creating employee:', error);
       alert('Failed to create employee');
+    }
+  };
+
+  const handleEditEmployee = (employee) => {
+    setEditingEmployee(employee);
+    setFormData({
+      name: employee.name,
+      email: employee.email,
+      password: '',
+      role: employee.role
+    });
+    setShowEditForm(true);
+  };
+
+  const handleUpdateEmployee = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const updateData = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role
+      };
+      
+      if (formData.password && formData.password.trim()) {
+        updateData.password = formData.password;
+      }
+      
+      console.log('Updating employee with data:', updateData);
+      
+      const response = await fetch(`http://localhost:5004/api/auth/users/${editingEmployee._id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Update result:', result);
+        
+        // Update local state immediately
+        setEmployees(prevEmployees => 
+          prevEmployees.map(emp => 
+            emp._id === editingEmployee._id 
+              ? { ...emp, ...updateData }
+              : emp
+          )
+        );
+        
+        setShowEditForm(false);
+        setEditingEmployee(null);
+        setFormData({ name: '', email: '', password: '', role: 'sales' });
+        setSuccessMessage(`Employee "${formData.name}" updated successfully!`);
+        
+        // Refresh from server to ensure consistency
+        setTimeout(() => fetchEmployees(), 500);
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Update error response:', errorData);
+        alert(`Failed to update employee: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      alert(`Failed to update employee: ${error.message}`);
+    }
+  };
+
+  const handleDeleteEmployee = async (employeeId, employeeName) => {
+    if (!window.confirm(`Are you sure you want to delete employee "${employeeName}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`http://localhost:5004/api/auth/users/${employeeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Delete result:', result);
+        
+        // Update local state immediately
+        setEmployees(prevEmployees => 
+          prevEmployees.filter(emp => emp._id !== employeeId)
+        );
+        
+        setSuccessMessage(`Employee "${employeeName}" deleted successfully!`);
+        
+        // Refresh from server to ensure consistency
+        setTimeout(() => fetchEmployees(), 500);
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Delete error response:', errorData);
+        alert(`Failed to delete employee: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      alert(`Failed to delete employee: ${error.message}`);
     }
   };
 
@@ -188,22 +334,69 @@ const EmployeeManagement = ({ darkMode }) => {
           margin: 0
         }}>Employee Management ({filteredEmployees.length}/{employees.length})</h2>
         
-        <button
-          onClick={() => setShowAddForm(true)}
-          style={{
+        {/* Only Super Admin can add employees */}
+        {currentUser?.role === 'super-admin' && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '600'
+            }}
+          >
+            + Create Employee ID
+          </button>
+        )}
+        
+        {/* Admin can only view */}
+        {(currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.role === 'senior-manager') && (
+          <div style={{
             padding: '0.5rem 1rem',
-            background: 'linear-gradient(135deg, #22c55e, #4ade80)',
-            color: 'white',
-            border: 'none',
+            background: darkMode ? '#374151' : '#f3f4f6',
+            color: darkMode ? '#9ca3af' : '#6b7280',
+            border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
             borderRadius: '6px',
-            cursor: 'pointer',
             fontSize: '0.875rem',
             fontWeight: '600'
-          }}
-        >
-          + Add Employee
-        </button>
+          }}>
+            👁️ {currentUser?.role === 'admin' ? 'Admin View' : currentUser?.role === 'manager' ? 'Manager Dashboard' : 'Senior Manager Dashboard'}
+          </div>
+        )}
       </div>
+      
+      {/* Success Message */}
+      {successMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'linear-gradient(135deg, #10b981, #34d399)',
+          color: 'white',
+          padding: '1rem 1.5rem',
+          borderRadius: '8px',
+          boxShadow: '0 4px 20px rgba(16, 185, 129, 0.3)',
+          zIndex: 1000,
+          fontSize: '0.875rem',
+          fontWeight: '600',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          animation: 'slideIn 0.3s ease-out'
+        }}>
+          ✅ {successMessage}
+          <style>{`
+            @keyframes slideIn {
+              from { transform: translateX(100%); opacity: 0; }
+              to { transform: translateX(0); opacity: 1; }
+            }
+          `}</style>
+        </div>
+      )}
       
       {/* Filters */}
       <div style={{
@@ -354,24 +547,103 @@ const EmployeeManagement = ({ darkMode }) => {
                     </span>
                   </td>
                   <td style={{ padding: '1rem' }}>
-                    <button
-                      onClick={() => {
-                        console.log('Button clicked for employee:', employee._id, employee.name);
-                        toggleEmployeeStatus(employee._id, employee.isActive);
-                      }}
-                      style={{
+                    {/* Role-based actions */}
+                    {currentUser?.role === 'super-admin' ? (
+                      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => handleEditEmployee(employee)}
+                          onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
+                          onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            border: 'none',
+                            borderRadius: '4px',
+                            background: '#3b82f6',
+                            color: 'white',
+                            cursor: 'pointer',
+                            fontSize: '0.7rem',
+                            fontWeight: '500',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => toggleEmployeeStatus(employee._id, employee.isActive)}
+                          disabled={actionLoading === `toggle-${employee._id}`}
+                          onMouseEnter={(e) => {
+                            if (!actionLoading) {
+                              e.target.style.background = employee.isActive ? '#dc2626' : '#059669';
+                              e.target.style.transform = 'scale(1.05)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!actionLoading) {
+                              e.target.style.background = employee.isActive ? '#ef4444' : '#10b981';
+                              e.target.style.transform = !employee.isActive ? 'scale(1.05)' : 'scale(1)';
+                            }
+                          }}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            border: 'none',
+                            borderRadius: '4px',
+                            background: actionLoading === `toggle-${employee._id}` ? '#9ca3af' : (employee.isActive ? '#ef4444' : '#10b981'),
+                            color: 'white',
+                            cursor: actionLoading === `toggle-${employee._id}` ? 'not-allowed' : 'pointer',
+                            fontSize: '0.7rem',
+                            fontWeight: '500',
+                            boxShadow: !employee.isActive && actionLoading !== `toggle-${employee._id}` ? '0 0 0 2px #10b981' : 'none',
+                            transform: !employee.isActive && actionLoading !== `toggle-${employee._id}` ? 'scale(1.05)' : 'scale(1)',
+                            transition: 'all 0.2s ease',
+                            opacity: actionLoading === `toggle-${employee._id}` ? 0.7 : 1
+                          }}
+                        >
+                          {actionLoading === `toggle-${employee._id}` ? '⏳' : (employee.isActive ? 'Deactivate' : 'Activate')}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmployee(employee._id, employee.name)}
+                          disabled={actionLoading === `delete-${employee._id}`}
+                          onMouseEnter={(e) => {
+                            if (!actionLoading) {
+                              e.target.style.background = '#991b1b';
+                              e.target.style.transform = 'scale(1.05)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!actionLoading) {
+                              e.target.style.background = '#dc2626';
+                              e.target.style.transform = 'scale(1)';
+                            }
+                          }}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            border: 'none',
+                            borderRadius: '4px',
+                            background: actionLoading === `delete-${employee._id}` ? '#9ca3af' : '#dc2626',
+                            color: 'white',
+                            cursor: actionLoading === `delete-${employee._id}` ? 'not-allowed' : 'pointer',
+                            fontSize: '0.7rem',
+                            fontWeight: '500',
+                            transition: 'all 0.2s ease',
+                            opacity: actionLoading === `delete-${employee._id}` ? 0.7 : 1
+                          }}
+                        >
+                          {actionLoading === `delete-${employee._id}` ? '⏳' : 'Delete'}
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{
                         padding: '0.5rem 1rem',
-                        border: 'none',
+                        background: darkMode ? '#374151' : '#f3f4f6',
+                        color: darkMode ? '#9ca3af' : '#6b7280',
                         borderRadius: '6px',
-                        background: employee.isActive ? '#ef4444' : '#10b981',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '600'
-                      }}
-                    >
-                      {employee.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
+                        fontSize: '0.75rem'
+                      }}>
+                        {currentUser?.role === 'admin' ? 'Admin View' : 
+                         currentUser?.role === 'manager' ? 'Manager View' : 
+                         currentUser?.role === 'senior-manager' ? 'Sr. Manager View' : 'View Only'}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -470,7 +742,7 @@ const EmployeeManagement = ({ darkMode }) => {
               fontWeight: '700',
               color: darkMode ? 'white' : '#1f2937',
               marginBottom: '1.5rem'
-            }}>Add New Employee</h3>
+            }}>Create Employee ID</h3>
             
             <form onSubmit={handleAddEmployee}>
               <div style={{ marginBottom: '1rem' }}>
@@ -569,7 +841,7 @@ const EmployeeManagement = ({ darkMode }) => {
                   <option value="manager">Manager</option>
                   <option value="senior-manager">Senior Manager</option>
                   <option value="admin">Admin</option>
-                  <option value="super-admin">Super Admin</option>
+                  <option value="support">Support</option>
                 </select>
               </div>
               
@@ -602,7 +874,178 @@ const EmployeeManagement = ({ darkMode }) => {
                     fontWeight: '600'
                   }}
                 >
-                  Create Employee
+                  Create ID
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Edit Employee Modal */}
+      {showEditForm && editingEmployee && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: darkMode ? '#1f2937' : 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            width: '90%',
+            maxWidth: '500px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: '700',
+              color: darkMode ? 'white' : '#1f2937',
+              marginBottom: '1.5rem'
+            }}>Edit Employee: {editingEmployee.name}</h3>
+            
+            <form onSubmit={handleUpdateEmployee}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Email *</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>New Password (leave blank to keep current)</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  placeholder="Enter new password or leave blank"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>Role *</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({...formData, role: e.target.value})}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    background: darkMode ? '#374151' : 'white',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}
+                >
+                  <option value="sales">Sales</option>
+                  <option value="manager">Manager</option>
+                  <option value="senior-manager">Senior Manager</option>
+                  <option value="admin">Admin</option>
+                  <option value="support">Support</option>
+                </select>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditForm(false);
+                    setEditingEmployee(null);
+                    setFormData({ name: '', email: '', password: '', role: 'sales' });
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'transparent',
+                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  Update Employee
                 </button>
               </div>
             </form>
@@ -886,7 +1329,7 @@ const UserPlanManager = ({ darkMode }) => {
   );
 };
 
-const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
+const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isStatModalOpen, setIsStatModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
@@ -894,24 +1337,67 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [customers, setCustomers] = useState([]);
+  const [users, setUsers] = useState([]);
   
   const handleStatClick = (stat) => {
     console.log('Stat clicked:', stat.title);
-    setModalTitle(stat.title);
     
-    // No mock data - will show empty state
-    let data = [];
-    
-    setModalData(data);
-    setIsStatModalOpen(true);
+    // Navigate to appropriate section based on stat
+    if (stat.title === 'Total Leads' || stat.title === 'Active Leads' || stat.title === 'Pending Leads' || stat.title === 'Closed Won') {
+      onNavigate('leads');
+    }
   };
   
+
+
   const leadsArray = Array.isArray(leads) ? leads : (leads?.leads ? leads.leads : []);
+  const customersArray = Array.isArray(customers) ? customers : (customers?.customers ? customers.customers : []);
+  const usersArray = Array.isArray(users) ? users : (users?.users ? users.users : []);
+  
+  // Calculate real-time stats
+  const totalLeads = leadsArray.length;
+  const activeLeads = leadsArray.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length;
+  const closedWonLeads = leadsArray.filter(l => l.status === 'closed-won').length;
+  const pendingLeads = leadsArray.filter(l => ['new', 'pending'].includes(l.status)).length;
+  
   const stats = [
-    { title: 'Total Leads', value: leadsArray.length.toString(), change: '+12.5%', trend: 'up', icon: Users },
-    { title: 'Active Leads', value: leadsArray.filter(l => ['qualified', 'proposal', 'negotiation'].includes(l.status)).length.toString(), change: '+8.2%', trend: 'up', icon: TrendingUp },
-    { title: 'Closed Won', value: leadsArray.filter(l => l.status === 'closed-won').length.toString(), change: '+5.7%', trend: 'up', icon: DollarSign },
-    { title: 'Pending Leads', value: leadsArray.filter(l => ['new', 'contacted'].includes(l.status)).length.toString(), change: '-3.1%', trend: 'down', icon: Phone }
+    { 
+      title: 'Total Leads', 
+      value: totalLeads.toString(), 
+      change: totalLeads > 0 ? '+12.5%' : '0%', 
+      trend: totalLeads > 0 ? 'up' : 'down', 
+      icon: Users,
+      action: () => handleStatClick({ title: 'Total Leads' }),
+      subtitle: `${customersArray.length} customers, ${usersArray.length} users`
+    },
+    { 
+      title: 'Active Leads', 
+      value: activeLeads.toString(), 
+      change: activeLeads > 0 ? '+8.2%' : '0%', 
+      trend: activeLeads > 0 ? 'up' : 'down', 
+      icon: TrendingUp,
+      action: () => handleStatClick({ title: 'Active Leads' }),
+      subtitle: `${Math.round((activeLeads / Math.max(totalLeads, 1)) * 100)}% of total`
+    },
+    { 
+      title: 'Closed Won', 
+      value: closedWonLeads.toString(), 
+      change: closedWonLeads > 0 ? '+5.7%' : '0%', 
+      trend: closedWonLeads > 0 ? 'up' : 'down', 
+      icon: DollarSign,
+      action: () => handleStatClick({ title: 'Closed Won' }),
+      subtitle: `${Math.round((closedWonLeads / Math.max(totalLeads, 1)) * 100)}% conversion rate`
+    },
+    { 
+      title: 'Pending Leads', 
+      value: pendingLeads.toString(), 
+      change: pendingLeads > 0 ? '-3.1%' : '0%', 
+      trend: 'down', 
+      icon: Phone,
+      action: () => handleStatClick({ title: 'Pending Leads' }),
+      subtitle: `Need immediate attention`
+    }
   ];
 
   // Demo requests that need approval
@@ -920,6 +1406,15 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
   useEffect(() => {
     fetchDemoRequests();
     fetchLeads();
+    fetchCustomers();
+    fetchUsers();
+    
+    // Auto-refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      fetchLeads();
+      fetchCustomers();
+      fetchUsers();
+    }, 30000);
     
     // Auto-cleanup every 1 minute
     const cleanupInterval = setInterval(() => {
@@ -947,20 +1442,77 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
       }
     }, 60000); // Check every 1 minute
     
-    return () => clearInterval(cleanupInterval);
+    return () => {
+      clearInterval(refreshInterval);
+      clearInterval(cleanupInterval);
+    };
   }, []);
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (showNotification = false) => {
     try {
       setLoading(true);
       const response = await apiService.getAllLeads();
       const leadsData = response?.leads || response || [];
       setLeads(Array.isArray(leadsData) ? leadsData : []);
+      if (showNotification) {
+        console.log('✅ Leads refreshed successfully');
+      }
     } catch (error) {
       console.error('Error fetching leads:', error);
       setLeads([]);
+      if (showNotification) {
+        console.error('❌ Failed to refresh leads');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCustomers = async (showNotification = false) => {
+    try {
+      const response = await apiService.getCustomers();
+      const customersData = response?.customers || response || [];
+      setCustomers(Array.isArray(customersData) ? customersData : []);
+      if (showNotification) {
+        console.log('✅ Customers refreshed successfully');
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      setCustomers([]);
+      if (showNotification) {
+        console.error('❌ Failed to refresh customers');
+      }
+    }
+  };
+
+  const fetchUsers = async (showNotification = false) => {
+    try {
+      const response = await apiService.getUsers();
+      const usersData = response?.users || response || [];
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      if (showNotification) {
+        console.log('✅ Users refreshed successfully');
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setUsers([]);
+      if (showNotification) {
+        console.error('❌ Failed to refresh users');
+      }
+    }
+  };
+
+  const handleRefreshAll = async () => {
+    try {
+      await Promise.all([
+        fetchLeads(true),
+        fetchCustomers(true),
+        fetchUsers(true),
+        fetchDemoRequests()
+      ]);
+      console.log('🔄 Dashboard data refreshed successfully!');
+    } catch (error) {
+      console.error('❌ Failed to refresh dashboard data:', error);
     }
   };
 
@@ -1088,15 +1640,65 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
       <div style={{
         marginBottom: '2rem'
       }}>
-        <h1 style={{
-          fontSize: '1.875rem',
-          fontWeight: '700',
-          color: darkMode ? '#f8fafc' : '#111827',
-          marginBottom: '0.5rem'
-        }}>{currentUser?.role === 'super-admin' ? 'Super Admin Dashboard' : 'Admin Dashboard'}</h1>
-        <p style={{
-          color: darkMode ? '#cbd5e1' : '#6b7280'
-        }}>Welcome back! Here's what's happening with your business today.</p>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '1rem'
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '1.875rem',
+              fontWeight: '700',
+              color: darkMode ? '#f8fafc' : '#111827',
+              marginBottom: '0.5rem'
+            }}>{
+              currentUser?.role === 'super-admin' ? 'Super Admin Dashboard' : 
+              currentUser?.role === 'admin' ? 'Admin Dashboard' :
+              currentUser?.role === 'manager' ? 'Manager Dashboard' :
+              currentUser?.role === 'senior-manager' ? 'Senior Manager Dashboard' :
+              'Dashboard'
+            }</h1>
+            <p style={{
+              color: darkMode ? '#cbd5e1' : '#6b7280'
+            }}>Welcome back! Here's what's happening with your business today.</p>
+          </div>
+          
+          {/* Just Refresh Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              onClick={handleRefreshAll}
+              disabled={loading}
+              style={{
+                padding: '0.5rem 1rem',
+                background: loading ? (darkMode ? '#4b5563' : '#e5e7eb') : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: loading ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: loading ? '2px solid transparent' : 'none',
+                borderTop: loading ? `2px solid ${darkMode ? '#9ca3af' : '#6b7280'}` : 'none',
+                borderRadius: '50%',
+                animation: loading ? 'spin 1s linear infinite' : 'none'
+              }}>
+                {!loading && '🔄'}
+              </div>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
         
         {/* Tab Navigation */}
         {currentUser?.role === 'super-admin' && (
@@ -1154,18 +1756,49 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
         <SuperAdminManagement darkMode={darkMode} />
       ) : (
         <>
+          {/* Loading State */}
+          {loading && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '2rem',
+              color: darkMode ? '#9ca3af' : '#6b7280'
+            }}>
+              <div style={{
+                border: `3px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                borderTop: '3px solid #22c55e',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                animation: 'spin 1s linear infinite',
+                marginRight: '1rem'
+              }}></div>
+              Loading dashboard data...
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          )}
+          
+          {/* Stats Cards */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: '2rem',
-            marginBottom: '3rem'
+            marginBottom: '3rem',
+            opacity: loading ? 0.5 : 1,
+            transition: 'opacity 0.3s ease'
           }}>
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <div 
               key={index} 
-              onClick={() => handleStatClick(stat)}
+              onClick={stat.action || (() => handleStatClick(stat))}
               style={{
                 background: darkMode ? '#1e293b' : 'linear-gradient(135deg, white, #f8fafc)',
                 borderRadius: '20px',
@@ -1218,6 +1851,14 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
                     margin: '0',
                     fontWeight: '600'
                   }}>{stat.title}</p>
+                  {stat.subtitle && (
+                    <p style={{
+                      color: darkMode ? '#9ca3af' : '#9ca3af',
+                      fontSize: '0.75rem',
+                      margin: '0.25rem 0 0 0',
+                      fontWeight: '400'
+                    }}>{stat.subtitle}</p>
+                  )}
                 </div>
                 <div style={{
                   background: `linear-gradient(135deg, ${stat.trend === 'up' ? '#10b981' : '#ef4444'}, ${stat.trend === 'up' ? '#34d399' : '#f87171'})`,
@@ -1248,6 +1889,128 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
                 <span style={{ marginLeft: '0.5rem' }}>{stat.change}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '0.75rem', opacity: 0.7 }}>vs last month</span>
               </div>
+              
+              {/* Quick Action Buttons */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginTop: '1rem'
+              }}>
+                {/* Quick Action Buttons for each stat */}
+                {stat.title === 'Total Leads' && (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate('add-enquiry');
+                      }}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: 'rgba(34, 197, 94, 0.1)',
+                        color: '#22c55e',
+                        border: '1px solid rgba(34, 197, 94, 0.2)',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Plus size={12} style={{ marginRight: '0.25rem' }} />
+                      Add Lead
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigate('leads');
+                      }}
+                      style={{
+                        padding: '0.25rem 0.5rem',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        color: '#3b82f6',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Eye size={12} style={{ marginRight: '0.25rem' }} />
+                      View All
+                    </button>
+                  </>
+                )}
+                
+                {stat.title === 'Active Leads' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate('leads');
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      color: '#10b981',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <UserCheck size={12} style={{ marginRight: '0.25rem' }} />
+                    View Active
+                  </button>
+                )}
+                
+                {stat.title === 'Closed Won' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate('leads');
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      background: 'rgba(34, 197, 94, 0.1)',
+                      color: '#22c55e',
+                      border: '1px solid rgba(34, 197, 94, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <DollarSign size={12} style={{ marginRight: '0.25rem' }} />
+                    View Won
+                  </button>
+                )}
+                
+                {stat.title === 'Pending Leads' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate('leads');
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      background: 'rgba(245, 158, 11, 0.1)',
+                      color: '#f59e0b',
+                      border: '1px solid rgba(245, 158, 11, 0.2)',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <UserX size={12} style={{ marginRight: '0.25rem' }} />
+                    View Pending
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
@@ -1255,8 +2018,115 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser }) => {
 
 
 
+      {/* Real-time Summary Section */}
+      <div style={{
+        background: darkMode ? '#1e293b' : 'white',
+        borderRadius: '0.5rem',
+        padding: '1.5rem',
+        boxShadow: darkMode ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+        marginBottom: '2rem'
+      }}>
+        <h2 style={{
+          fontSize: '1.25rem',
+          fontWeight: '600',
+          color: darkMode ? '#f8fafc' : '#111827',
+          marginBottom: '1.5rem'
+        }}>System Overview</h2>
+        
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1rem'
+        }}>
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#374151' : '#f9fafb',
+            borderRadius: '8px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#22c55e',
+              marginBottom: '0.5rem'
+            }}>{leadsArray.length}</div>
+            <div style={{
+              fontSize: '0.875rem',
+              color: darkMode ? '#d1d5db' : '#6b7280'
+            }}>Total Leads</div>
+          </div>
+          
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#374151' : '#f9fafb',
+            borderRadius: '8px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#3b82f6',
+              marginBottom: '0.5rem'
+            }}>{customersArray.length}</div>
+            <div style={{
+              fontSize: '0.875rem',
+              color: darkMode ? '#d1d5db' : '#6b7280'
+            }}>Total Customers</div>
+          </div>
+          
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#374151' : '#f9fafb',
+            borderRadius: '8px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#8b5cf6',
+              marginBottom: '0.5rem'
+            }}>{usersArray.length}</div>
+            <div style={{
+              fontSize: '0.875rem',
+              color: darkMode ? '#d1d5db' : '#6b7280'
+            }}>Total Users</div>
+          </div>
+          
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#374151' : '#f9fafb',
+            borderRadius: '8px',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              color: '#f59e0b',
+              marginBottom: '0.5rem'
+            }}>{demoRequests.length}</div>
+            <div style={{
+              fontSize: '0.875rem',
+              color: darkMode ? '#d1d5db' : '#6b7280'
+            }}>Demo Requests</div>
+          </div>
+        </div>
+        
+        {/* Last Updated */}
+        <div style={{
+          marginTop: '1rem',
+          padding: '0.75rem',
+          background: darkMode ? '#4b5563' : '#e5e7eb',
+          borderRadius: '6px',
+          textAlign: 'center',
+          fontSize: '0.75rem',
+          color: darkMode ? '#9ca3af' : '#6b7280'
+        }}>
+          Last updated: {new Date().toLocaleString()}
+        </div>
+      </div>
+
       {/* Employee Management Section */}
-      <EmployeeManagement darkMode={darkMode} />
+      <EmployeeManagement darkMode={darkMode} currentUser={currentUser} />
 
       {/* User Management Section */}
       <div style={{

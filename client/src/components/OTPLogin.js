@@ -37,15 +37,22 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
   const sendOTP = async () => {
     setLoading(true);
     try {
+      const requestBody = {
+        method: selectedMethod
+      };
+      
+      if (selectedMethod === 'sms') {
+        requestBody.phoneNumber = email; // Using email state for phone number too
+      } else {
+        requestBody.email = email;
+      }
+      
       const response = await fetch(`${config.api.baseUrl}/otp/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          email,
-          method: selectedMethod
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const result = await response.json();
@@ -66,15 +73,20 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
   const verifyOTP = async () => {
     setLoading(true);
     try {
+      const requestBody = { otp };
+      
+      if (selectedMethod === 'sms') {
+        requestBody.phoneNumber = email;
+      } else {
+        requestBody.email = email;
+      }
+      
       const response = await fetch(`${config.api.baseUrl}/otp/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          email,
-          otp
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const result = await response.json();
@@ -179,21 +191,21 @@ const OTPLogin = ({ onBack, darkMode = false }) => {
           </>
         )}
 
-        {/* Email Input */}
+        {/* Contact Input */}
         {step === 'phone' && (
           <>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
               <h2 style={{ color: darkMode ? 'white' : '#111827' }}>
-                Enter Email Address
+                {selectedMethod === 'sms' ? 'Enter Phone Number' : 'Enter Email Address'}
               </h2>
               <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                We'll send OTP to your email
+                {selectedMethod === 'sms' ? "We'll send OTP to your phone" : "We'll send OTP to your email"}
               </p>
             </div>
 
             <input
-              type="email"
-              placeholder="your.email@example.com"
+              type={selectedMethod === 'sms' ? 'tel' : 'email'}
+              placeholder={selectedMethod === 'sms' ? '+91 9876543210' : 'your.email@example.com'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{

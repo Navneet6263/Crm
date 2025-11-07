@@ -121,24 +121,45 @@ const deleteNotification = async (req, res) => {
 const createLeadAssignmentNotification = async (leadId, assignedToUserId, assignedByUserId) => {
   try {
     const Lead = require('../models/Lead');
-    const lead = await Lead.findById(leadId);
+    const lead = await Lead.findById(leadId).populate('assignedBy', 'name role');
     
-    if (!lead) return;
+    if (!lead) {
+      console.log('❌ Lead not found for notification:', leadId);
+      return;
+    }
     
-    await createNotification({
-      title: 'New Lead Assigned',
-      message: `A new lead "${lead.companyName}" has been assigned to you`,
+    const assignedByUser = await User.findById(assignedByUserId);
+    const assignedToUser = await User.findById(assignedToUserId);
+    
+    console.log('📧 Creating lead assignment notification:', {
+      leadId,
+      leadCompany: lead.companyName,
+      assignedTo: assignedToUser?.name,
+      assignedBy: assignedByUser?.name
+    });
+    
+    // Create notification for assigned user
+    const notification = await createNotification({
+      title: '🎯 New Lead Assigned to You',
+      message: `Lead "${lead.companyName}" (${lead.contactPerson}) has been assigned to you by ${assignedByUser?.name || 'Admin'}`,
       type: 'lead_assigned',
       userId: assignedToUserId,
       leadId: leadId,
       priority: 'high',
       actionable: true,
-      actionView: 'my-leads'
+      actionView: 'my-leads',
+      metadata: {
+        leadCompany: lead.companyName,
+        leadContact: lead.contactPerson,
+        assignedBy: assignedByUser?.name,
+        assignedAt: new Date()
+      }
     });
     
-    console.log('✅ Lead assignment notification created');
+    console.log('✅ Lead assignment notification created:', notification?._id);
+    return notification;
   } catch (error) {
-    console.error('Error creating lead assignment notification:', error);
+    console.error('❌ Error creating lead assignment notification:', error);
   }
 };
 
