@@ -5,7 +5,6 @@ const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
-const mongoose = require('mongoose');
 const connectDB = require('./config/database');
 
 // Load environment variables
@@ -15,10 +14,8 @@ dotenv.config();
 let isDBConnected = false;
 connectDB().then(() => {
   isDBConnected = true;
-  console.log('✅ Database connected successfully');
 }).catch(err => {
-  console.error('❌ Database connection failed:', err.message);
-  process.exit(1);
+  console.error('Database connection failed:', err.message);
 });
 
 // Import models
@@ -81,7 +78,6 @@ app.use('/api', apiLimiter);
 app.use(cors({
   origin: [
     'https://crm-two-ashy.vercel.app',
-    'https://crm-1-zn0m.onrender.com',
     'https://your-frontend-domain.vercel.app',
     'https://your-frontend-domain.netlify.app',
     'http://localhost:3000',
@@ -132,12 +128,6 @@ initializePassport(app);
 
 // Enhanced auth middleware with security checks
 const authenticateToken = async (req, res, next) => {
-  // Check database connection first
-  if (!isDBConnected) {
-    console.log('❌ Database not connected');
-    return res.status(503).json({ message: 'Service temporarily unavailable' });
-  }
-  
   console.log('🔐 Auth check for:', req.method, req.path);
   console.log('📋 Headers:', { Authorization: req.headers.authorization ? 'Token present' : 'No token', Cookie: req.headers.cookie ? 'Cookie present' : 'No cookie' });
   
@@ -156,20 +146,16 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
     console.log('✅ Token decoded successfully:', { userId: decoded.id });
     
-    // Check if token is blacklisted (with error handling)
-    try {
-      const TokenBlacklist = require('./models/TokenBlacklist');
-      const blacklisted = await TokenBlacklist.findOne({
-        userId: decoded.id,
-        deactivatedAt: { $lte: new Date() }
-      });
-      
-      if (blacklisted) {
-        console.log('❌ Token is blacklisted');
-        return res.status(401).json({ message: 'Token has been revoked' });
-      }
-    } catch (blacklistError) {
-      console.log('⚠️ Blacklist check failed, continuing:', blacklistError.message);
+    // Check if token is blacklisted
+    const TokenBlacklist = require('./models/TokenBlacklist');
+    const blacklisted = await TokenBlacklist.findOne({
+      userId: decoded.id,
+      deactivatedAt: { $lte: new Date() }
+    });
+    
+    if (blacklisted) {
+      console.log('❌ Token is blacklisted');
+      return res.status(401).json({ message: 'Token has been revoked' });
     }
     
     // Get user with populated company information
@@ -208,24 +194,8 @@ const authenticateToken = async (req, res, next) => {
 // Auth Routes
 app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res) => {
   try {
-    // Check database connection first
-    if (!isDBConnected) {
-      console.log('❌ Database not connected during login');
-      return res.status(503).json({ 
-        success: false,
-        message: 'Service temporarily unavailable. Please try again later.' 
-      });
-    }
-    
-    console.log('🔐 LOGIN REQUEST:', { email: req.body.email, hasPassword: !!req.body.password });
+    console.log('🔐 LOGIN REQUEST:', req.body);
     const { email, password } = req.body;
-    
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Email and password are required' 
-      });
-    }
     
     // Find user by email
     const user = await User.findOne({ email });
@@ -233,36 +203,14 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
     
     if (!user) {
       console.log('❌ User not found for email:', email);
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid email or password' 
-      });
+      return res.status(401).json({ message: 'Email not found' });
     }
     
-    console.log('🔑 User details:', {
-      email: user.email,
-      role: user.role,
-      isActive: user.isActive,
-      hasPassword: !!user.password
-    });
-    
-    // Check if user is active
-    if (!user.isActive) {
-      console.log('❌ User account is inactive');
-      return res.status(401).json({ 
-        success: false,
-        message: 'Account is deactivated. Please contact administrator.' 
-      });
-    }
+    console.log('🔑 Stored password:', user.password);
+    console.log('🔑 Input password:', password);
     
     // Check password - try both hashed and plain text
-    let isValidPassword = false;
-    
-    try {
-      isValidPassword = await bcrypt.compare(password, user.password);
-    } catch (bcryptError) {
-      console.log('⚠️ Bcrypt error, trying plain text:', bcryptError.message);
-    }
+    let isValidPassword = await bcrypt.compare(password, user.password);
     
     // If bcrypt fails, try plain text comparison
     if (!isValidPassword && user.password === password) {
@@ -274,10 +222,7 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
     
     if (!isValidPassword) {
       console.log('❌ Invalid password');
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid email or password' 
-      });
+      return res.status(401).json({ message: 'Incorrect password' });
     }
     
     // Generate JWT token
@@ -287,28 +232,22 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
       { expiresIn: '7d' }
     );
     
-    console.log('✅ Login successful, token generated for:', user.email);
+    console.log('✅ Login successful, token generated');
     
     res.json({
       success: true,
       token,
       user: {
         id: user._id,
-        _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        isActive: user.isActive
+        role: user.role
       },
       message: 'Login successful'
     });
   } catch (error) {
     console.error('❌ Login error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
@@ -1048,68 +987,23 @@ app.get('/api/my/team', authenticateToken, getTeamMembers);
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
-    const healthData = {
+    const userCount = await User.countDocuments();
+    const leadCount = await Lead.countDocuments();
+    const customerCount = await Customer.countDocuments();
+    const demoRequestCount = await DemoRequest.countDocuments();
+    
+    res.json({ 
       message: 'Green Call CRM Backend is running!',
       status: 'active',
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development',
-      database: {
-        connected: isDBConnected,
-        readyState: mongoose.connection.readyState,
-        host: mongoose.connection.host || 'unknown',
-        name: mongoose.connection.name || 'unknown'
-      },
-      server: {
-        port: PORT,
-        uptime: process.uptime(),
-        memory: process.memoryUsage()
-      }
-    };
-    
-    // Only try to get counts if database is connected
-    if (isDBConnected) {
-      try {
-        const [userCount, leadCount, customerCount, demoRequestCount] = await Promise.all([
-          User.countDocuments(),
-          Lead.countDocuments(), 
-          Customer.countDocuments(),
-          DemoRequest.countDocuments()
-        ]);
-        
-        healthData.counts = {
-          users: userCount,
-          leads: leadCount,
-          customers: customerCount,
-          demoRequests: demoRequestCount
-        };
-      } catch (countError) {
-        healthData.counts = { error: 'Failed to fetch counts' };
-      }
-    } else {
-      healthData.counts = { error: 'Database not connected' };
-    }
-    
-    res.json(healthData);
-  } catch (error) {
-    res.status(500).json({ 
-      message: 'Health check failed', 
-      error: error.message,
-      database: {
-        connected: isDBConnected,
-        readyState: mongoose.connection.readyState
-      },
-      timestamp: new Date().toISOString()
+      users: userCount,
+      leads: leadCount,
+      customers: customerCount,
+      demoRequests: demoRequestCount
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Health check failed', error: error.message });
   }
-});
-
-// Simple ping endpoint
-app.get('/api/ping', (req, res) => {
-  res.json({ 
-    message: 'pong', 
-    timestamp: new Date().toISOString(),
-    database: isDBConnected ? 'connected' : 'disconnected'
-  });
 });
 
 // Error handling middleware
@@ -1125,61 +1019,9 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 5005;
 
-// Graceful shutdown handling
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  process.exit(0);
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 API available at http://localhost:${PORT}/api`);
+}).on('error', (err) => {
+  console.error('Server error:', err);
 });
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
-
-// Unhandled promise rejection handler
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Start server only after database connection
-const startServer = async () => {
-  try {
-    // Wait for database connection
-    let retries = 5;
-    while (!isDBConnected && retries > 0) {
-      console.log('⏳ Waiting for database connection...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      retries--;
-    }
-    
-    if (!isDBConnected) {
-      console.error('❌ Failed to connect to database after retries');
-      process.exit(1);
-    }
-    
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 API available at http://localhost:${PORT}/api`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`💾 Database: ${isDBConnected ? 'Connected' : 'Disconnected'}`);
-    });
-    
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`❌ Port ${PORT} is already in use`);
-        process.exit(1);
-      } else {
-        console.error('❌ Server error:', err);
-      }
-    });
-    
-    // Handle server timeout
-    server.timeout = 30000; // 30 seconds
-    
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
