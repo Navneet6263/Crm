@@ -592,29 +592,30 @@ const createEmployee = async (req, res) => {
     });
     
     console.log('💾 Attempting to save user to database...');
-    const user = await User.create(userData);
-    console.log('💾 User.create() completed successfully');
     
-    console.log('✅ User created successfully:', {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      isActive: user.isActive,
-      companyId: user.companyId,
-      tenantId: user.tenantId
-    });
+    // Create user and ensure it's saved
+    const user = new User(userData);
+    await user.save();
     
-    // Verify user was actually saved
-    const savedUser = await User.findById(user._id);
-    console.log('🔍 Verification - User found in DB:', !!savedUser);
-    if (savedUser) {
-      console.log('🔍 Saved user details:', {
-        id: savedUser._id,
-        email: savedUser.email,
-        role: savedUser.role
-      });
+    console.log('💾 User.save() completed');
+    
+    // Verify user was actually saved by querying database
+    const savedUser = await User.findById(user._id).lean();
+    
+    if (!savedUser) {
+      console.error('❌ CRITICAL: User not found in database after save!');
+      throw new Error('Failed to save user to database');
     }
+    
+    console.log('✅ User verified in database:', {
+      id: savedUser._id,
+      name: savedUser.name,
+      email: savedUser.email,
+      role: savedUser.role,
+      isActive: savedUser.isActive,
+      companyId: savedUser.companyId,
+      tenantId: savedUser.tenantId
+    });
 
     // Update current SuperAdmin user to have companyId if they don't have one
     if (req.user.role === 'super-admin' && !req.user.companyId) {
@@ -628,24 +629,27 @@ const createEmployee = async (req, res) => {
     console.log('📤 Sending success response...');
     res.status(201).json({
       success: true,
-      message: `Employee created successfully with role: ${user.role.toUpperCase()}`,
+      message: `Employee created successfully with role: ${savedUser.role.toUpperCase()}`,
       user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        roleDisplay: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
-        isActive: user.isActive,
-        companyId: user.companyId
+        _id: savedUser._id,
+        name: savedUser.name,
+        email: savedUser.email,
+        role: savedUser.role,
+        roleDisplay: savedUser.role.charAt(0).toUpperCase() + savedUser.role.slice(1).replace('-', ' '),
+        isActive: savedUser.isActive,
+        companyId: savedUser.companyId,
+        tenantId: savedUser.tenantId
       },
       roleInfo: {
-        role: user.role,
-        displayName: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
-        permissions: user.role === 'super-admin' ? ['all'] : 
-                    user.role === 'admin' ? ['manage_company', 'view_all_leads', 'create_users'] :
-                    user.role === 'manager' ? ['view_team_leads', 'assign_leads'] :
-                    user.role === 'sales' ? ['view_own_leads', 'create_leads'] : ['view_only']
-      }
+        role: savedUser.role,
+        displayName: savedUser.role.charAt(0).toUpperCase() + savedUser.role.slice(1).replace('-', ' '),
+        permissions: savedUser.role === 'super-admin' ? ['all'] : 
+                    savedUser.role === 'admin' ? ['manage_company', 'view_all_leads', 'create_users'] :
+                    savedUser.role === 'manager' ? ['view_team_leads', 'assign_leads'] :
+                    savedUser.role === 'sales' ? ['view_own_leads', 'create_leads'] : ['view_only']
+      },
+      verified: true,
+      savedToDatabase: true
     });
     console.log('✅ === CREATE EMPLOYEE COMPLETED ===');
   } catch (error) {
