@@ -3,7 +3,6 @@ import apiService from '../services/apiService';
 import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield, Settings, Plus, Eye, UserCheck, UserX } from 'lucide-react';
 import BookDemoModal from './BookDemoModal';
 import SuperAdminManagement from './SuperAdminManagement';
-import config from '../config';  // make sure it's imported at the top
 
 // Employee Management Component
 const EmployeeManagement = ({ darkMode, currentUser }) => {
@@ -96,12 +95,11 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-
-const response = await fetch(`${config.api.baseUrl}/auth/users`, {
-  headers: {
-    'Authorization': `Bearer ${token}`
-  }
-});
+      const response = await fetch('http://localhost:5004/api/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (response.ok) {
         const data = await response.json();
