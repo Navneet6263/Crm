@@ -6,12 +6,17 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const config = {
   // API Configuration
-  api: {
-    baseUrl: process.env.REACT_APP_API_URL || 'http://localhost:5004',
-    timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 30000, // 30 seconds
-    retryAttempts: parseInt(process.env.REACT_APP_RETRY_ATTEMPTS) || 3,
-    allowInsecure: isDevelopment // Only allow in development
-  },
+ api: {
+  baseUrl:
+    process.env.REACT_APP_API_URL ||
+    (window.location.hostname === 'localhost'
+      ? 'http://localhost:5004'
+      : 'https://green-crm-backend.onrender.com'),
+  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 30000,
+  retryAttempts: parseInt(process.env.REACT_APP_RETRY_ATTEMPTS) || 3,
+  allowInsecure: isDevelopment,
+},
+
   
   // Feature Flags
   features: {
