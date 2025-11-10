@@ -9,9 +9,6 @@ const config = {
  api: {
     baseUrl:
       process.env.REACT_APP_API_URL ||
-      (window.location.hostname === 'localhost'
-        ? 'http://localhost:5004/api'
-        : 'https://crm-1-zn0m.onrender.com/api'),
     timeout: parseInt(process.env.REACT_APP_API_TIMEOUT) || 30000, // 30 seconds
     retryAttempts: parseInt(process.env.REACT_APP_RETRY_ATTEMPTS) || 3,
     allowInsecure: isDevelopment // Only allow in development
