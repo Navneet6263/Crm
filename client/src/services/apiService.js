@@ -1,7 +1,7 @@
 // API Service for connecting to .NET backend
 import config from '../config';
 
-const API_BASE_URL = config.api.baseUrl; // Your .NET API URL from config
+const API_BASE_URL = config.api.baseUrl; // 
 const USE_MOCK = false; // Completely disabled - ONLY real backend
 
 
@@ -123,13 +123,13 @@ const apiService = {
   
   // Authentication - Enhanced with persistent login
   login: async (credentials) => {
-    console.log('🔐 Attempting login with backend:', credentials.email || credentials.username);
+    console.log(' Attempting login with backend:', credentials.email || credentials.username);
     
     try {
       // Use authService for real backend login
       return await authService.loginWithBackend(credentials);
     } catch (error) {
-      console.error('❌ Backend login failed:', error);
+      console.error(' Backend login failed:', error);
       throw error;
     }
   },
@@ -153,7 +153,7 @@ const apiService = {
       const data = await response.json();
       if (data.success && data.token) {
         localStorage.setItem('authToken', data.token);
-        console.log('✅ Auth check successful, user:', data.user?.email, 'Company:', data.user?.company?.name);
+        console.log(' Auth check successful, user:', data.user?.email, 'Company:', data.user?.company?.name);
         return data;
       }
       
@@ -1569,26 +1569,7 @@ const apiService = {
     }
   },
 
-  getSalesAnalytics: async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/ai/sales-analytics`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch sales analytics');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching sales analytics:', error);
-      throw error;
-    }
-  },
+
 
   getAIRecommendations: async () => {
     try {

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Brain, X, Send, Minimize2, Maximize2 } from 'lucide-react';
-import { showToast } from './ToastNotification';
 
 const AIChatWidget = ({ darkMode, currentUser, crmData }) => {
   const [isOpen, setIsOpen] = useState(false);

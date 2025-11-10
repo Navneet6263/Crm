@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Brain, 
-  MessageSquare, 
-  Zap, 
   Send, 
   Sparkles,
   Mail,
-  Phone,
   Calendar,
   Target,
   TrendingUp,
@@ -39,7 +36,7 @@ What would you like help with today?`,
 
     setMessages([welcomeMessage]);
     generateSuggestions();
-  }, [currentUser, crmData]);
+  }, [currentUser, crmData, generateSuggestions]);
 
   const generateSuggestions = () => {
     const leadCount = crmData.leads?.length || 0;

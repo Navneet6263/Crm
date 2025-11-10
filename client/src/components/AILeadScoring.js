@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, Zap, TrendingUp, Target, Star, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Brain, Zap, TrendingUp, Target, AlertCircle, Clock } from 'lucide-react';
 import apiService from '../services/apiService';
 
 const AILeadScoring = ({ leads = [], darkMode }) => {
@@ -124,46 +124,46 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
     }
   };
 
-  const analyzeLeads = async () => {
-    setIsAnalyzing(true);
-    
-    try {
-      // Try backend AI analysis first
-      const aiData = await apiService.getAILeadScoring();
-      if (aiData.success && aiData.scoredLeads) {
-        setScoredLeads(aiData.scoredLeads);
-        setIsAnalyzing(false);
-        return;
-      }
-    } catch (error) {
-      console.log('Using local AI analysis');
-    }
-    
-    // Fallback to local analysis
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const analyzed = leads.map(lead => {
-      const aiAnalysis = calculateAIScore(lead);
-      return {
-        ...lead,
-        aiAnalysis: aiAnalysis || {
-          score: 0,
-          factors: [],
-          priority: 'Low',
-          recommendation: {
-            action: 'Review Required',
-            message: 'Lead needs manual review.',
-            icon: AlertCircle,
-            color: '#6b7280'
-          }
-        }
-      };
-    });
-    
-    analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
-    setScoredLeads(analyzed);
-    setIsAnalyzing(false);
-  };
+  // const analyzeLeads = async () => {
+  //   setIsAnalyzing(true);
+  //   
+  //   try {
+  //     // Try backend AI analysis first
+  //     const aiData = await apiService.getAILeadScoring();
+  //     if (aiData.success && aiData.scoredLeads) {
+  //       setScoredLeads(aiData.scoredLeads);
+  //       setIsAnalyzing(false);
+  //       return;
+  //     }
+  //   } catch (error) {
+  //     console.log('Using local AI analysis');
+  //   }
+  //   
+  //   // Fallback to local analysis
+  //   await new Promise(resolve => setTimeout(resolve, 1000));
+  //   
+  //   const analyzed = leads.map(lead => {
+  //     const aiAnalysis = calculateAIScore(lead);
+  //     return {
+  //       ...lead,
+  //       aiAnalysis: aiAnalysis || {
+  //         score: 0,
+  //         factors: [],
+  //         priority: 'Low',
+  //         recommendation: {
+  //           action: 'Review Required',
+  //           message: 'Lead needs manual review.',
+  //           icon: AlertCircle,
+  //           color: '#6b7280'
+  //         }
+  //       }
+  //     };
+  //   });
+  //   
+  //   analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
+  //   setScoredLeads(analyzed);
+  //   setIsAnalyzing(false);
+  // };
 
   useEffect(() => {
     const initializeComponent = async () => {
@@ -232,7 +232,7 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
     };
     
     initializeComponent();
-  }, [leads]);
+  }, [leads, calculateAIScore]);
 
   const getScoreColor = (score) => {
     if (score >= 80) return '#22c55e';

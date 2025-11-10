@@ -124,7 +124,7 @@ const AppContent = () => {
       section.items.forEach(item => {
         if (item.label.toLowerCase().includes(lower)) {
           // Check permissions
-          const hasPermission = !item.adminOnly && !item.superAdminOnly || 
+          const hasPermission = (!item.adminOnly && !item.superAdminOnly) || 
                                (item.adminOnly && ['admin', 'manager', 'senior-manager', 'super-admin'].includes(currentUser?.role)) ||
                                (item.superAdminOnly && currentUser?.role === 'super-admin');
           
