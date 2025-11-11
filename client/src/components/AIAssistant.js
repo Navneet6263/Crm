@@ -11,6 +11,15 @@ import {
 } from 'lucide-react';
 import { showToast } from './ToastNotification';
 
+// Fallback toast function
+const safeShowToast = (type, message) => {
+  try {
+    showToast(type, message);
+  } catch (error) {
+    console.log(`${type.toUpperCase()}: ${message}`);
+  }
+};
+
 const AIAssistant = ({ darkMode, currentUser, crmData }) => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -35,35 +44,47 @@ What would you like help with today?`,
     };
 
     setMessages([welcomeMessage]);
-    generateSuggestions();
-  }, [currentUser, crmData, generateSuggestions]);
-
-  const generateSuggestions = () => {
-    const leadCount = crmData.leads?.length || 0;
-    const suggestions = [
+    
+    // Generate suggestions inline to avoid dependency issues
+    const leadCount = crmData?.leads?.length || 0;
+    const newSuggestions = [
       `📧 Write follow-up email for ${leadCount} leads`,
       '📊 Analyze my sales performance this month',
       '🎯 What leads should I prioritize today?',
       '📝 Generate meeting summary template',
       '💡 Suggest ways to improve conversion rate'
     ];
-    setSuggestions(suggestions);
+    setSuggestions(newSuggestions);
+  }, [currentUser?.name, crmData?.leads?.length]);
+
+  const generateSuggestions = () => {
+    const leadCount = crmData?.leads?.length || 0;
+    const newSuggestions = [
+      `📧 Write follow-up email for ${leadCount} leads`,
+      '📊 Analyze my sales performance this month',
+      '🎯 What leads should I prioritize today?',
+      '📝 Generate meeting summary template',
+      '💡 Suggest ways to improve conversion rate'
+    ];
+    setSuggestions(newSuggestions);
   };
 
   const generateAIResponse = async (userMessage) => {
     try {
       // Try to use real AI API first
       const aiService = await import('../services/aiService');
-      const response = await aiService.default.generateResponse(userMessage, {
-        currentUser,
-        crmData
-      });
-      return response;
+      if (aiService?.default?.generateResponse) {
+        const response = await aiService.default.generateResponse(userMessage, {
+          currentUser,
+          crmData
+        });
+        return response;
+      }
     } catch (error) {
-      console.error('AI Service Error:', error);
-      // Fallback to local responses
-      return generateLocalResponse(userMessage);
+      console.log('AI Service not available, using local responses');
     }
+    // Fallback to local responses
+    return generateLocalResponse(userMessage);
   };
 
   const generateLocalResponse = (userMessage) => {
@@ -241,19 +262,31 @@ Try asking me something like:
 
     // Simulate AI thinking time
     setTimeout(async () => {
-      const aiResponse = await generateAIResponse(inputMessage);
-      
-      const aiMessage = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: aiResponse.content,
-        responseType: aiResponse.type,
-        actions: aiResponse.actions,
-        timestamp: new Date().toISOString()
-      };
+      try {
+        const aiResponse = await generateAIResponse(inputMessage);
+        
+        const aiMessage = {
+          id: Date.now() + 1,
+          type: 'ai',
+          content: aiResponse.content,
+          responseType: aiResponse.type,
+          actions: aiResponse.actions,
+          timestamp: new Date().toISOString()
+        };
 
-      setMessages(prev => [...prev, aiMessage]);
-      setIsTyping(false);
+        setMessages(prev => [...prev, aiMessage]);
+      } catch (error) {
+        console.error('Error generating AI response:', error);
+        const errorMessage = {
+          id: Date.now() + 1,
+          type: 'ai',
+          content: 'Sorry, I encountered an error. Please try again.',
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsTyping(false);
+      }
     }, 1500);
   };
 
@@ -262,22 +295,30 @@ Try asking me something like:
   };
 
   const handleAction = (action, message) => {
-    switch (action) {
-      case 'Copy Email':
-        navigator.clipboard.writeText(message.content);
-        showToast('success', '📋 Email template copied to clipboard!');
-        break;
-      case 'Send to Lead':
-        showToast('info', '📧 Opening email client...');
-        break;
-      case 'View Detailed Report':
-        showToast('info', '📊 Generating detailed report...');
-        break;
-      case 'Call Lead':
-        showToast('info', '📞 Initiating call...');
-        break;
-      default:
-        showToast('info', `🤖 ${action} feature coming soon!`);
+    try {
+      switch (action) {
+        case 'Copy Email':
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(message.content);
+            safeShowToast('success', '📋 Email template copied to clipboard!');
+          } else {
+            console.log('Clipboard not available');
+          }
+          break;
+        case 'Send to Lead':
+          safeShowToast('info', '📧 Opening email client...');
+          break;
+        case 'View Detailed Report':
+          safeShowToast('info', '📊 Generating detailed report...');
+          break;
+        case 'Call Lead':
+          safeShowToast('info', '📞 Initiating call...');
+          break;
+        default:
+          safeShowToast('info', `🤖 ${action} feature coming soon!`);
+      }
+    } catch (error) {
+      console.error('Action error:', error);
     }
   };
 

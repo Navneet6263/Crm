@@ -98,7 +98,7 @@ const SignUp = ({ onSignUp, onBackToSignIn, onBack, darkMode = false }) => {
         
         // Show role assignment notification
         if (userRole === 'admin' || userRole === 'super-admin') {
-          alert(`🎉 Welcome! You've been assigned ${userRole} privileges based on your email.`);
+          console.log(`🎉 Welcome! You've been assigned ${userRole} privileges based on your email.`);
         }
       }
     } catch (error) {
@@ -437,7 +437,8 @@ const SignUp = ({ onSignUp, onBackToSignIn, onBack, darkMode = false }) => {
             <button
               type="button"
               onClick={() => {
-                window.location.href = 'http://localhost:5004/api/auth/google';
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004';
+                window.location.href = `${apiUrl}/api/auth/google`;
               }}
               style={{
                 flex: 1,
@@ -475,7 +476,8 @@ const SignUp = ({ onSignUp, onBackToSignIn, onBack, darkMode = false }) => {
             <button
               type="button"
               onClick={() => {
-                window.location.href = 'http://localhost:5004/api/auth/linkedin';
+                const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004';
+                window.location.href = `${apiUrl}/api/auth/linkedin`;
               }}
               style={{
                 flex: 1,

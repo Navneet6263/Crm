@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Calendar, Download, Eye, CheckCircle, AlertCircle, DollarSign, TrendingUp } from 'lucide-react';
+import { CreditCard, Calendar, Download, Eye, CheckCircle, AlertCircle, DollarSign, TrendingUp, Crown } from 'lucide-react';
 import apiService from '../services/apiService';
+import { ROLES } from '../utils/permissions';
 
 const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -10,6 +11,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
   const [currentPlan, setCurrentPlan] = useState(null);
   const [companyData, setCompanyData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Plans from backend
   const [plans, setPlans] = useState([
@@ -39,8 +41,20 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
       popular: false,
       color: '#f59e0b',
       limits: { users: 50, leads: 10000, emails: 'unlimited' }
+    },
+    {
+      value: 'superadmin',
+      name: 'Super Admin Plan', 
+      price: 0,
+      features: ['Unlimited everything', 'Super admin access', 'All features', 'No restrictions', 'Full system control'],
+      popular: false,
+      color: '#dc2626',
+      limits: { users: 'unlimited', leads: 'unlimited', emails: 'unlimited' }
     }
   ]);
+
+  const [invoices, setInvoices] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   // Fetch company data and plans from backend
   useEffect(() => {
@@ -49,22 +63,202 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         setLoading(true);
         
         // Get current user's company data
-        const teamResponse = await apiService.getTeamMembers();
-        if (teamResponse.success && teamResponse.company) {
-          const company = teamResponse.company;
-          setCompanyData(company);
+        try {
+          const teamResponse = await apiService.getTeamMembers();
+          console.log('Team Response:', teamResponse);
           
-          // Set current plan from company data
+          if (teamResponse.success && teamResponse.company) {
+            const company = teamResponse.company;
+            setCompanyData(company);
+            
+            // Get current user info from token
+            const userToken = localStorage.getItem('authToken');
+            if (userToken) {
+              try {
+                const payload = JSON.parse(atob(userToken.split('.')[1]));
+                const currentUserData = teamResponse.team?.find(member => member._id === payload.id) || 
+                                     { role: payload.role || userRole };
+                setCurrentUser(currentUserData);
+                
+                // Check if user is superadmin - if yes, show unlimited plan
+                if (currentUserData.role === ROLES.SUPER_ADMIN) {
+                  setCurrentPlan({
+                    value: 'unlimited',
+                    name: 'Unlimited Access (Super Admin)',
+                    price: 0,
+                    billingCycle: 'unlimited',
+                    nextBilling: 'Never expires',
+                    status: 'active'
+                  });
+                  
+                  // Set unlimited company data for superadmin
+                  setCompanyData({
+                    ...company,
+                    plan: {
+                      name: 'unlimited',
+                      usersLimit: -1,
+                      leadsLimit: -1,
+                      customersLimit: -1,
+                      emailLimit: -1,
+                      smsLimit: -1,
+                      storageLimit: -1
+                    }
+                  });
+                } else {
+                  // Set current plan from company data for regular users
+                  setCurrentPlan({
+                    value: company.plan.name,
+                    name: company.plan.name === 'basic' ? 'Basic Plan' : 
+                          company.plan.name === 'professional' ? 'Professional Plan' : 
+                          company.plan.name === 'enterprise' ? 'Enterprise Plan' : 'Super Admin Plan',
+                    price: company.plan.name === 'basic' ? 999 : 
+                           company.plan.name === 'professional' ? 2999 : 
+                           company.plan.name === 'enterprise' ? 9999 : 0,
+                    billingCycle: company.plan.name === 'superadmin' ? 'unlimited' : 'monthly',
+                    nextBilling: new Date(company.plan.endDate).toISOString().split('T')[0],
+                    status: company.status
+                  });
+                }
+              } catch (tokenError) {
+                console.error('Error parsing user token:', tokenError);
+                // Fallback to company plan
+                setCurrentPlan({
+                  value: company.plan.name,
+                  name: company.plan.name === 'basic' ? 'Basic Plan' : 
+                        company.plan.name === 'professional' ? 'Professional Plan' : 
+                        company.plan.name === 'enterprise' ? 'Enterprise Plan' : 'Super Admin Plan',
+                  price: company.plan.name === 'basic' ? 999 : 
+                         company.plan.name === 'professional' ? 2999 : 
+                         company.plan.name === 'enterprise' ? 9999 : 0,
+                  billingCycle: company.plan.name === 'superadmin' ? 'unlimited' : 'monthly',
+                  nextBilling: new Date(company.plan.endDate).toISOString().split('T')[0],
+                  status: company.status
+                });
+              }
+            }
+          } else {
+            console.log('No company data found, creating default plan');
+            // Check if user might be superadmin from token for fallback
+            const userToken = localStorage.getItem('authToken');
+            let isSuperAdmin = false;
+            if (userToken) {
+              try {
+                const payload = JSON.parse(atob(userToken.split('.')[1]));
+                isSuperAdmin = payload.role === ROLES.SUPER_ADMIN;
+                setCurrentUser({ role: payload.role });
+              } catch (error) {
+                console.error('Error parsing token for fallback:', error);
+              }
+            }
+            
+            if (isSuperAdmin) {
+              setCurrentPlan({
+                value: 'unlimited',
+                name: 'Unlimited Access (Super Admin)',
+                price: 0,
+                billingCycle: 'unlimited',
+                nextBilling: 'Never expires',
+                status: 'active'
+              });
+              
+              setCompanyData({
+                name: process.env.REACT_APP_DEFAULT_COMPANY_NAME || 'Your Company',
+                plan: {
+                  name: 'unlimited',
+                  usersLimit: -1,
+                  leadsLimit: -1,
+                  customersLimit: -1,
+                  emailLimit: -1,
+                  smsLimit: -1,
+                  storageLimit: -1
+                },
+                usage: {
+                  currentUsers: 1,
+                  currentLeads: 0,
+                  currentCustomers: 0
+                }
+              });
+            } else {
+              // Set default plan if no company data
+              setCurrentPlan({
+                value: 'basic',
+                name: 'Basic Plan',
+                price: 999,
+                billingCycle: 'monthly',
+                nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                status: 'active'
+              });
+              
+              // Set default company data
+              setCompanyData({
+                name: process.env.REACT_APP_DEFAULT_COMPANY_NAME || 'Your Company',
+                plan: {
+                  name: 'basic',
+                  usersLimit: 5,
+                  leadsLimit: 1000,
+                  customersLimit: 500
+                },
+                usage: {
+                  currentUsers: 1,
+                  currentLeads: 0,
+                  currentCustomers: 0
+                }
+              });
+            }
+          }
+        } catch (teamError) {
+          console.error('Team API error:', teamError);
+          // Set fallback data
           setCurrentPlan({
-            value: company.plan.name,
-            name: company.plan.name === 'basic' ? 'Basic Plan' : 
-                  company.plan.name === 'professional' ? 'Professional Plan' : 'Enterprise Plan',
-            price: company.plan.name === 'basic' ? 999 : 
-                   company.plan.name === 'professional' ? 2999 : 9999,
+            value: 'basic',
+            name: 'Basic Plan',
+            price: 999,
             billingCycle: 'monthly',
-            nextBilling: new Date(company.plan.endDate).toISOString().split('T')[0],
-            status: company.status
+            nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            status: 'active'
           });
+        }
+        
+        // Try to get company plan directly if team API failed
+        if (!currentPlan) {
+          try {
+            const planResponse = await apiService.get('/my/plan');
+            console.log('Plan Response:', planResponse);
+            
+            if (planResponse.success && planResponse.company) {
+              const company = planResponse.company;
+              setCompanyData(company);
+              
+              setCurrentPlan({
+                value: company.plan.name,
+                name: company.plan.name === 'basic' ? 'Basic Plan' : 
+                      company.plan.name === 'professional' ? 'Professional Plan' : 
+                      company.plan.name === 'enterprise' ? 'Enterprise Plan' : 'Super Admin Plan',
+                price: company.plan.name === 'basic' ? 999 : 
+                       company.plan.name === 'professional' ? 2999 : 
+                       company.plan.name === 'enterprise' ? 9999 : 0,
+                billingCycle: company.plan.name === 'superadmin' ? 'unlimited' : 'monthly',
+                nextBilling: new Date(company.plan.endDate).toISOString().split('T')[0],
+                status: company.status
+              });
+            }
+          } catch (planError) {
+            console.error('Plan API error:', planError);
+          }
+        }
+        
+        // Fetch billing data (invoices and payment methods)
+        try {
+          const billingResponse = await apiService.get('/companies/my/billing');
+          if (billingResponse.success) {
+            setInvoices(billingResponse.invoices || []);
+            setPaymentMethods(billingResponse.paymentMethods || []);
+          }
+        } catch (error) {
+          console.log('Billing data not available, using defaults');
+          // Set default/sample data if billing API is not available
+          setInvoices([]);
+          setPaymentMethods([]);
         }
         
         // Get plan configurations from backend
@@ -74,11 +268,16 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
             const backendPlans = Object.entries(planResponse.plans).map(([key, plan]) => ({
               value: key,
               name: key === 'basic' ? 'Basic Plan' : 
-                    key === 'professional' ? 'Professional Plan' : 'Enterprise Plan',
-              price: key === 'basic' ? 999 : key === 'professional' ? 2999 : 9999,
+                    key === 'professional' ? 'Professional Plan' : 
+                    key === 'enterprise' ? 'Enterprise Plan' : 'Super Admin Plan',
+              price: key === 'basic' ? 999 : 
+                     key === 'professional' ? 2999 : 
+                     key === 'enterprise' ? 9999 : 0,
               features: plan.features || [],
               popular: key === 'professional',
-              color: key === 'basic' ? '#22c55e' : key === 'professional' ? '#3b82f6' : '#f59e0b',
+              color: key === 'basic' ? '#22c55e' : 
+                     key === 'professional' ? '#3b82f6' : 
+                     key === 'enterprise' ? '#f59e0b' : '#dc2626',
               limits: {
                 users: plan.usersLimit === -1 ? 'unlimited' : plan.usersLimit,
                 leads: plan.leadsLimit === -1 ? 'unlimited' : plan.leadsLimit,
@@ -93,55 +292,79 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         
       } catch (error) {
         console.error('Error fetching billing data:', error);
+        // Set minimal fallback data to prevent error state
+        if (!currentPlan) {
+          // Check if user might be superadmin from token
+          const userToken = localStorage.getItem('authToken');
+          let isSuperAdmin = false;
+          if (userToken) {
+            try {
+              const payload = JSON.parse(atob(userToken.split('.')[1]));
+              isSuperAdmin = payload.role === ROLES.SUPER_ADMIN;
+              setCurrentUser({ role: payload.role });
+            } catch (error) {
+              console.error('Error parsing token for fallback:', error);
+            }
+          }
+          
+          if (isSuperAdmin) {
+            setCurrentPlan({
+              value: 'unlimited',
+              name: 'Unlimited Access (Super Admin)',
+              price: 0,
+              billingCycle: 'unlimited',
+              nextBilling: 'Never expires',
+              status: 'active'
+            });
+          } else {
+            setCurrentPlan({
+              value: 'basic',
+              name: 'Basic Plan',
+              price: 999,
+              billingCycle: 'monthly',
+              nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              status: 'active'
+            });
+          }
+        }
+        if (!companyData) {
+          // Check if user is superadmin for fallback data
+          const userToken = localStorage.getItem('authToken');
+          let isSuperAdmin = false;
+          if (userToken) {
+            try {
+              const payload = JSON.parse(atob(userToken.split('.')[1]));
+              isSuperAdmin = payload.role === ROLES.SUPER_ADMIN;
+            } catch (error) {
+              console.error('Error parsing token for company fallback:', error);
+            }
+          }
+          
+          setCompanyData({
+            name: process.env.REACT_APP_DEFAULT_COMPANY_NAME || 'Your Company',
+            plan: {
+              name: isSuperAdmin ? 'unlimited' : 'basic',
+              usersLimit: isSuperAdmin ? -1 : 5,
+              leadsLimit: isSuperAdmin ? -1 : 1000,
+              customersLimit: isSuperAdmin ? -1 : 500,
+              emailLimit: isSuperAdmin ? -1 : 1000,
+              smsLimit: isSuperAdmin ? -1 : 100,
+              storageLimit: isSuperAdmin ? -1 : 1
+            },
+            usage: {
+              currentUsers: 1,
+              currentLeads: 0,
+              currentCustomers: 0
+            }
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, []);
-
-  const [invoices] = useState([
-    {
-      id: 'INV-2024-001',
-      date: '2024-01-15',
-      amount: 2499,
-      status: 'paid',
-      downloadUrl: '#'
-    },
-    {
-      id: 'INV-2023-012',
-      date: '2023-12-15',
-      amount: 2499,
-      status: 'paid',
-      downloadUrl: '#'
-    },
-    {
-      id: 'INV-2023-011',
-      date: '2023-11-15',
-      amount: 2499,
-      status: 'paid',
-      downloadUrl: '#'
-    }
-  ]);
-
-  const [paymentMethods] = useState([
-    {
-      id: 1,
-      type: 'card',
-      last4: '4242',
-      brand: 'Visa',
-      expiryMonth: 12,
-      expiryYear: 2025,
-      isDefault: true
-    },
-    {
-      id: 2,
-      type: 'upi',
-      upiId: 'user@paytm',
-      isDefault: false
-    }
-  ]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const containerStyle = {
     padding: '0',
@@ -192,6 +415,15 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveTab(tab.id);
+              }
+            }}
+            tabIndex={0}
+            role="button"
+            aria-pressed={activeTab === tab.id}
                 style={{
                   padding: '0.75rem 1.5rem',
                   border: 'none',
@@ -227,13 +459,16 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
           flexDirection: 'column',
           gap: '1rem'
         }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '4px solid #f3f4f6',
-            borderTop: '4px solid #22c55e',
-            borderRadius: '50%'
-          }} className="loading-spinner" />
+          <div 
+            className="loading-spinner"
+            style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #22c55e',
+              borderRadius: '50%'
+            }} 
+          />
           <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '1.125rem' }}>
             Loading billing information...
           </p>
@@ -241,7 +476,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
       )}
 
       {/* Error State */}
-      {!loading && !currentPlan && (
+      {!loading && (!currentPlan || !companyData) && (
         <div style={{
           ...cardStyle,
           padding: '3rem',
@@ -260,26 +495,99 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
           <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '1.5rem' }}>
             Please contact your administrator or try refreshing the page.
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #22c55e, #4ade80)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '600'
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button
+              onClick={() => {
+              try {
+                window.location.reload();
+              } catch (error) {
+                console.error('Failed to reload page:', error);
+              }
             }}
-          >
-            Refresh Page
-          </button>
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+            >
+              Refresh Page
+            </button>
+            <button
+              onClick={() => {
+                setLoading(true);
+                // Retry fetching data
+                const fetchData = async () => {
+                  try {
+                    const teamResponse = await apiService.getTeamMembers();
+                    if (teamResponse.success && teamResponse.company) {
+                      const company = teamResponse.company;
+                      setCompanyData(company);
+                      setCurrentPlan({
+                        value: company.plan.name,
+                        name: company.plan.name === 'basic' ? 'Basic Plan' : 
+                              company.plan.name === 'professional' ? 'Professional Plan' : 'Enterprise Plan',
+                        price: company.plan.name === 'basic' ? 999 : 
+                               company.plan.name === 'professional' ? 2999 : 9999,
+                        billingCycle: 'monthly',
+                        nextBilling: new Date(company.plan.endDate).toISOString().split('T')[0],
+                        status: company.status
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Retry failed:', error);
+                    // Set fallback data even on retry failure
+                    setCurrentPlan({
+                      value: 'basic',
+                      name: 'Basic Plan',
+                      price: 999,
+                      billingCycle: 'monthly',
+                      nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                      status: 'active'
+                    });
+                    setCompanyData({
+                      name: process.env.REACT_APP_DEFAULT_COMPANY_NAME || 'Your Company',
+                      plan: {
+                        name: 'basic',
+                        usersLimit: 5,
+                        leadsLimit: 1000,
+                        customersLimit: 500
+                      },
+                      usage: {
+                        currentUsers: 1,
+                        currentLeads: 0,
+                        currentCustomers: 0
+                      }
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                };
+                fetchData();
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'transparent',
+                color: darkMode ? '#9ca3af' : '#6b7280',
+                border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
       {/* Overview Tab */}
-      {!loading && activeTab === 'overview' && currentPlan && (
+      {!loading && activeTab === 'overview' && currentPlan && companyData && (
         <div style={{ display: 'grid', gap: '2rem' }}>
           {/* Current Plan */}
           <div style={{ ...cardStyle, padding: '2rem' }}>
@@ -300,9 +608,14 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
             }}>
               <div style={{
                 padding: '1.5rem',
-                background: darkMode ? '#374151' : '#f9fafb',
+                background: currentUser?.role === ROLES.SUPER_ADMIN 
+                  ? 'linear-gradient(135deg, #dc2626, #ef4444)' 
+                  : darkMode ? '#374151' : '#f9fafb',
                 borderRadius: '12px',
-                border: `2px solid #22c55e`
+                border: currentUser?.role === ROLES.SUPER_ADMIN 
+                  ? '2px solid #dc2626' 
+                  : `2px solid #22c55e`,
+                color: currentUser?.role === ROLES.SUPER_ADMIN ? 'white' : 'inherit'
               }}>
                 <div style={{
                   display: 'flex',
@@ -310,28 +623,32 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                   gap: '0.5rem',
                   marginBottom: '0.5rem'
                 }}>
-                  <CheckCircle size={20} style={{ color: '#22c55e' }} />
+                  {currentUser?.role === ROLES.SUPER_ADMIN ? (
+                    <Crown size={20} style={{ color: 'white' }} />
+                  ) : (
+                    <CheckCircle size={20} style={{ color: '#22c55e' }} />
+                  )}
                   <span style={{
                     fontSize: '0.875rem',
                     fontWeight: '600',
-                    color: '#22c55e'
+                    color: currentUser?.role === ROLES.SUPER_ADMIN ? 'white' : '#22c55e'
                   }}>
-                    ACTIVE
+                    {currentUser?.role === ROLES.SUPER_ADMIN ? 'SUPER ADMIN' : 'ACTIVE'}
                   </span>
                 </div>
                 <h3 style={{
                   fontSize: '1.5rem',
                   fontWeight: '700',
-                  color: darkMode ? 'white' : '#1f2937',
+                  color: currentUser?.role === ROLES.SUPER_ADMIN ? 'white' : (darkMode ? 'white' : '#1f2937'),
                   margin: 0
                 }}>
                   {currentPlan.name}
                 </h3>
                 <p style={{
-                  color: darkMode ? '#9ca3af' : '#6b7280',
+                  color: currentUser?.role === ROLES.SUPER_ADMIN ? 'rgba(255,255,255,0.9)' : (darkMode ? '#9ca3af' : '#6b7280'),
                   margin: 0
                 }}>
-                  ₹{currentPlan.price.toLocaleString()}/{currentPlan.billingCycle}
+                  {currentPlan.price === 0 ? 'FREE' : `₹${currentPlan.price.toLocaleString()}`}/{currentPlan.billingCycle}
                 </p>
               </div>
 
@@ -361,7 +678,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                   color: darkMode ? 'white' : '#1f2937',
                   margin: 0
                 }}>
-                  {new Date(currentPlan.nextBilling).toLocaleDateString()}
+                  {currentPlan.nextBilling === 'Never expires' ? 'Never expires' : new Date(currentPlan.nextBilling).toLocaleDateString()}
                 </h3>
                 <p style={{
                   color: darkMode ? '#9ca3af' : '#6b7280',
@@ -397,7 +714,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                   color: darkMode ? 'white' : '#1f2937',
                   margin: 0
                 }}>
-                  ₹{(currentPlan.price * 3).toLocaleString()}
+                  {currentPlan.price === 0 ? 'FREE' : `₹${(currentPlan.price * 3).toLocaleString()}`}
                 </h3>
                 <p style={{
                   color: darkMode ? '#9ca3af' : '#6b7280',
@@ -413,7 +730,9 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                 onClick={() => setShowPlanModal(true)}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                  background: currentUser?.role === ROLES.SUPER_ADMIN 
+                    ? 'linear-gradient(135deg, #dc2626, #ef4444)' 
+                    : 'linear-gradient(135deg, #22c55e, #4ade80)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
@@ -421,13 +740,14 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                   fontSize: '0.875rem',
                   fontWeight: '600'
                 }}>
-                {userRole === 'super-admin' ? 'Upgrade Plan' : 'View Plans'}
+                {currentUser?.role === ROLES.SUPER_ADMIN ? 'Manage All Plans' : (userRole === 'super-admin' ? 'Upgrade Plan' : 'View Plans')}
               </button>
-              {userRole === 'super-admin' && (
+              {(userRole === 'super-admin' || currentUser?.role === ROLES.SUPER_ADMIN) && currentPlan.value !== 'unlimited' && (
                 <button 
                   onClick={() => {
                     setCurrentPlan(prev => ({ ...prev, status: 'cancelled' }));
-                    alert('Plan cancelled successfully! Your current plan will remain active until the end of billing cycle.');
+                    console.log('Plan cancellation requested');
+                    // TODO: Implement proper plan cancellation flow
                   }}
                   style={{
                     padding: '0.75rem 1.5rem',
@@ -499,7 +819,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                   unit: ' GB' 
                 }
               ].map((stat, index) => {
-                const percentage = stat.limit === 'unlimited' ? 100 : (stat.current / stat.limit) * 100;
+                const percentage = stat.limit === 'unlimited' || stat.limit === -1 ? 100 : (stat.current / stat.limit) * 100;
                 return (
                   <div key={index} style={{
                     padding: '1.5rem',
@@ -520,7 +840,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       color: darkMode ? 'white' : '#1f2937',
                       marginBottom: '0.5rem'
                     }}>
-                      {stat.current.toLocaleString()}{stat.unit} / {stat.limit === 'unlimited' ? '∞' : stat.limit.toLocaleString()}{stat.unit}
+                      {stat.current.toLocaleString()}{stat.unit} / {(stat.limit === 'unlimited' || stat.limit === -1) ? '∞' : stat.limit.toLocaleString()}{stat.unit}
                     </div>
                     <div style={{
                       width: '100%',
@@ -530,9 +850,9 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       overflow: 'hidden'
                     }}>
                       <div style={{
-                        width: stat.limit === 'unlimited' ? '100%' : `${percentage}%`,
+                        width: (stat.limit === 'unlimited' || stat.limit === -1) ? '100%' : `${percentage}%`,
                         height: '100%',
-                        background: stat.limit === 'unlimited' ? '#22c55e' : (percentage > 80 ? '#ef4444' : percentage > 60 ? '#f59e0b' : '#22c55e'),
+                        background: (stat.limit === 'unlimited' || stat.limit === -1) ? '#22c55e' : (percentage > 80 ? '#ef4444' : percentage > 60 ? '#f59e0b' : '#22c55e'),
                         borderRadius: '4px',
                         transition: 'width 0.3s ease'
                       }} />
@@ -835,124 +1155,164 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
             Invoice History
           </h2>
           
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: darkMode ? '#9ca3af' : '#6b7280'
-                  }}>
-                    Invoice ID
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: darkMode ? '#9ca3af' : '#6b7280'
-                  }}>
-                    Date
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: darkMode ? '#9ca3af' : '#6b7280'
-                  }}>
-                    Amount
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: darkMode ? '#9ca3af' : '#6b7280'
-                  }}>
-                    Status
-                  </th>
-                  <th style={{
-                    padding: '1rem',
-                    textAlign: 'left',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: darkMode ? '#9ca3af' : '#6b7280'
-                  }}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map(invoice => (
-                  <tr key={invoice.id} style={{ borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
-                    <td style={{
+          {invoices.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
+                    <th style={{
                       padding: '1rem',
+                      textAlign: 'left',
                       fontSize: '0.875rem',
-                      color: darkMode ? 'white' : '#1f2937',
-                      fontWeight: '500'
+                      fontWeight: '600',
+                      color: darkMode ? '#9ca3af' : '#6b7280'
                     }}>
-                      {invoice.id}
-                    </td>
-                    <td style={{
+                      Invoice ID
+                    </th>
+                    <th style={{
                       padding: '1rem',
+                      textAlign: 'left',
                       fontSize: '0.875rem',
-                      color: darkMode ? '#d1d5db' : '#374151'
+                      fontWeight: '600',
+                      color: darkMode ? '#9ca3af' : '#6b7280'
                     }}>
-                      {new Date(invoice.date).toLocaleDateString()}
-                    </td>
-                    <td style={{
+                      Date
+                    </th>
+                    <th style={{
                       padding: '1rem',
+                      textAlign: 'left',
                       fontSize: '0.875rem',
-                      color: darkMode ? '#d1d5db' : '#374151',
-                      fontWeight: '600'
+                      fontWeight: '600',
+                      color: darkMode ? '#9ca3af' : '#6b7280'
                     }}>
-                      ₹{invoice.amount.toLocaleString()}
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <span style={{
-                        padding: '0.25rem 0.75rem',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        background: invoice.status === 'paid' ? '#dcfce7' : '#fee2e2',
-                        color: invoice.status === 'paid' ? '#16a34a' : '#dc2626'
-                      }}>
-                        {invoice.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button style={{
-                          padding: '0.5rem',
-                          background: 'transparent',
-                          border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          color: darkMode ? '#d1d5db' : '#374151'
-                        }}>
-                          <Eye size={14} />
-                        </button>
-                        <button style={{
-                          padding: '0.5rem',
-                          background: 'transparent',
-                          border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          color: darkMode ? '#d1d5db' : '#374151'
-                        }}>
-                          <Download size={14} />
-                        </button>
-                      </div>
-                    </td>
+                      Amount
+                    </th>
+                    <th style={{
+                      padding: '1rem',
+                      textAlign: 'left',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: darkMode ? '#9ca3af' : '#6b7280'
+                    }}>
+                      Status
+                    </th>
+                    <th style={{
+                      padding: '1rem',
+                      textAlign: 'left',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: darkMode ? '#9ca3af' : '#6b7280'
+                    }}>
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {invoices.map(invoice => (
+                    <tr key={invoice.id} style={{ borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
+                      <td style={{
+                        padding: '1rem',
+                        fontSize: '0.875rem',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontWeight: '500'
+                      }}>
+                        {invoice.id}
+                      </td>
+                      <td style={{
+                        padding: '1rem',
+                        fontSize: '0.875rem',
+                        color: darkMode ? '#d1d5db' : '#374151'
+                      }}>
+                        {new Date(invoice.date).toLocaleDateString()}
+                      </td>
+                      <td style={{
+                        padding: '1rem',
+                        fontSize: '0.875rem',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        fontWeight: '600'
+                      }}>
+                        ₹{invoice.amount.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          background: invoice.status === 'paid' ? '#dcfce7' : '#fee2e2',
+                          color: invoice.status === 'paid' ? '#16a34a' : '#dc2626'
+                        }}>
+                          {invoice.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button style={{
+                            padding: '0.5rem',
+                            background: 'transparent',
+                            border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: darkMode ? '#d1d5db' : '#374151'
+                          }}>
+                            <Eye size={14} />
+                          </button>
+                          <button style={{
+                            padding: '0.5rem',
+                            background: 'transparent',
+                            border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: darkMode ? '#d1d5db' : '#374151'
+                          }}>
+                            <Download size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem',
+              color: darkMode ? '#9ca3af' : '#6b7280'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📄</div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: darkMode ? 'white' : '#1f2937',
+                marginBottom: '0.5rem'
+              }}>
+                No Invoices Yet
+              </h3>
+              <p style={{ marginBottom: '1.5rem' }}>
+                {currentPlan?.value === 'trial' || currentPlan?.value === 'basic' ? 
+                  'Upgrade to a paid plan to start receiving invoices.' :
+                  'Your invoices will appear here once billing starts.'}
+              </p>
+              {(currentPlan?.value === 'trial' || currentPlan?.value === 'basic') && (
+                <button
+                  onClick={() => setShowPlanModal(true)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Upgrade Plan
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -987,97 +1347,136 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
             </button>
           </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {paymentMethods.map(method => (
-              <div key={method.id} style={{
-                padding: '1.5rem',
-                background: darkMode ? '#374151' : '#f9fafb',
-                borderRadius: '12px',
-                border: method.isDefault ? `2px solid #22c55e` : `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{
-                    width: '48px',
-                    height: '32px',
-                    background: method.type === 'card' ? '#1a365d' : '#7c3aed',
-                    borderRadius: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                    fontWeight: '600'
-                  }}>
-                    {method.type === 'card' ? method.brand : 'UPI'}
-                  </div>
-                  <div>
+          {paymentMethods.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {paymentMethods.map(method => (
+                <div key={method.id} style={{
+                  padding: '1.5rem',
+                  background: darkMode ? '#374151' : '#f9fafb',
+                  borderRadius: '12px',
+                  border: method.isDefault ? `2px solid #22c55e` : `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{
-                      fontSize: '1rem',
-                      fontWeight: '600',
-                      color: darkMode ? 'white' : '#1f2937'
-                    }}>
-                      {method.type === 'card' 
-                        ? `•••• •••• •••• ${method.last4}`
-                        : method.upiId
-                      }
-                    </div>
-                    <div style={{
-                      fontSize: '0.875rem',
-                      color: darkMode ? '#9ca3af' : '#6b7280'
-                    }}>
-                      {method.type === 'card' 
-                        ? `Expires ${method.expiryMonth}/${method.expiryYear}`
-                        : 'UPI Payment'
-                      }
-                    </div>
-                  </div>
-                  {method.isDefault && (
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '12px',
+                      width: '48px',
+                      height: '32px',
+                      background: method.type === 'card' ? '#1a365d' : '#7c3aed',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
                       fontSize: '0.75rem',
-                      fontWeight: '600',
-                      background: '#dcfce7',
-                      color: '#16a34a'
+                      fontWeight: '600'
                     }}>
-                      DEFAULT
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {!method.isDefault && (
+                      {method.type === 'card' ? method.brand : 'UPI'}
+                    </div>
+                    <div>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        color: darkMode ? 'white' : '#1f2937'
+                      }}>
+                        {method.type === 'card' 
+                          ? `•••• •••• •••• ${method.last4}`
+                          : method.upiId
+                        }
+                      </div>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: darkMode ? '#9ca3af' : '#6b7280'
+                      }}>
+                        {method.type === 'card' 
+                          ? `Expires ${method.expiryMonth}/${method.expiryYear}`
+                          : 'UPI Payment'
+                        }
+                      </div>
+                    </div>
+                    {method.isDefault && (
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        background: '#dcfce7',
+                        color: '#16a34a'
+                      }}>
+                        DEFAULT
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {!method.isDefault && (
+                      <button style={{
+                        padding: '0.5rem 1rem',
+                        background: 'transparent',
+                        color: '#22c55e',
+                        border: `1px solid #22c55e`,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}>
+                        Set Default
+                      </button>
+                    )}
                     <button style={{
                       padding: '0.5rem 1rem',
                       background: 'transparent',
-                      color: '#22c55e',
-                      border: `1px solid #22c55e`,
+                      color: '#ef4444',
+                      border: `1px solid #ef4444`,
                       borderRadius: '6px',
                       cursor: 'pointer',
                       fontSize: '0.75rem',
                       fontWeight: '600'
                     }}>
-                      Set Default
+                      Remove
                     </button>
-                  )}
-                  <button style={{
-                    padding: '0.5rem 1rem',
-                    background: 'transparent',
-                    color: '#ef4444',
-                    border: `1px solid #ef4444`,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                    fontWeight: '600'
-                  }}>
-                    Remove
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem',
+              color: darkMode ? '#9ca3af' : '#6b7280'
+            }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>💳</div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: darkMode ? 'white' : '#1f2937',
+                marginBottom: '0.5rem'
+              }}>
+                No Payment Methods
+              </h3>
+              <p style={{ marginBottom: '1.5rem' }}>
+                Add a payment method to manage your subscription billing.
+              </p>
+              <button
+                onClick={() => {
+                  // TODO: Implement payment method setup
+                  console.log('Payment method setup requested');
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600'
+                }}
+              >
+                Add Payment Method
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1454,7 +1853,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                         color: darkMode ? 'white' : '#1f2937',
                         marginBottom: '0.25rem'
                       }}>
-                        ₹{plan.price.toLocaleString()}
+                        {plan.price === 0 ? 'FREE' : `₹${plan.price.toLocaleString()}`}
                       </div>
                       <div style={{
                         fontSize: '0.75rem',
@@ -1485,7 +1884,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                     
                     <button 
                       onClick={async () => {
-                        if (userRole === 'super-admin' || userRole === 'admin') {
+                        if (currentUser?.role === ROLES.SUPER_ADMIN || userRole === 'super-admin' || userRole === 'admin') {
                           try {
                             setSelectedPlan(plan);
                             setShowPlanModal(false);
@@ -1524,12 +1923,12 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                             }
                           } catch (error) {
                             console.error('Error updating plan:', error);
-                            alert('Failed to update plan. Please try again.');
                             setShowCongrats(false);
                             setSelectedPlan(null);
+                            // TODO: Show proper error notification
                           }
                         } else {
-                          alert('Please contact your administrator to upgrade your plan.');
+                          console.log('Plan upgrade requested - contact administrator');
                           setShowPlanModal(false);
                         }
                       }}
@@ -1560,7 +1959,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       disabled={currentPlan.value === plan.value}
                     >
                       {currentPlan.value === plan.value ? 'Current Plan' : 
-                       userRole === 'super-admin' ? 'Switch to This Plan' : 'Contact Admin'}
+                       (currentUser?.role === ROLES.SUPER_ADMIN || userRole === 'super-admin') ? 'Switch to This Plan' : 'Contact Admin'}
                     </button>
                   </div>
                 ))}
@@ -1723,6 +2122,10 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
             @keyframes confetti {
               0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
               100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
             }
           `}</style>
         </div>

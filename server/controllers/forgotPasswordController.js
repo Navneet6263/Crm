@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const emailService = require('../services/emailService');
 
 // Store OTPs temporarily (in production, use Redis)
@@ -105,8 +106,13 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Verify OTP
-    if (storedOTP.otp !== otp) {
+    // Verify OTP using secure comparison to prevent timing attacks
+    const isValidOTP = crypto.timingSafeEqual(
+      Buffer.from(storedOTP.otp, 'utf8'),
+      Buffer.from(otp, 'utf8')
+    );
+    
+    if (!isValidOTP) {
       storedOTP.attempts++;
       return res.status(400).json({
         success: false,

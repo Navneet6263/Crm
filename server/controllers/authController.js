@@ -372,8 +372,8 @@ const createTeamMember = async (req, res) => {
           slug: 'greencall-crm',
           contactEmail: 'admin@greencall.com',
           adminCredentials: {
-            email: 'admin@greencall.com',
-            password: 'admin123'
+            email: process.env.DEFAULT_ADMIN_EMAIL || 'admin@greencall.com',
+            password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'
           },
           plan: { name: 'enterprise' },
           status: 'active',
@@ -560,8 +560,8 @@ const createEmployee = async (req, res) => {
         slug: 'greencall-crm',
         contactEmail: 'admin@greencall.com',
         adminCredentials: {
-          email: 'admin@greencall.com',
-          password: 'admin123'
+          email: process.env.DEFAULT_ADMIN_EMAIL || 'admin@greencall.com',
+          password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'
         },
         plan: { 
           name: 'enterprise',

@@ -96,6 +96,15 @@ const createCompany = async (req, res) => {
         emailLimit: -1,
         smsLimit: 10000,
         features: ['full_crm', 'ai_assistant', 'custom_reports', 'advanced_automation', 'api_access']
+      },
+      superadmin: {
+        leadsLimit: -1,
+        usersLimit: -1,
+        customersLimit: -1,
+        storageLimit: -1,
+        emailLimit: -1,
+        smsLimit: -1,
+        features: ['unlimited_everything', 'super_admin_access', 'all_features']
       }
     };
     const selectedPlan = PLAN_CONFIGS[planName];
@@ -505,6 +514,15 @@ const updateCompanyPlan = async (req, res) => {
         emailLimit: -1, 
         smsLimit: 10000, 
         features: ['full_crm', 'ai_assistant', 'custom_reports', 'advanced_automation', 'api_access'] 
+      },
+      superadmin: { 
+        leadsLimit: -1, 
+        usersLimit: -1, 
+        customersLimit: -1, 
+        storageLimit: -1, 
+        emailLimit: -1, 
+        smsLimit: -1, 
+        features: ['unlimited_everything', 'super_admin_access', 'all_features'] 
       }
     };
     
@@ -764,6 +782,16 @@ const getPlanConfigs = async (req, res) => {
         smsLimit: 10000,
         features: ['full_crm', 'ai_assistant', 'custom_reports', 'advanced_automation', 'api_access'],
         price: '₹9999/month'
+      },
+      superadmin: {
+        leadsLimit: -1,
+        usersLimit: -1,
+        customersLimit: -1,
+        storageLimit: -1,
+        emailLimit: -1,
+        smsLimit: -1,
+        features: ['unlimited_everything', 'super_admin_access', 'all_features'],
+        price: 'Unlimited'
       }
     };
     res.json({
@@ -800,14 +828,14 @@ const getTeamMembers = async (req, res) => {
             isGenerated: true
           },
           plan: { 
-            name: 'enterprise', 
+            name: 'superadmin', 
             usersLimit: -1, 
             leadsLimit: -1, 
             customersLimit: -1,
-            storageLimit: 100,
+            storageLimit: -1,
             emailLimit: -1,
-            smsLimit: 10000,
-            features: ['full_crm', 'ai_assistant', 'custom_reports', 'advanced_automation', 'api_access'],
+            smsLimit: -1,
+            features: ['unlimited_everything', 'super_admin_access', 'all_features'],
             startDate: new Date(),
             endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
           },
@@ -1537,6 +1565,117 @@ const createDefaultCompany = async (req, res) => {
   }
 };
 
+// Get billing data for current user's company
+const getBillingData = async (req, res) => {
+  try {
+    console.log('💳 Getting billing data for user:', req.user.email, 'Role:', req.user.role);
+    
+    // Extract company ID with improved handling
+    let userCompanyId;
+    if (req.user.companyId && typeof req.user.companyId === 'object' && req.user.companyId._id) {
+      userCompanyId = req.user.companyId._id;
+    } else if (req.user.companyId) {
+      userCompanyId = req.user.companyId;
+    } else if (req.user.tenantId) {
+      userCompanyId = req.user.tenantId;
+    }
+    
+    console.log('🏢 Extracted Company ID:', userCompanyId);
+    
+    if (!userCompanyId) {
+      console.log('❌ No company ID found for user');
+      return res.status(400).json({ 
+        success: false,
+        message: 'User not associated with any company. Please contact your administrator.' 
+      });
+    }
+
+    // Get company with billing information
+    const company = await Company.findById(userCompanyId)
+      .select('name plan usage status createdAt')
+      .lean();
+      
+    if (!company) {
+      console.log('❌ Company not found with ID:', userCompanyId);
+      return res.status(404).json({ 
+        success: false,
+        message: 'Company not found. Please contact your administrator.' 
+      });
+    }
+
+    // Generate sample invoices based on company plan
+    const planPrice = company.plan.name === 'basic' ? 999 : 
+                     company.plan.name === 'professional' ? 2999 : 
+                     company.plan.name === 'enterprise' ? 9999 : 0; // SuperAdmin = 0
+    
+    const invoices = [];
+    const currentDate = new Date();
+    
+    // Generate last 3 months invoices if not trial and not superadmin
+    if (company.plan.name !== 'trial' && company.plan.name !== 'superadmin') {
+      for (let i = 0; i < 3; i++) {
+        const invoiceDate = new Date(currentDate);
+        invoiceDate.setMonth(currentDate.getMonth() - i);
+        
+        invoices.push({
+          id: `INV-${invoiceDate.getFullYear()}-${String(invoiceDate.getMonth() + 1).padStart(3, '0')}`,
+          date: invoiceDate.toISOString().split('T')[0],
+          amount: planPrice,
+          status: 'paid',
+          planName: company.plan.name,
+          downloadUrl: '#'
+        });
+      }
+    }
+
+    // Sample payment methods (in real app, this would come from payment gateway)
+    const paymentMethods = (company.plan.name !== 'trial' && company.plan.name !== 'superadmin') ? [
+      {
+        id: 1,
+        type: 'card',
+        last4: '4242',
+        brand: 'Visa',
+        expiryMonth: 12,
+        expiryYear: 2025,
+        isDefault: true
+      }
+    ] : [];
+
+    console.log('✅ Billing data retrieved:', {
+      companyName: company.name,
+      planName: company.plan.name,
+      invoicesCount: invoices.length,
+      paymentMethodsCount: paymentMethods.length
+    });
+
+    res.json({
+      success: true,
+      company: {
+        id: company._id,
+        name: company.name,
+        plan: company.plan,
+        usage: company.usage,
+        status: company.status
+      },
+      invoices,
+      paymentMethods,
+      billingHistory: {
+        totalPaid: invoices.reduce((sum, inv) => sum + inv.amount, 0),
+        lastPayment: invoices.length > 0 ? invoices[0].date : null,
+        nextBilling: company.plan.endDate
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get billing data error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch billing data',
+      error: error.message 
+    });
+  }
+};
+
 // Setup company after user registration
 const setupCompany = async (req, res) => {
   try {
@@ -1571,7 +1710,7 @@ const setupCompany = async (req, res) => {
       talentId,
       adminCredentials: {
         email: req.user.email,
-        password: 'temp123', // Temporary password
+        password: process.env.DEFAULT_USER_PASSWORD || 'temp123', // Temporary password
         isGenerated: false
       },
       plan: {
@@ -1659,6 +1798,7 @@ module.exports = {
   toggleTeamMemberStatus,
   deleteTeamMember,
   getMyCompanyPlan,
+  getBillingData,
   getCompaniesForSuperAdmin,
   createDefaultCompany
 };

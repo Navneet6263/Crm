@@ -81,29 +81,44 @@ export const confirmAction = (message, onConfirm, onCancel) => {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
   `;
 
-  dialog.innerHTML = `
-    <div style="margin-bottom: 20px; font-size: 16px; color: #374151;">${message}</div>
-    <div style="display: flex; gap: 12px; justify-content: center;">
-      <button id="confirm-yes" style="
-        background: #ef4444;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 500;
-      ">Yes, Delete</button>
-      <button id="confirm-no" style="
-        background: #6b7280;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 500;
-      ">Cancel</button>
-    </div>
+  // Create elements safely to prevent XSS
+  const messageDiv = document.createElement('div');
+  messageDiv.style.cssText = 'margin-bottom: 20px; font-size: 16px; color: #374151;';
+  messageDiv.textContent = message; // Use textContent to prevent XSS
+  
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: center;';
+  
+  const confirmBtn = document.createElement('button');
+  confirmBtn.id = 'confirm-yes';
+  confirmBtn.textContent = 'Yes, Delete';
+  confirmBtn.style.cssText = `
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
   `;
+  
+  const cancelBtn = document.createElement('button');
+  cancelBtn.id = 'confirm-no';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = `
+    background: #6b7280;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+  `;
+  
+  buttonContainer.appendChild(confirmBtn);
+  buttonContainer.appendChild(cancelBtn);
+  dialog.appendChild(messageDiv);
+  dialog.appendChild(buttonContainer);
 
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);

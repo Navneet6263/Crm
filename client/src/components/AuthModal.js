@@ -59,8 +59,12 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess, darkMode }) => {
         isAuthenticated: true
       };
       
-      // Store user data in localStorage
-      localStorage.setItem('user', JSON.stringify(userData));
+      // Store user data in localStorage (consider using secure storage in production)
+      try {
+        localStorage.setItem('user', JSON.stringify(userData));
+      } catch (error) {
+        console.error('Failed to store user data:', error);
+      }
       
       onAuthSuccess(userData);
       onClose();

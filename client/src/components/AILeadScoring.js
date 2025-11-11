@@ -176,63 +176,47 @@ const AILeadScoring = ({ leads = [], darkMode }) => {
         }
 
         // Try to get AI scoring from backend first
-        const aiData = await apiService.getAILeadScoring();
-        if (aiData.success && aiData.scoredLeads && aiData.scoredLeads.length > 0) {
-          setScoredLeads(aiData.scoredLeads);
-        } else {
-          // Fallback to local analysis
-          const analyzed = leads.map(lead => {
-            const aiAnalysis = calculateAIScore(lead);
-            return {
-              ...lead,
-              aiAnalysis: aiAnalysis || {
-                score: 0,
-                factors: [],
-                priority: 'Low',
-                recommendation: {
-                  action: 'Review Required',
-                  message: 'Lead needs manual review.',
-                  icon: AlertCircle,
-                  color: '#6b7280'
-                }
-              }
-            };
-          });
-          analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
-          setScoredLeads(analyzed);
+        try {
+          const aiData = await apiService.getAILeadScoring();
+          if (aiData.success && aiData.scoredLeads && aiData.scoredLeads.length > 0) {
+            setScoredLeads(aiData.scoredLeads);
+            setIsLoading(false);
+            return;
+          }
+        } catch (backendError) {
+          console.log('AI backend not available, using local analysis');
         }
+
+        // Fallback to local analysis
+        const analyzed = leads.map(lead => {
+          const aiAnalysis = calculateAIScore(lead);
+          return {
+            ...lead,
+            aiAnalysis: aiAnalysis || {
+              score: 0,
+              factors: [],
+              priority: 'Low',
+              recommendation: {
+                action: 'Review Required',
+                message: 'Lead needs manual review.',
+                icon: AlertCircle,
+                color: '#6b7280'
+              }
+            }
+          };
+        });
+        analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
+        setScoredLeads(analyzed);
       } catch (error) {
-        console.log('AI backend not available, using local analysis');
-        if (leads && leads.length > 0) {
-          const analyzed = leads.map(lead => {
-            const aiAnalysis = calculateAIScore(lead);
-            return {
-              ...lead,
-              aiAnalysis: aiAnalysis || {
-                score: 0,
-                factors: [],
-                priority: 'Low',
-                recommendation: {
-                  action: 'Review Required',
-                  message: 'Lead needs manual review.',
-                  icon: AlertCircle,
-                  color: '#6b7280'
-                }
-              }
-            };
-          });
-          analyzed.sort((a, b) => (b.aiAnalysis?.score || 0) - (a.aiAnalysis?.score || 0));
-          setScoredLeads(analyzed);
-        } else {
-          setScoredLeads([]);
-        }
+        console.error('Error in AI Lead Scoring:', error);
+        setScoredLeads([]);
       } finally {
         setIsLoading(false);
       }
     };
     
     initializeComponent();
-  }, [leads, calculateAIScore]);
+  }, [leads]);
 
   const getScoreColor = (score) => {
     if (score >= 80) return '#22c55e';

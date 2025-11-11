@@ -20,6 +20,7 @@ const {
   toggleTeamMemberStatus,
   deleteTeamMember,
   getMyCompanyPlan,
+  getBillingData,
   getCompaniesForSuperAdmin,
   createDefaultCompany
 } = require('../controllers/companyController');
@@ -58,6 +59,7 @@ router.delete('/my/team/:userId', deleteTeamMember); // Delete team member
 
 // Get current user's company plan details
 router.get('/my/plan', getMyCompanyPlan); // Get current user's company plan and usage details
+router.get('/my/billing', getBillingData); // Get current user's billing data
 
 // SuperAdmin specific routes
 router.get('/superadmin/list', getCompaniesForSuperAdmin); // Get companies for SuperAdmin dropdown

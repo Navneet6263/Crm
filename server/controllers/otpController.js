@@ -1,5 +1,6 @@
 const smsService = require('../services/smsService');
 const User = require('../models/User');
+const crypto = require('crypto');
 
 // Store OTPs temporarily (in production use Redis)
 const otpStore = new Map();
@@ -98,8 +99,13 @@ const verifyOTP = async (req, res) => {
       return res.status(400).json({ message: 'Too many attempts' });
     }
 
-    // Verify OTP
-    if (storedData.otp !== otp) {
+    // Verify OTP using secure comparison to prevent timing attacks
+    const isValidOTP = crypto.timingSafeEqual(
+      Buffer.from(storedData.otp, 'utf8'),
+      Buffer.from(otp, 'utf8')
+    );
+    
+    if (!isValidOTP) {
       storedData.attempts++;
       return res.status(400).json({ message: 'Invalid OTP' });
     }
@@ -117,7 +123,7 @@ const verifyOTP = async (req, res) => {
           name: `User_${phoneNumber.slice(-4)}`,
           phone: phoneNumber,
           email: `${phoneNumber}@temp.com`,
-          password: 'temp123',
+          password: process.env.DEFAULT_USER_PASSWORD || 'temp123',
           role: 'sales',
           loginMethod: 'otp',
           companyId: tenantId,
@@ -132,7 +138,7 @@ const verifyOTP = async (req, res) => {
           name: email.split('@')[0],
           email: email,
           phone: '',
-          password: 'temp123',
+          password: process.env.DEFAULT_USER_PASSWORD || 'temp123',
           role: 'sales',
           loginMethod: 'otp',
           companyId: tenantId,

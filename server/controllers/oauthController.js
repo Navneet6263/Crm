@@ -39,8 +39,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET &&
                 if (!superAdmin) {
                     superAdmin = await User.create({
                         name: 'Super Admin',
-                        email: 'superadmin@greencrm.com',
-                        password: 'super123',
+                        email: process.env.SUPER_ADMIN_EMAIL || 'superadmin@greencrm.com',
+                        password: process.env.SUPER_ADMIN_PASSWORD || 'super123',
                         role: 'super-admin'
                     });
                 }
@@ -105,8 +105,8 @@ if (process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET &&
             if (!superAdmin) {
                 superAdmin = await User.create({
                     name: 'Super Admin',
-                    email: 'superadmin@greencrm.com',
-                    password: 'super123',
+                    email: process.env.SUPER_ADMIN_EMAIL || 'superadmin@greencrm.com',
+                    password: process.env.SUPER_ADMIN_PASSWORD || 'super123',
                     role: 'super-admin'
                 });
             }
@@ -165,7 +165,8 @@ passport.deserializeUser(async (id, done) => {
 // OAuth Controllers
 const googleAuth = (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID === 'your-google-client-id-here') {
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_not_configured&message=Google OAuth not configured. Please use email/password login.`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/login?error=oauth_not_configured&message=Google OAuth not configured. Please use email/password login.`);
     }
     passport.authenticate('google', {
         scope: ['profile', 'email']
@@ -180,12 +181,14 @@ const googleCallback = (req, res, next) => {
     passport.authenticate('google', { failureRedirect: '/login' }, (err, user) => {
         if (err) {
             console.error('❌ Google OAuth error:', err);
-            return res.redirect(`${process.env.FRONTEND_URL}/?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            return res.redirect(`${frontendUrl}/?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
         }
         
         if (!user) {
             console.log('❌ No user returned from Google OAuth');
-            return res.redirect(`${process.env.FRONTEND_URL}/?error=oauth_failed&message=No user data received`);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            return res.redirect(`${frontendUrl}/?error=oauth_failed&message=No user data received`);
         }
         
         console.log('✅ Google OAuth successful for user:', user.email);
@@ -196,7 +199,8 @@ const googleCallback = (req, res, next) => {
             { expiresIn: '7d' }
         );
         
-        res.redirect(`${process.env.FRONTEND_URL}/?token=${token}`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/?token=${token}`);
     })(req, res, next);
 };
 
@@ -205,7 +209,8 @@ const linkedinAuth = (req, res, next) => {
     console.log('LinkedIn Client ID:', process.env.LINKEDIN_CLIENT_ID);
     if (!process.env.LINKEDIN_CLIENT_ID || process.env.LINKEDIN_CLIENT_ID === 'demo-linkedin-client-id' || process.env.LINKEDIN_CLIENT_ID === 'your-linkedin-client-id') {
         console.log('❌ LinkedIn OAuth not configured');
-        return res.redirect(`${process.env.FRONTEND_URL}/?error=oauth_not_configured&message=LinkedIn OAuth not configured. Please use email/password login.`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return res.redirect(`${frontendUrl}/?error=oauth_not_configured&message=LinkedIn OAuth not configured. Please use email/password login.`);
     }
     passport.authenticate('linkedin')(req, res, next);
 };
@@ -218,12 +223,14 @@ const linkedinCallback = (req, res, next) => {
     passport.authenticate('linkedin', { failureRedirect: '/login' }, (err, user) => {
         if (err) {
             console.error('❌ LinkedIn OAuth error:', err);
-            return res.redirect(`${process.env.FRONTEND_URL}/?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            return res.redirect(`${frontendUrl}/?error=oauth_failed&message=${encodeURIComponent(err.message)}`);
         }
         
         if (!user) {
             console.log('❌ No user returned from LinkedIn OAuth');
-            return res.redirect(`${process.env.FRONTEND_URL}/?error=oauth_failed&message=No user data received`);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            return res.redirect(`${frontendUrl}/?error=oauth_failed&message=No user data received`);
         }
         
         console.log('✅ LinkedIn OAuth successful for user:', user.email);
@@ -234,7 +241,8 @@ const linkedinCallback = (req, res, next) => {
             { expiresIn: '7d' }
         );
         
-        res.redirect(`${process.env.FRONTEND_URL}/?token=${token}`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/?token=${token}`);
     })(req, res, next);
 };
 

@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/database');
 
@@ -212,13 +213,24 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
     console.log('🔑 Stored password:', user.password);
     console.log('🔑 Input password:', password);
     
-    // Check password - try both hashed and plain text
+    // Check password - try both hashed and plain text with secure comparison
     let isValidPassword = await bcrypt.compare(password, user.password);
     
-    // If bcrypt fails, try plain text comparison
-    if (!isValidPassword && user.password === password) {
-      isValidPassword = true;
-      console.log('✅ Plain text password match');
+    // If bcrypt fails, try plain text comparison with timing-safe comparison
+    if (!isValidPassword) {
+      try {
+        const isPlainTextMatch = crypto.timingSafeEqual(
+          Buffer.from(user.password, 'utf8'),
+          Buffer.from(password, 'utf8')
+        );
+        if (isPlainTextMatch) {
+          isValidPassword = true;
+          console.log('✅ Plain text password match');
+        }
+      } catch (error) {
+        // Buffers have different lengths, not a match
+        isValidPassword = false;
+      }
     }
     
     console.log('🔓 Password valid:', isValidPassword);
@@ -299,10 +311,21 @@ app.put('/api/auth/change-password', authenticateToken, auditLogger('PASSWORD_CH
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Verify current password
+    // Verify current password with secure comparison
     let isValidPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!isValidPassword && user.password === currentPassword) {
-      isValidPassword = true; // Handle plain text passwords
+    if (!isValidPassword) {
+      try {
+        const isPlainTextMatch = crypto.timingSafeEqual(
+          Buffer.from(user.password, 'utf8'),
+          Buffer.from(currentPassword, 'utf8')
+        );
+        if (isPlainTextMatch) {
+          isValidPassword = true; // Handle plain text passwords
+        }
+      } catch (error) {
+        // Buffers have different lengths, not a match
+        isValidPassword = false;
+      }
     }
     
     if (!isValidPassword) {
@@ -998,12 +1021,13 @@ app.use('/api/ai', require('./routes/ai'));
 
 
 // Direct routes for frontend compatibility
-const { getPlanConfigs, getMyCompanyPlan, getTeamMembers } = require('./controllers/companyController');
+const { getPlanConfigs, getMyCompanyPlan, getTeamMembers, getBillingData } = require('./controllers/companyController');
 
 // Plans routes
 app.get('/api/plans', authenticateToken, getPlanConfigs);
 app.get('/api/my/plan', authenticateToken, getMyCompanyPlan);
 app.get('/api/my/team', authenticateToken, getTeamMembers);
+app.get('/api/companies/my/billing', authenticateToken, getBillingData);
 
 // Health check
 app.get('/api/health', async (req, res) => {

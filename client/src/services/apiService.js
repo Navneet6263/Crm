@@ -479,8 +479,10 @@ const apiService = {
   // Search leads - Real backend only
   searchLeads: async (searchTerm, filters = {}) => {
     try {
+      // Sanitize search term to prevent XSS
+      const sanitizedSearchTerm = searchTerm ? searchTerm.replace(/[<>"'&]/g, '') : '';
       const queryParams = new URLSearchParams({
-        search: searchTerm,
+        search: sanitizedSearchTerm,
         ...filters
       });
       
@@ -1305,9 +1307,16 @@ const apiService = {
         throw new Error('Invalid response format from server');
       }
       
+      // Sanitize team member data to prevent XSS
+      const sanitizedTeam = Array.isArray(data.team) ? data.team.map(member => ({
+        ...member,
+        name: member.name ? member.name.replace(/[<>"'&]/g, '') : '',
+        email: member.email ? member.email.replace(/[<>"'&]/g, '') : ''
+      })) : [];
+      
       return {
         success: true,
-        team: Array.isArray(data.team) ? data.team : [],
+        team: sanitizedTeam,
         totalMembers: data.totalMembers || 0,
         company: data.company || null,
         limits: data.limits || { current: 0, max: 5, canAdd: false }
