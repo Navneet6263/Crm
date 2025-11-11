@@ -871,7 +871,7 @@ const getTeamMembers = async (req, res) => {
         team: teamMembers || [],
         totalMembers: teamMembers.length,
         company: {
-          id: defaultCompany._id,
+          _id: defaultCompany._id,
           name: defaultCompany.name,
           plan: defaultCompany.plan
         },
@@ -904,11 +904,46 @@ const getTeamMembers = async (req, res) => {
     console.log('📋 User Object Keys:', Object.keys(req.user));
     
     if (!userCompanyId) {
-      console.log('❌ No company ID found for user');
-      return res.status(400).json({ 
-        success: false,
-        message: 'User not associated with any company. Please contact your administrator.' 
+      console.log('❌ No company ID found for user - creating default company');
+      
+      // Create a default company for users without one
+      const defaultCompany = await Company.create({
+        name: `${req.user.name || req.user.email}'s Company`,
+        slug: generateSlug(`${req.user.name || req.user.email}-company`),
+        contactEmail: req.user.email,
+        plan: {
+          name: 'basic',
+          usersLimit: 5,
+          leadsLimit: 1000,
+          customersLimit: 500,
+          storageLimit: 1,
+          emailLimit: 1000,
+          smsLimit: 100,
+          features: ['basic_crm', 'lead_management', 'basic_reports'],
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        },
+        usage: {
+          currentLeads: 0,
+          currentUsers: 1,
+          currentCustomers: 0,
+          storageUsed: 0,
+          emailsSent: 0,
+          smsSent: 0,
+          lastReset: new Date()
+        },
+        status: 'active',
+        createdBy: req.user._id
       });
+      
+      // Update user with company ID
+      await User.findByIdAndUpdate(req.user._id, {
+        companyId: defaultCompany._id,
+        tenantId: defaultCompany._id
+      });
+      
+      userCompanyId = defaultCompany._id;
+      console.log('✅ Created default company:', defaultCompany.name);
     }
 
     // Get company info for limits first
@@ -959,7 +994,7 @@ const getTeamMembers = async (req, res) => {
       team: validTeamMembers || [],
       totalMembers: validTeamMembers.length,
       company: {
-        id: company._id,
+        _id: company._id,
         name: company.name,
         plan: company.plan
       },
