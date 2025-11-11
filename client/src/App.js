@@ -369,19 +369,23 @@ const AppContent = () => {
     try {
       // Use apiService.register for real backend registration
       const response = await apiService.register(userData);
-      const { token, user } = response;
+      const { token, user, talentId, needsCompanySetup } = response;
       
       localStorage.setItem('authToken', token);
       setCurrentUser(user);
       setIsLoggedIn(true);
       
-      // Show company setup page after registration
-      setShowCompanySetup(true);
-      
-      showToast('success', `Welcome ${user.name}! Please setup your company details.`);
+      // Show company setup if needed
+      if (needsCompanySetup) {
+        setShowCompanySetup(true);
+        showToast('success', `Welcome ${user.name}! Your Talent ID: ${talentId}. Please setup your company details.`);
+      } else {
+        setActiveView('dashboard');
+        showToast('success', `Welcome ${user.name}!`);
+      }
     } catch (error) {
       console.error('Signup error:', error);
-      throw error; // Re-throw to trigger error handling in SignUp component
+      throw error;
     }
   };
 

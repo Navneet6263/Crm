@@ -94,6 +94,13 @@ const rolePermissions = {
     'view_own_analytics',
     'view_settings',
     'view_assigned_customers'
+  ],
+  'user': [
+    'view_own_leads',
+    'create_leads',
+    'view_own_customers',
+    'create_customers',
+    'view_settings'
   ]
 };
 

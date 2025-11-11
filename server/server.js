@@ -77,9 +77,6 @@ app.use('/api', apiLimiter);
 // Middleware
 app.use(cors({
   origin: [
-    'https://crm-two-ashy.vercel.app',
-    'https://your-frontend-domain.vercel.app',
-    'https://your-frontend-domain.netlify.app',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001'
@@ -366,8 +363,8 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
     
     let query = { isActive: true };
     
-    // Company-based filtering (except super-admin)
-    if (req.user.role !== 'super-admin') {
+    // Company-based filtering (except super-admin and user)
+    if (req.user.role !== 'super-admin' && req.user.role !== 'user') {
       if (req.user.companyId) {
         query.companyId = req.user.companyId;
         console.log('🏢 Company-based filtering:', req.user.companyId);
@@ -376,10 +373,17 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
       }
     }
     
-    // Role-based filtering within company
+    // Role-based filtering
     if (req.user.role === 'admin' || req.user.role === 'manager') {
       // Admin and manager can see all company leads
       console.log('🔑 Admin/Manager access - showing all company leads');
+    } else if (req.user.role === 'user') {
+      // User role can only see their own leads (no company filter)
+      console.log('👤 User role - showing only own leads');
+      query = {
+        isActive: true,
+        createdBy: req.user.id
+      };
     } else if (req.user.role !== 'super-admin') {
       // Normal users can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
@@ -413,7 +417,8 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
     console.log('🔍 Final Query:', JSON.stringify(query, null, 2));
 
     const leads = await Lead.find(query)
-      .populate('createdBy assignedTo', 'name email role')
+      .populate('createdBy', 'name email role')
+      .populate('assignedTo', 'name email role')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -453,13 +458,15 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
       });
     }
     
-    // Check if user belongs to a company (except super-admin)
-    if (req.user.role !== 'super-admin' && !req.user.companyId) {
+    // Allow user role to create leads without company association
+    if (req.user.role === 'user') {
+      console.log('👤 User role - allowing lead creation without company');
+    } else if (req.user.role !== 'super-admin' && !req.user.companyId) {
       return res.status(403).json({ message: 'User not associated with any company' });
     }
     
-    // Check company lead limits
-    if (req.user.companyId) {
+    // Check company lead limits (skip for user role)
+    if (req.user.companyId && req.user.role !== 'user') {
       const company = await require('./models/Company').findById(req.user.companyId);
       if (company && !company.canAddLead()) {
         return res.status(400).json({ 
@@ -505,6 +512,9 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
     
     // Create notification for lead creation
     await createLeadCreationNotification(savedLead._id, userId);
+    
+    // Populate createdBy field to show creator name and date
+    await savedLead.populate('createdBy', 'name email role');
     
     console.log('=== END LEAD CREATION ===\n');
     
@@ -635,13 +645,16 @@ app.get('/api/customers', authenticateToken, async (req, res) => {
     
     let query = { isActive: true };
     
-    // Company-based filtering (except super-admin)
-    if (req.user.role !== 'super-admin') {
+    // Company-based filtering (except super-admin and user)
+    if (req.user.role !== 'super-admin' && req.user.role !== 'user') {
       if (req.user.companyId) {
         query.companyId = req.user.companyId;
       } else {
         return res.status(403).json({ message: 'User not associated with any company' });
       }
+    } else if (req.user.role === 'user') {
+      // User role can only see their own customers
+      query.createdBy = req.user.id;
     }
     
     if (status) query.status = status;
@@ -707,8 +720,10 @@ app.post('/api/customers', authenticateToken, async (req, res) => {
       });
     }
     
-    // Check if user belongs to a company (except super-admin)
-    if (req.user.role !== 'super-admin' && !req.user.companyId) {
+    // Allow user role to create customers without company association
+    if (req.user.role === 'user') {
+      console.log('👤 User role - allowing customer creation without company');
+    } else if (req.user.role !== 'super-admin' && !req.user.companyId) {
       return res.status(403).json({ message: 'User not associated with any company' });
     }
     

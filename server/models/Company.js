@@ -2,6 +2,15 @@ const mongoose = require('mongoose');
 
 // Plan configurations
 const PLAN_CONFIGS = {
+  trial: {
+    leadsLimit: 5,
+    usersLimit: 1,
+    customersLimit: 3,
+    storageLimit: 0.1, // GB
+    emailLimit: 10, // per month
+    smsLimit: 5, // per month
+    features: ['basic_crm']
+  },
   basic: {
     leadsLimit: 1000,
     usersLimit: 5,
@@ -92,8 +101,8 @@ const companySchema = new mongoose.Schema({
   plan: {
     name: {
       type: String,
-      enum: ['basic', 'professional', 'enterprise'],
-      default: 'basic'
+      enum: ['trial', 'basic', 'professional', 'enterprise'],
+      default: 'trial'
     },
     leadsLimit: {
       type: Number,

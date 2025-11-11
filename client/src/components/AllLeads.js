@@ -513,7 +513,10 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                 }}>
                   <span>Source: {lead.leadSource || lead.source}</span>
                   <span>Value: ₹{lead.estimatedValue ? Number(lead.estimatedValue).toLocaleString() : (lead.value || '0')}</span>
-                  <span>Created: {lead.createdDate ? new Date(lead.createdDate).toLocaleDateString() : (lead.lastContact || 'N/A')}</span>
+                  <span>Created: {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-IN') : 'N/A'}</span>
+                  {lead.createdBy && (
+                    <span>By: {typeof lead.createdBy === 'object' ? lead.createdBy.name : lead.createdBy}</span>
+                  )}
                 </div>
               </div>
 

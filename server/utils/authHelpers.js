@@ -47,8 +47,8 @@ const safeLog = (level, message, data = {}) => {
 
 // Role validation whitelist
 const ALLOWED_ROLES = {
-  ADMIN_CAN_CREATE: ['manager', 'sales', 'support'],
-  ALL_ROLES: ['super-admin', 'admin', 'manager', 'sales', 'support']
+  ADMIN_CAN_CREATE: ['manager', 'sales', 'support', 'user'],
+  ALL_ROLES: ['super-admin', 'admin', 'manager', 'sales', 'support', 'user']
 };
 
 module.exports = {

@@ -22,26 +22,25 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    default: 'sales'
+    default: 'user'
   },
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    required: function() {
-      return this.role !== 'super-admin';
-    }
+    ref: 'Company'
   },
   tenantId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    required: function() {
-      return this.role !== 'super-admin';
-    }
+    ref: 'Company'
   },
   phone: {
     type: String,
     trim: true,
     sparse: true
+  },
+  department: {
+    type: String,
+    trim: true,
+    default: ''
   },
   loginMethod: {
     type: String,

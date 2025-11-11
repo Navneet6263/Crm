@@ -97,13 +97,17 @@ const BulkUpload = ({ darkMode, onClose, onUploadComplete }) => {
           setUploadResults(results);
           
           if (results.success > 0) {
-            showToast('success', `✅ ${results.success} ${uploadType} uploaded successfully!`);
+            const sanitizedSuccess = String(results.success).replace(/[<>"'&]/g, '');
+            const sanitizedUploadType = String(uploadType).replace(/[<>"'&]/g, '');
+            showToast('success', `✅ ${sanitizedSuccess} ${sanitizedUploadType} uploaded successfully!`);
             if (results.failed > 0) {
-              showToast('warning', `⚠️ ${results.failed} records failed to upload`);
+              const sanitizedFailed = String(results.failed).replace(/[<>"'&]/g, '');
+              showToast('warning', `⚠️ ${sanitizedFailed} records failed to upload`);
             }
             onUploadComplete();
           } else if (results.failed > 0) {
-            showToast('error', `❌ All ${results.failed} records failed to upload`);
+            const sanitizedFailed = String(results.failed).replace(/[<>"'&]/g, '');
+            showToast('error', `❌ All ${sanitizedFailed} records failed to upload`);
           }
         } catch (error) {
           console.error('Upload error:', error);

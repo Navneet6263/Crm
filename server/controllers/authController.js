@@ -14,7 +14,7 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    let assignedRole = role || 'sales';
+    let assignedRole = role || 'user';
     let tenantId = null;
     
     // If user is authenticated (admin creating team member)
@@ -54,20 +54,38 @@ const register = async (req, res) => {
         if (emailPrefix === 'navneet') {
           assignedRole = 'super-admin';
         } else {
-          assignedRole = 'sales'; // All other greencall.com emails get sales role
+          assignedRole = 'user'; // All other greencall.com emails get user role
         }
       } else {
-        assignedRole = 'sales'; // All other domains get sales role
+        assignedRole = 'user'; // All other domains get user role for trial
       }
     }
 
-    const userData = { name, email, password, role: assignedRole };
+    // Generate talent ID
+    const talentId = `TID${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    
+    const userData = { 
+      name, 
+      email, 
+      password, 
+      role: assignedRole,
+      talentId: talentId
+    };
+    
+    // Add phone and company fields if provided
+    if (req.body.phone) userData.phone = req.body.phone;
+    if (req.body.company || req.body.companyName) {
+      userData.company = req.body.company || req.body.companyName;
+    }
+    
+    // Handle company association only if user is authenticated (admin creating team member)
     if (tenantId) {
       userData.tenantId = tenantId;
-      userData.companyId = tenantId; // For consistency
+      userData.companyId = tenantId;
     }
 
     const user = await User.create(userData);
+    
     const token = generateToken(user._id, false, user.role);
 
     res.status(201).json({
@@ -77,16 +95,14 @@ const register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        talentId: user.talentId,
         roleDisplay: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
         tenantId: user.tenantId
       },
       token,
-      message: `User created successfully with role: ${user.role.toUpperCase()}`,
-      roleInfo: {
-        role: user.role,
-        displayName: user.role.charAt(0).toUpperCase() + user.role.slice(1).replace('-', ' '),
-        createdBy: req.user ? req.user.role : 'system'
-      }
+      message: `Account created successfully! Your Talent ID: ${user.talentId}`,
+      talentId: user.talentId,
+      needsCompanySetup: !user.companyId
     });
   } catch (error) {
     res.status(400).json({ message: error.message });

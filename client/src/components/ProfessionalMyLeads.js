@@ -790,7 +790,10 @@ const ProfessionalMyLeads = ({ darkMode, crmData, user }) => {
                         color: darkMode ? '#9ca3af' : '#6b7280',
                         margin: 0
                       }}>
-                        {new Date(selectedLead.createdDate).toLocaleDateString()}
+                        {selectedLead.createdAt ? new Date(selectedLead.createdAt).toLocaleDateString('en-IN') : 'N/A'}
+                        {selectedLead.createdBy && (
+                          <span> by {typeof selectedLead.createdBy === 'object' ? selectedLead.createdBy.name : selectedLead.createdBy}</span>
+                        )}
                       </p>
                     </div>
                   </div>

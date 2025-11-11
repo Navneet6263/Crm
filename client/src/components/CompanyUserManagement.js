@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaUsers, FaUserShield, FaUserTie, FaEye, FaEyeSlash } from 'react-icons/fa';
 import apiService from '../services/apiService';
 import { showSuccess, showError, confirmAction } from '../utils/notifications';
+import { validateUserData, sanitizeUserData } from '../utils/validation';
 
 const CompanyUserManagement = ({ currentUser, darkMode }) => {
   const [users, setUsers] = useState([]);
@@ -12,24 +13,51 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
   const [companyInfo, setCompanyInfo] = useState(null);
   const [limits, setLimits] = useState({ current: 0, max: 5, canAdd: false });
 
-  // Load team members from backend
+  // Load team members from backend with cleanup
   useEffect(() => {
-    loadTeamMembers();
+    let isMounted = true;
+    const abortController = new AbortController();
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await loadTeamMembers();
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
   }, []);
 
   const loadTeamMembers = async () => {
     try {
       setLoading(true);
       const response = await apiService.getTeamMembers();
-      if (response.success) {
-        setUsers(response.team || []);
-        setCompanyInfo(response.company);
-        setLimits(response.limits || { current: 0, max: 5, canAdd: false });
+      if (response && response.success) {
+        // Ensure team is an array and filter out invalid entries
+        const teamMembers = Array.isArray(response.team) ? response.team.filter(user => 
+          user && user._id && user.email
+        ) : [];
+        
+        setUsers(teamMembers);
+        setCompanyInfo(response.company || null);
+        setLimits(response.limits || { current: teamMembers.length, max: 5, canAdd: false });
+      } else {
+        console.warn('Invalid response format:', response);
+        setUsers([]);
+        setCompanyInfo(null);
+        setLimits({ current: 0, max: 5, canAdd: false });
       }
     } catch (error) {
       console.error('Error loading team members:', error);
-      showError('Failed to load team members: ' + error.message);
+      const errorMessage = error.message || 'Unknown error occurred';
+      showError(`Failed to load team members: ${errorMessage}`);
       setUsers([]);
+      setCompanyInfo(null);
+      setLimits({ current: 0, max: 5, canAdd: false });
     } finally {
       setLoading(false);
     }
@@ -48,80 +76,134 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
 
   const roles = [
     { value: 'manager', label: 'Manager', icon: FaUserShield, color: '#667eea' },
-    { value: 'sales_rep', label: 'Sales Representative', icon: FaUserTie, color: '#22c55e' },
-    { value: 'viewer', label: 'Viewer Only', icon: FaEye, color: '#f59e0b' }
+    { value: 'sales', label: 'Sales Representative', icon: FaUserTie, color: '#22c55e' },
+    { value: 'support', label: 'Support', icon: FaEye, color: '#f59e0b' },
+    { value: 'user', label: 'User', icon: FaUsers, color: '#6b7280' }
   ];
 
   const permissions = {
     manager: ['view_all_leads', 'edit_all_leads', 'delete_leads', 'view_reports', 'manage_team'],
-    sales_rep: ['view_leads', 'edit_own_leads', 'add_leads', 'view_own_reports'],
-    viewer: ['view_leads', 'view_reports']
+    sales: ['view_leads', 'edit_own_leads', 'add_leads', 'view_own_reports'],
+    support: ['view_leads', 'view_reports', 'customer_support'],
+    user: ['view_leads', 'view_reports']
   };
 
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    role: 'sales_rep',
+    role: 'sales',
     department: '',
     password: ''
   });
 
   const handleAddUser = async () => {
+    // Validate permissions
+    if (currentUser?.role !== 'super-admin' && !['admin', 'manager'].includes(currentUser?.role)) {
+      showError('You need Admin or Manager role to add team members.');
+      return;
+    }
+
+    // Check plan limits
     if (currentUser?.role !== 'super-admin' && !limits.canAdd) {
       showError(`Your ${currentPlan} plan allows only ${limits.max} users. Please upgrade your plan.`);
       return;
     }
 
-    if (!newUser.name || !newUser.email || !newUser.role) {
-      showError('Please fill in all required fields');
+    // Validate and sanitize user data
+    const sanitizedData = sanitizeUserData(newUser);
+    const validation = validateUserData(sanitizedData);
+    
+    if (!validation.isValid) {
+      showError(`Validation failed:\n${validation.errors.join('\n')}`);
       return;
     }
 
     try {
-      const response = await apiService.createTeamMember({
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        department: newUser.department
-      });
+      const userData = sanitizedData;
 
-      if (response.success) {
-        const roleDisplay = response.roleInfo?.displayName || response.user.roleDisplay || response.user.role;
-        showSuccess(`✅ Team member added successfully with role: ${roleDisplay}! ${response.user.tempPassword ? 'Temporary password: ' + response.user.tempPassword : ''}`);
+      const response = await apiService.createTeamMember(userData);
+
+      if (response && response.success) {
+        const roleDisplay = roles.find(r => r.value === response.user.role)?.label || response.user.role;
+        const tempPasswordMsg = response.user.tempPassword ? 
+          `\n\n🔑 Temporary Password: ${response.user.tempPassword}\n\nPlease share this with the new team member securely.` : '';
+        
+        showSuccess(`✅ Team member added successfully!\n👤 Name: ${response.user.name}\n📧 Email: ${response.user.email}\n🎭 Role: ${roleDisplay}${tempPasswordMsg}`);
+        
+        // Reset form
         setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
         setShowAddModal(false);
-        loadTeamMembers(); // Reload the list
+        
+        // Reload the list
+        await loadTeamMembers();
+      } else {
+        throw new Error(response?.message || 'Invalid response from server');
       }
     } catch (error) {
       console.error('Error adding user:', error);
-      showError('Failed to add team member: ' + error.message);
+      const errorMessage = error.message || 'Unknown error occurred';
+      showError(`Failed to add team member: ${errorMessage}`);
     }
   };
 
   const handleDeleteUser = (userId) => {
+    if (!userId) {
+      showError('Invalid user ID');
+      return;
+    }
+
+    const user = users.find(u => u._id === userId);
+    const userName = user?.name || 'this user';
+
     confirmAction(
-      'Are you sure you want to delete this user? This action cannot be undone.',
+      `Are you sure you want to delete ${userName}? This action cannot be undone and will permanently remove all their data.`,
       async () => {
         try {
-          await apiService.deleteTeamMember(userId);
-          showSuccess('Team member deleted successfully!');
-          loadTeamMembers(); // Reload the list
+          const response = await apiService.deleteTeamMember(userId);
+          
+          if (response && response.success) {
+            showSuccess(`✅ Team member "${userName}" deleted successfully!`);
+            await loadTeamMembers(); // Reload the list
+          } else {
+            throw new Error(response?.message || 'Delete operation failed');
+          }
         } catch (error) {
           console.error('Error deleting user:', error);
-          showError('Failed to delete team member: ' + error.message);
+          const errorMessage = error.message || 'Unknown error occurred';
+          showError(`Failed to delete team member: ${errorMessage}`);
         }
       }
     );
   };
 
   const toggleUserStatus = async (userId) => {
+    if (!userId) {
+      showError('Invalid user ID');
+      return;
+    }
+
+    const user = users.find(u => u._id === userId);
+    if (!user) {
+      showError('User not found');
+      return;
+    }
+
+    const action = user.isActive ? 'deactivate' : 'activate';
+    const userName = user.name || 'this user';
+
     try {
-      await apiService.toggleTeamMemberStatus(userId);
-      showSuccess('Team member status updated successfully!');
-      loadTeamMembers(); // Reload the list
+      const response = await apiService.toggleTeamMemberStatus(userId);
+      
+      if (response && response.success) {
+        showSuccess(`✅ Team member "${userName}" ${action}d successfully!`);
+        await loadTeamMembers(); // Reload the list
+      } else {
+        throw new Error(response?.message || 'Status update failed');
+      }
     } catch (error) {
       console.error('Error toggling user status:', error);
-      showError('Failed to update team member status: ' + error.message);
+      const errorMessage = error.message || 'Unknown error occurred';
+      showError(`Failed to ${action} team member: ${errorMessage}`);
     }
   };
 
@@ -137,25 +219,42 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
   };
 
   const handleUpdateUser = async () => {
-    if (!editingUser) return;
+    if (!editingUser || !editingUser._id) {
+      showError('No user selected for editing');
+      return;
+    }
+
+    // Validate and sanitize user data
+    const sanitizedData = sanitizeUserData(newUser);
+    const validation = validateUserData(sanitizedData);
+    
+    if (!validation.isValid) {
+      showError(`Validation failed:\n${validation.errors.join('\n')}`);
+      return;
+    }
 
     try {
-      const response = await apiService.updateTeamMember(editingUser._id, {
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        department: newUser.department
-      });
+      const updateData = sanitizedData;
 
-      if (response.success) {
-        showSuccess('Team member updated successfully!');
+      const response = await apiService.updateTeamMember(editingUser._id, updateData);
+
+      if (response && response.success) {
+        const roleDisplay = roles.find(r => r.value === response.user.role)?.label || response.user.role;
+        showSuccess(`✅ Team member "${response.user.name}" updated successfully!\n🎭 New Role: ${roleDisplay}`);
+        
+        // Reset form and close modal
         setEditingUser(null);
         setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
-        loadTeamMembers(); // Reload the list
+        
+        // Reload the list
+        await loadTeamMembers();
+      } else {
+        throw new Error(response?.message || 'Update operation failed');
       }
     } catch (error) {
       console.error('Error updating user:', error);
-      showError('Failed to update team member: ' + error.message);
+      const errorMessage = error.message || 'Unknown error occurred';
+      showError(`Failed to update team member: ${errorMessage}`);
     }
   };
 
@@ -164,11 +263,22 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
     setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(user => {
+    if (!user || typeof user !== 'object') return false;
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    if (!searchLower) return true;
+    
+    const name = (user.name || '').toLowerCase();
+    const email = (user.email || '').toLowerCase();
+    const department = (user.department || '').toLowerCase();
+    const role = (user.role || '').toLowerCase();
+    
+    return name.includes(searchLower) || 
+           email.includes(searchLower) || 
+           department.includes(searchLower) ||
+           role.includes(searchLower);
+  });
 
   return (
     <div style={{

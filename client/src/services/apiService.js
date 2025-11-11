@@ -1282,7 +1282,11 @@ const apiService = {
   getTeamMembers: async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/my/team`, {
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/companies/my/team`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -1290,34 +1294,80 @@ const apiService = {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch team members');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to fetch team members`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Validate response structure
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response format from server');
+      }
+      
+      return {
+        success: true,
+        team: Array.isArray(data.team) ? data.team : [],
+        totalMembers: data.totalMembers || 0,
+        company: data.company || null,
+        limits: data.limits || { current: 0, max: 5, canAdd: false }
+      };
     } catch (error) {
       console.error('Error fetching team members:', error);
-      return { team: [], totalMembers: 0, limits: { current: 0, max: 5, canAdd: false } };
+      return { 
+        success: false,
+        team: [], 
+        totalMembers: 0, 
+        company: null,
+        limits: { current: 0, max: 5, canAdd: false },
+        error: error.message
+      };
     }
   },
 
   createTeamMember: async (memberData) => {
     try {
       const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+
+      // Validate input data
+      if (!memberData || typeof memberData !== 'object') {
+        throw new Error('Invalid member data provided');
+      }
+
+      if (!memberData.name || !memberData.email || !memberData.role) {
+        throw new Error('Name, email, and role are required fields');
+      }
+
       const response = await fetch(`${API_BASE_URL}/companies/my/team`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(memberData)
+        body: JSON.stringify({
+          name: memberData.name.trim(),
+          email: memberData.email.trim().toLowerCase(),
+          role: memberData.role,
+          department: memberData.department || ''
+        })
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create team member');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to create team member`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Validate response
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Invalid response from server');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error creating team member:', error);
       throw error;
@@ -1327,21 +1377,50 @@ const apiService = {
   updateTeamMember: async (userId, memberData) => {
     try {
       const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      // Validate input data
+      if (!memberData || typeof memberData !== 'object') {
+        throw new Error('Invalid member data provided');
+      }
+
+      if (!memberData.name || !memberData.email || !memberData.role) {
+        throw new Error('Name, email, and role are required fields');
+      }
+
       const response = await fetch(`${API_BASE_URL}/companies/my/team/${userId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(memberData)
+        body: JSON.stringify({
+          name: memberData.name.trim(),
+          email: memberData.email.trim().toLowerCase(),
+          role: memberData.role,
+          department: memberData.department || ''
+        })
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update team member');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to update team member`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Validate response
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Invalid response from server');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error updating team member:', error);
       throw error;
@@ -1351,6 +1430,14 @@ const apiService = {
   toggleTeamMemberStatus: async (userId) => {
     try {
       const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
       const response = await fetch(`${API_BASE_URL}/companies/my/team/${userId}/toggle`, {
         method: 'PUT',
         headers: {
@@ -1360,11 +1447,18 @@ const apiService = {
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to toggle team member status');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to toggle team member status`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Validate response
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Invalid response from server');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error toggling team member status:', error);
       throw error;
@@ -1374,6 +1468,14 @@ const apiService = {
   deleteTeamMember: async (userId) => {
     try {
       const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
       const response = await fetch(`${API_BASE_URL}/companies/my/team/${userId}`, {
         method: 'DELETE',
         headers: {
@@ -1383,11 +1485,18 @@ const apiService = {
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete team member');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: Failed to delete team member`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Validate response
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Invalid response from server');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error deleting team member:', error);
       throw error;

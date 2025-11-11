@@ -67,7 +67,7 @@ const SignUp = ({ onSignUp, onBackToSignIn, onBack, darkMode = false }) => {
       return 'admin';
     }
     
-    return 'sales-executive'; // Default role
+    return 'user'; // Default role for trial users
   };
 
   const handleSubmit = async (e) => {

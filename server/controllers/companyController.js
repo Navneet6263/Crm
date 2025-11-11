@@ -796,9 +796,30 @@ const getTeamMembers = async (req, res) => {
           contactEmail: 'admin@greencall.com',
           adminCredentials: {
             email: 'admin@greencall.com',
-            password: 'admin123'
+            password: generateStrongPassword(12),
+            isGenerated: true
           },
-          plan: { name: 'enterprise', usersLimit: -1, leadsLimit: -1, customersLimit: -1 },
+          plan: { 
+            name: 'enterprise', 
+            usersLimit: -1, 
+            leadsLimit: -1, 
+            customersLimit: -1,
+            storageLimit: 100,
+            emailLimit: -1,
+            smsLimit: 10000,
+            features: ['full_crm', 'ai_assistant', 'custom_reports', 'advanced_automation', 'api_access'],
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          },
+          usage: {
+            currentLeads: 0,
+            currentUsers: 0,
+            currentCustomers: 0,
+            storageUsed: 0,
+            emailsSent: 0,
+            smsSent: 0,
+            lastReset: new Date()
+          },
           status: 'active',
           createdBy: req.user._id
         });
@@ -809,16 +830,17 @@ const getTeamMembers = async (req, res) => {
         isActive: true,
         role: { $ne: 'super-admin' } // Exclude other super-admins
       })
-      .select('name email role createdAt lastLogin department companyId tenantId')
+      .select('name email role createdAt lastLogin department companyId tenantId isActive')
       .populate('companyId', 'name')
       .populate('tenantId', 'name')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
       console.log('👥 SuperAdmin found team members:', teamMembers.length);
 
       return res.json({
         success: true,
-        team: teamMembers,
+        team: teamMembers || [],
         totalMembers: teamMembers.length,
         company: {
           id: defaultCompany._id,
@@ -885,8 +907,14 @@ const getTeamMembers = async (req, res) => {
       ],
       isActive: true 
     })
-    .select('name email role createdAt lastLogin department')
-    .sort({ createdAt: -1 });
+    .select('name email role createdAt lastLogin department isActive _id')
+    .sort({ createdAt: -1 })
+    .lean();
+
+    // Validate team members data
+    const validTeamMembers = teamMembers.filter(member => 
+      member && member._id && member.email && member.name
+    );
 
     console.log('👥 Found team members:', teamMembers.length);
 
@@ -900,15 +928,15 @@ const getTeamMembers = async (req, res) => {
 
     res.json({
       success: true,
-      team: teamMembers,
-      totalMembers: teamMembers.length,
+      team: validTeamMembers || [],
+      totalMembers: validTeamMembers.length,
       company: {
         id: company._id,
         name: company.name,
         plan: company.plan
       },
       limits: {
-        current: teamMembers.length,
+        current: validTeamMembers.length,
         max: company.plan.usersLimit,
         canAdd: canAdd
       }
@@ -930,6 +958,46 @@ const createTeamMember = async (req, res) => {
     const { name, email, role, department } = req.body;
     
     console.log('👤 Creating team member - User:', req.user.email, 'Role:', req.user.role);
+    
+    // Validate required fields
+    if (!name || !name.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Name is required' 
+      });
+    }
+    
+    if (!email || !email.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email is required' 
+      });
+    }
+    
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Please enter a valid email address' 
+      });
+    }
+    
+    if (!role) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Role is required' 
+      });
+    }
+    
+    // Validate role values
+    const validRoles = ['admin', 'manager', 'sales', 'support', 'user'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ 
+        success: false,
+        message: `Invalid role. Allowed roles: ${validRoles.join(', ')}` 
+      });
+    }
     
     // Extract company ID with improved handling
     let userCompanyId;
@@ -998,9 +1066,12 @@ const createTeamMember = async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
     if (existingUser) {
-      return res.status(409).json({ message: 'User with this email already exists' });
+      return res.status(409).json({ 
+        success: false,
+        message: 'User with this email already exists' 
+      });
     }
 
     // Generate temporary password
@@ -1010,11 +1081,11 @@ const createTeamMember = async (req, res) => {
     const newUser = await User.create({
       companyId: userCompanyId,
       tenantId: userCompanyId, // For consistency
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password: tempPassword,
       role: role || 'sales',
-      department,
+      department: department?.trim() || '',
       isActive: true,
       createdBy: req.user.id
     });

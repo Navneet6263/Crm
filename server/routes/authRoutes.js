@@ -6,7 +6,7 @@ const { checkUserLimit } = require('../middleware/userLimit');
 const router = express.Router();
 
 // Public routes
-router.post('/register', checkUserLimit, register);
+router.post('/register', register); // Remove checkUserLimit for simple registration
 router.post('/login', login);
 router.get('/check-auth', checkAuth);
 router.post('/logout', logout);
