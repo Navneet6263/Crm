@@ -47,6 +47,9 @@ const { createLeadAssignmentNotification, createLeadCreationNotification } = req
 
 const app = express();
 
+// Trust proxy for production deployment (Render, Heroku, etc.)
+app.set('trust proxy', 1);
+
 // Increase header size limits for Node.js
 app.use((req, res, next) => {
   req.connection.server.maxHeadersCount = 0;
@@ -77,6 +80,9 @@ app.use('/api', apiLimiter);
 // Middleware
 app.use(cors({
   origin: [
+    'https://crm-two-ashy.vercel.app',
+    'https://green-crm-frontend.vercel.app',
+    'https://navneet6263.github.io',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001'
