@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText } from 'lucide-react';
 import apiService from '../services/apiService';
 
 const MyLeads = ({ darkMode = false }) => {
@@ -7,6 +7,8 @@ const MyLeads = ({ darkMode = false }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [showLeadDetails, setShowLeadDetails] = useState(false);
 
   useEffect(() => {
     const fetchMyLeads = async () => {
@@ -341,10 +343,66 @@ const MyLeads = ({ darkMode = false }) => {
                         </span>
                       )}
                     </div>
+                    
+                    {/* Requirements Preview */}
+                    {lead.requirements && (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px 12px',
+                        backgroundColor: darkMode ? '#4b556320' : '#f8fafc',
+                        borderRadius: '6px',
+                        border: `1px solid ${darkMode ? '#4b5563' : '#e2e8f0'}`,
+                        fontSize: '13px',
+                        color: darkMode ? '#d1d5db' : '#64748b'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <FileText size={12} />
+                          <span style={{ fontWeight: '600' }}>Requirements:</span>
+                        </div>
+                        <div style={{ 
+                          maxHeight: '40px', 
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical'
+                        }}>
+                          {lead.requirements}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Status Update */}
-                  <div style={{ marginLeft: '16px' }}>
+                  {/* Actions */}
+                  <div style={{ marginLeft: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {/* View Details Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLead(lead);
+                        setShowLeadDetails(true);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '6px',
+                        borderRadius: '6px',
+                        color: darkMode ? '#60a5fa' : '#3b82f6',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = darkMode ? '#3b82f620' : '#dbeafe';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      title="View Lead Details"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    
+                    {/* Status Update */}
                     <select
                       value={lead.status}
                       onChange={(e) => updateLeadStatus(lead._id, e.target.value)}
@@ -371,6 +429,150 @@ const MyLeads = ({ darkMode = false }) => {
             })
           )}
         </div>
+        
+        {/* Lead Details Modal */}
+        {showLeadDetails && selectedLead && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: darkMode ? '#1f2937' : 'white',
+              borderRadius: '16px',
+              width: '90%',
+              maxWidth: '600px',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              {/* Header */}
+              <div style={{
+                padding: '2rem',
+                borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <h2 style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    color: darkMode ? 'white' : '#1f2937',
+                    margin: 0
+                  }}>
+                    Lead Details
+                  </h2>
+                  <p style={{
+                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    fontSize: '0.875rem',
+                    margin: 0
+                  }}>
+                    {selectedLead.contactPerson} - {selectedLead.companyName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowLeadDetails(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: darkMode ? '#9ca3af' : '#6b7280'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div style={{ padding: '2rem' }}>
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Contact Person</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.contactPerson}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Company</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.companyName}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Email</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.email}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Phone</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.phone}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Industry</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.industry || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Lead Source</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.leadSource}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Status</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.status}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Priority</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.priority}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Estimated Value</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>₹{selectedLead.estimatedValue ? Number(selectedLead.estimatedValue).toLocaleString() : '0'}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Assigned To</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.assignedTo ? (typeof selectedLead.assignedTo === 'object' ? selectedLead.assignedTo.name : selectedLead.assignedTo) : 'Unassigned'}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Requirements Section */}
+                  {selectedLead.requirements && (
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151', display: 'block', marginBottom: '0.5rem' }}>Requirements / Services Needed</label>
+                      <div style={{
+                        padding: '1rem',
+                        backgroundColor: darkMode ? '#374151' : '#f8fafc',
+                        borderRadius: '8px',
+                        border: `1px solid ${darkMode ? '#4b5563' : '#e2e8f0'}`,
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        fontSize: '0.875rem',
+                        lineHeight: '1.5',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {selectedLead.requirements}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Created Date</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.createdAt ? new Date(selectedLead.createdAt).toLocaleDateString('en-IN') : 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151' }}>Created By</label>
+                      <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.createdBy ? (typeof selectedLead.createdBy === 'object' ? selectedLead.createdBy.name : selectedLead.createdBy) : 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
