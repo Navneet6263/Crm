@@ -81,14 +81,13 @@ app.use('/api', apiLimiter);
 // Middleware
 app.use(cors({
   origin: [
-    'https://crm-two-ashy.vercel.app',
+  'https://crm-two-ashy.vercel.app',  // your deployed frontend
+    'http://localhost:3000',             // for local testing
+    'http://127.0.0.1:3000',
+    'http://localhost:3001'
   ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-2fa-token', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-  preflightContinue: false,
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
