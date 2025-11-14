@@ -82,10 +82,7 @@ app.use('/api', apiLimiter);
 app.use(cors({
   origin: [
     'https://crm-two-ashy.vercel.app',
-    'https://green-crm-frontend.vercel.app',
-    'https://navneet6263.github.io',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
+    'http://localhost:3000'
     'http://localhost:3001'
   ],
   credentials: true,
