@@ -82,8 +82,6 @@ app.use('/api', apiLimiter);
 app.use(cors({
   origin: [
     'https://crm-two-ashy.vercel.app',
-    'http://localhost:3000'
-    'http://localhost:3001'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
