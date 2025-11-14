@@ -227,7 +227,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
       
       console.log('Updating employee with data:', updateData);
       
-      const response = await fetch(`http://localhost:5004/api/auth/users/${editingEmployee._id}`, {
+      const response = await fetch(`https://crm-1-zn0m.onrender.com/api/auth/users/${editingEmployee._id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
