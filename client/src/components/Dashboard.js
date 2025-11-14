@@ -139,10 +139,12 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
   }, [crmData, user, leads]);
 
   const containerStyle = {
-    padding: '2rem',
-    background: darkMode ? '#0f172a' : '#f9fafb',
+    padding: '0',
+    background: darkMode ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     minHeight: '100vh',
-    color: darkMode ? '#f8fafc' : '#1f2937'
+    color: darkMode ? '#f8fafc' : '#1f2937',
+    position: 'relative',
+    overflow: 'hidden'
   };
 
   const cardStyle = {
@@ -230,56 +232,176 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
 
   return (
     <div style={containerStyle}>
-      {/* Welcome Header */}
-      <div style={{ marginBottom: '2rem' }}>
+      {/* Animated Background Elements */}
+      <div style={{
+        position: 'absolute',
+        top: '-50%',
+        right: '-20%',
+        width: '600px',
+        height: '600px',
+        background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
+        borderRadius: '50%',
+        animation: 'float 6s ease-in-out infinite'
+      }} />
+      <div style={{
+        position: 'absolute',
+        bottom: '-30%',
+        left: '-10%',
+        width: '400px',
+        height: '400px',
+        background: 'radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%)',
+        borderRadius: '50%',
+        animation: 'float 8s ease-in-out infinite reverse'
+      }} />
+      
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        @keyframes slideInUp {
+          from { transform: translateY(30px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+      
+      {/* Modern Glassmorphism Header */}
+      <div style={{
+        background: darkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '0 0 32px 32px',
+        padding: '2rem 3rem',
+        marginBottom: '2rem',
+        border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+        boxShadow: darkMode ? '0 8px 32px rgba(0, 0, 0, 0.3)' : '0 8px 32px rgba(0, 0, 0, 0.1)',
+        position: 'relative',
+        zIndex: 10
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h1 style={{
-              fontSize: '2rem',
-              fontWeight: '700',
-              color: darkMode ? 'white' : '#1f2937',
-              margin: '0 0 0.5rem 0'
-            }}>
-              Welcome back, {user?.name || 'User'}! 👋
-            </h1>
-            <p style={{
-              color: darkMode ? '#9ca3af' : '#6b7280',
-              fontSize: '1.125rem',
-              margin: 0
-            }}>
-              Here's what's happening with your sales pipeline today
-            </p>
+          <div style={{ animation: 'slideInUp 0.8s ease-out' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                animation: 'pulse 2s infinite'
+              }}>👋</div>
+              <div>
+                <h1 style={{
+                  fontSize: '2.5rem',
+                  fontWeight: '800',
+                  background: darkMode ? 'linear-gradient(135deg, #f8fafc, #e2e8f0)' : 'linear-gradient(135deg, #1e293b, #475569)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  margin: 0,
+                  letterSpacing: '-0.02em'
+                }}>
+                  Welcome back, {user?.name || 'User'}!
+                </h1>
+                <p style={{
+                  color: darkMode ? '#94a3b8' : '#64748b',
+                  fontSize: '1.125rem',
+                  margin: 0,
+                  fontWeight: '500'
+                }}>
+                  🚀 Here's your sales empire today
+                </p>
+              </div>
+            </div>
           </div>
           
-          <button
-            onClick={() => setActiveView('add-enquiry')}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #22c55e, #4ade80)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '1rem',
-              fontWeight: '600',
-              boxShadow: '0 4px 14px rgba(34, 197, 94, 0.4)'
-            }}
-          >
-            <Plus size={20} />
-            Add New Lead
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', animation: 'slideInUp 0.8s ease-out 0.2s both' }}>
+            <button
+              onClick={() => setActiveView('add-enquiry')}
+              style={{
+                padding: '1rem 2rem',
+                background: 'linear-gradient(135deg, #22c55e, #16a34a, #15803d)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                fontSize: '1.1rem',
+                fontWeight: '700',
+                boxShadow: '0 8px 25px rgba(34, 197, 94, 0.4)',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px) scale(1.05)';
+                e.target.style.boxShadow = '0 12px 35px rgba(34, 197, 94, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0) scale(1)';
+                e.target.style.boxShadow = '0 8px 25px rgba(34, 197, 94, 0.4)';
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                transition: 'left 0.5s'
+              }} />
+              <Plus size={24} />
+              🎆 Add New Lead
+            </button>
+            
+            <button
+              onClick={() => setActiveView('analytics')}
+              style={{
+                padding: '1rem 1.5rem',
+                background: darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                color: '#3b82f6',
+                border: '2px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '1rem',
+                fontWeight: '600',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(59, 130, 246, 0.2)';
+                e.target.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(59, 130, 246, 0.1)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              📈 Analytics
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Quick Stats */}
+      <div style={{ padding: '0 3rem' }}>
+      {/* Enhanced Quick Stats */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '2rem'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: '2rem',
+        marginBottom: '3rem',
+        position: 'relative',
+        zIndex: 5
       }}>
         {[
           {
@@ -328,94 +450,171 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                 handleStatCardClick(stat);
               }}
               style={{
-                ...cardStyle,
-                padding: '2rem',
+                padding: '2.5rem',
                 position: 'relative',
                 overflow: 'hidden',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                background: darkMode ? '#1e293b' : 'linear-gradient(135deg, #ffffff, #f8fafc)',
-                color: darkMode ? '#f8fafc' : '#1f2937'
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                background: darkMode 
+                  ? 'rgba(30, 41, 59, 0.8)' 
+                  : 'rgba(255, 255, 255, 0.9)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '24px',
+                border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+                boxShadow: darkMode 
+                  ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
+                  : '0 8px 32px rgba(0, 0, 0, 0.1)',
+                color: darkMode ? '#f8fafc' : '#1f2937',
+                animation: `slideInUp 0.6s ease-out ${index * 0.1}s both`
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                e.currentTarget.style.boxShadow = `0 20px 40px ${stat.color}30`;
-                e.currentTarget.style.borderColor = stat.color;
+                e.currentTarget.style.transform = 'translateY(-12px) scale(1.03)';
+                e.currentTarget.style.boxShadow = `0 25px 50px ${stat.color}40`;
+                e.currentTarget.style.background = darkMode 
+                  ? `rgba(30, 41, 59, 0.95)` 
+                  : `rgba(255, 255, 255, 0.95)`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.borderColor = darkMode ? '#374151' : '#e5e7eb';
+                e.currentTarget.style.boxShadow = darkMode 
+                  ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
+                  : '0 8px 32px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.background = darkMode 
+                  ? 'rgba(30, 41, 59, 0.8)' 
+                  : 'rgba(255, 255, 255, 0.9)';
               }}
             >
+              {/* Animated Background Orbs */}
               <div style={{
                 position: 'absolute',
-                top: '-30%',
-                right: '-15%',
-                width: '100px',
-                height: '100px',
+                top: '-40%',
+                right: '-20%',
+                width: '120px',
+                height: '120px',
                 background: stat.bgGradient,
                 borderRadius: '50%',
-                opacity: 0.15
+                opacity: 0.2,
+                animation: 'float 4s ease-in-out infinite'
               }} />
               <div style={{
                 position: 'absolute',
-                top: '10%',
-                right: '10%',
-                width: '40px',
-                height: '40px',
-                background: `${stat.color}20`,
+                top: '60%',
+                left: '-10%',
+                width: '80px',
+                height: '80px',
+                background: `radial-gradient(circle, ${stat.color}30, transparent)`,
                 borderRadius: '50%',
-                opacity: 0.6
+                opacity: 0.4,
+                animation: 'float 6s ease-in-out infinite reverse'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '15%',
+                right: '15%',
+                width: '60px',
+                height: '60px',
+                background: `${stat.color}15`,
+                borderRadius: '50%',
+                opacity: 0.8,
+                animation: 'pulse 3s infinite'
               }} />
               
               <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
                   <div style={{
-                    padding: '1rem',
+                    padding: '1.25rem',
                     background: stat.bgGradient,
-                    borderRadius: '16px',
-                    boxShadow: `0 8px 20px ${stat.color}40`,
-                    transform: 'rotate(-5deg)'
+                    borderRadius: '20px',
+                    boxShadow: `0 12px 30px ${stat.color}50`,
+                    transform: 'rotate(-8deg)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'rotate(0deg) scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'rotate(-8deg) scale(1)';
                   }}>
-                    <Icon size={28} color="white" />
+                    <Icon size={32} color="white" />
                   </div>
                   
                   <div style={{
-                    padding: '0.5rem 0.75rem',
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    color: '#22c55e',
-                    fontWeight: '600',
-                    border: '1px solid rgba(34, 197, 94, 0.2)'
+                    padding: '0.75rem 1rem',
+                    background: stat.change.startsWith('+') 
+                      ? 'rgba(34, 197, 94, 0.15)' 
+                      : 'rgba(239, 68, 68, 0.15)',
+                    borderRadius: '25px',
+                    fontSize: '0.875rem',
+                    color: stat.change.startsWith('+') ? '#16a34a' : '#dc2626',
+                    fontWeight: '700',
+                    border: `2px solid ${stat.change.startsWith('+') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                    backdropFilter: 'blur(10px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}>
+                    <span>{stat.change.startsWith('+') ? '📈' : '📉'}</span>
                     {stat.change}
                   </div>
                 </div>
                 
                 <div>
-                  <h3 style={{
-                    fontSize: '2.5rem',
-                    fontWeight: '800',
-                    margin: '0 0 0.5rem 0',
-                    color: darkMode ? '#f8fafc' : '#1f2937'
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: '0.5rem',
+                    marginBottom: '0.75rem'
                   }}>
-                    {stat.value}
-                  </h3>
+                    <h3 style={{
+                      fontSize: '3rem',
+                      fontWeight: '900',
+                      margin: 0,
+                      background: darkMode 
+                        ? 'linear-gradient(135deg, #f8fafc, #e2e8f0)' 
+                        : 'linear-gradient(135deg, #1e293b, #475569)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      letterSpacing: '-0.02em',
+                      lineHeight: '1'
+                    }}>
+                      {stat.value}
+                    </h3>
+                    <div style={{
+                      padding: '0.25rem 0.5rem',
+                      background: `${stat.color}20`,
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: stat.color
+                    }}>
+                      LIVE
+                    </div>
+                  </div>
                   <p style={{
-                    color: darkMode ? '#9ca3af' : '#6b7280',
-                    fontSize: '1rem',
+                    color: darkMode ? '#94a3b8' : '#64748b',
+                    fontSize: '1.125rem',
                     margin: 0,
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    letterSpacing: '0.025em'
                   }}>
                     {stat.title}
                   </p>
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.5rem 0',
+                    borderTop: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+                    fontSize: '0.875rem',
+                    color: darkMode ? '#64748b' : '#94a3b8',
+                    fontWeight: '500'
+                  }}>
+                    🔥 Updated just now
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
+      </div>
       </div>
 
       <div style={{

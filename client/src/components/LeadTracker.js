@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Target, Mail, Phone, Edit, Eye, CheckCircle, DollarSign, Clock, Activity, Search, Filter, Square, CheckSquare, Trash2, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { Target, Mail, Phone, Edit, Eye, CheckCircle, DollarSign, Clock, Activity, Search, Filter, Square, CheckSquare, Trash2, MoreHorizontal, FileSpreadsheet, Calendar, TrendingUp, Building, User } from 'lucide-react';
 import apiService from '../services/apiService';
 
 import { exportLeadsToExcel } from '../utils/excelExport';
@@ -57,7 +57,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
           lead.contactPerson?.toLowerCase().includes(term) ||
           lead.email?.toLowerCase().includes(term) ||
           lead.phone?.includes(searchTerm) ||
-          lead.notes?.toLowerCase().includes(term);
+          (lead.notes && typeof lead.notes === 'string' ? lead.notes.toLowerCase().includes(term) : false);
         
         if (exactMatch) return true;
         
@@ -228,6 +228,11 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
   // Enhanced Export to Excel
   const handleExportToExcel = useCallback(() => {
     try {
+      if (filteredLeads.length === 0) {
+        alert('No leads to export. Please check your filters.');
+        return;
+      }
+
       const result = exportLeadsToExcel(filteredLeads, {
         includeTimestamp: true
       });
@@ -235,16 +240,11 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
       if (result.success) {
         // Show success notification
         const message = `Successfully exported ${result.recordCount} leads to ${result.filename}`;
-        
-        // You can replace this with a toast notification
-        if (window.confirm(`${message}\n\nWould you like to export with additional filters?`)) {
-          // Future: Open advanced export modal
-          console.log('Advanced export requested');
-        }
+        alert(message);
       }
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed. Please try again.');
+      alert(`Export failed: ${error.message}. Please try again.`);
     }
   }, [filteredLeads]);
 
@@ -262,165 +262,158 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
   };
 
   const containerStyle = {
-    padding: '0',
-    background: darkMode ? '#111827' : '#f9fafb',
-    minHeight: '100vh'
+    minHeight: '100vh',
+    backgroundColor: darkMode ? '#1f2937' : '#f9fafb',
+    padding: '24px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
   };
 
   const cardStyle = {
-    background: darkMode ? '#1f2937' : 'white',
+    backgroundColor: darkMode ? '#374151' : 'white',
     borderRadius: '16px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+    boxShadow: darkMode ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    border: darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
     transition: 'all 0.3s ease'
   };
 
   return (
     <div style={containerStyle}>
-      {/* Header */}
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: isMobile ? 'flex-start' : 'center', 
-          justifyContent: 'space-between',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: '1rem', 
-          marginBottom: '1rem' 
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{
+          ...cardStyle,
+          padding: '32px',
+          marginBottom: '32px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Target style={{ color: '#3b82f6' }} size={isMobile ? 24 : 32} />
-            <div>
-              <h1 style={{
-                fontSize: isMobile ? '1.5rem' : '2rem',
-                fontWeight: '700',
-                color: darkMode ? 'white' : '#1f2937',
-                margin: 0
-              }}>
-                Lead Tracker
-              </h1>
-              <p style={{ 
-                color: darkMode ? '#9ca3af' : '#6b7280', 
-                fontSize: isMobile ? '0.875rem' : '1.125rem',
-                margin: '0.25rem 0 0 0'
-              }}>
-                Track and update lead status and activities
-              </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <Target size={32} color={darkMode ? '#60a5fa' : '#3b82f6'} />
+              <div>
+                <h1 style={{
+                  fontSize: '32px',
+                  fontWeight: 'bold',
+                  color: darkMode ? 'white' : '#111827',
+                  margin: 0
+                }}>
+                  Lead Tracker
+                </h1>
+                <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '1.125rem', margin: 0 }}>
+                  Track and manage your leads with advanced features
+                </p>
+              </div>
             </div>
-          </div>
-          
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleExportToExcel}
-              style={{
-                padding: '0.5rem 1rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#10b981',
-                color: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                if (!isMobile) {
-                  e.target.style.background = '#059669';
-                  e.target.style.transform = 'translateY(-1px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isMobile) {
-                  e.target.style.background = '#10b981';
-                  e.target.style.transform = 'translateY(0)';
-                }
-              }}
-              title={`Export ${filteredLeads.length} leads to Excel`}
-            >
-              <FileSpreadsheet size={16} />
-              {!isMobile && `Export (${filteredLeads.length})`}
-            </button>
             
-            {selectedLeads.length > 0 && (
+            {/* View Toggle */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
-                onClick={() => setShowBulkActions(!showBulkActions)}
+                onClick={() => setViewMode('grid')}
                 style={{
                   padding: '0.5rem 1rem',
                   borderRadius: '8px',
                   border: 'none',
-                  background: '#f59e0b',
-                  color: 'white',
+                  background: viewMode === 'grid' ? '#3b82f6' : (darkMode ? '#4b5563' : '#f3f4f6'),
+                  color: viewMode === 'grid' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
                   cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Grid
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: viewMode === 'list' ? '#3b82f6' : (darkMode ? '#4b5563' : '#f3f4f6'),
+                  color: viewMode === 'list' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                List
+              </button>
+              <button
+                onClick={handleExportToExcel}
+                disabled={filteredLeads.length === 0}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: filteredLeads.length === 0 ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  cursor: filteredLeads.length === 0 ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                   fontSize: '0.875rem',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  opacity: filteredLeads.length === 0 ? 0.6 : 1
                 }}
+                title={filteredLeads.length === 0 ? 'No leads to export' : `Export ${filteredLeads.length} leads to Excel`}
               >
-                <MoreHorizontal size={16} />
-                {!isMobile && `Bulk (${selectedLeads.length})`}
+                <FileSpreadsheet size={16} />
+                Export ({filteredLeads.length})
               </button>
-            )}
-          </div>
-        </div>
-        
-        {/* Search and Filter Bar */}
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          marginBottom: '1rem',
-          flexDirection: isMobile ? 'column' : 'row'
-        }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Search 
-              size={20} 
-              style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: darkMode ? '#9ca3af' : '#6b7280'
-              }} 
-            />
-            <input
-              type="text"
-              placeholder="Search leads..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                borderRadius: '8px',
-                background: darkMode ? '#374151' : 'white',
-                color: darkMode ? 'white' : '#1f2937',
-                fontSize: '1rem',
-                outline: 'none'
-              }}
-            />
+              {selectedLeads.length > 0 && (
+                <button
+                  onClick={() => setShowBulkActions(!showBulkActions)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#f59e0b',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  <MoreHorizontal size={16} />
+                  Bulk ({selectedLeads.length})
+                </button>
+              )}
+            </div>
           </div>
           
-          <div style={{ position: 'relative', minWidth: isMobile ? '100%' : '200px' }}>
-            <Filter 
-              size={20} 
-              style={{
+          {/* Enhanced Filters */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Search Bar */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
+              <Search size={20} style={{
                 position: 'absolute',
-                left: '0.75rem',
+                left: '1rem',
                 top: '50%',
                 transform: 'translateY(-50%)',
                 color: darkMode ? '#9ca3af' : '#6b7280'
-              }} 
-            />
+              }} />
+              <input
+                type="text"
+                placeholder="Search your leads..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem 0.75rem 3rem',
+                  border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                  borderRadius: '8px',
+                  background: darkMode ? '#374151' : 'white',
+                  color: darkMode ? 'white' : '#1f2937',
+                  fontSize: '1rem',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Status Filter */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               style={{
-                width: '100%',
-                padding: '0.75rem 0.75rem 0.75rem 2.5rem',
+                padding: '0.75rem',
                 border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
                 borderRadius: '8px',
                 background: darkMode ? '#374151' : 'white',
@@ -551,45 +544,84 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
         )}
       </div>
 
-      {/* Stats Overview */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: isMobile ? '1rem' : '1.5rem',
-        marginBottom: '2rem'
-      }}>
-        {[
-          { label: 'Total Leads', value: filteredLeads.length, icon: Target, color: '#3b82f6' },
-          { label: 'Active', value: filteredLeads.filter(l => ['new', 'contacted', 'qualified'].includes(l.status)).length, icon: Activity, color: '#10b981' },
-          { label: 'Converted', value: filteredLeads.filter(l => l.status === 'converted').length, icon: CheckCircle, color: '#22c55e' },
-          { label: 'Pipeline Value', value: `₹${(filteredLeads.reduce((sum, l) => sum + (l.estimatedValue || 0), 0) / 100000).toFixed(1)}L`, icon: DollarSign, color: '#f59e0b' }
-        ].map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div key={index} style={{ ...cardStyle, padding: isMobile ? '1rem' : '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <p style={{
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    color: darkMode ? '#9ca3af' : '#6b7280',
-                    marginBottom: '0.25rem'
-                  }}>
-                    {stat.label}
-                  </p>
-                  <p style={{
-                    fontSize: isMobile ? '1.25rem' : '1.5rem',
-                    fontWeight: '700',
-                    color: darkMode ? 'white' : '#1f2937'
-                  }}>
-                    {stat.value}
-                  </p>
+        {/* Enhanced Stats */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '2rem'
+        }}>
+          {[
+            { 
+              label: 'Total Leads', 
+              value: filteredLeads.length,
+              icon: Target, 
+              color: '#3b82f6' 
+            },
+            { 
+              label: 'High Priority', 
+              value: filteredLeads.filter(l => l.priority === 'high' || l.priority === 'urgent').length,
+              icon: TrendingUp, 
+              color: '#ef4444' 
+            },
+            { 
+              label: 'Active Opportunities', 
+              value: filteredLeads.filter(l => ['qualified', 'proposal', 'negotiation'].includes(l.status)).length,
+              icon: Activity, 
+              color: '#22c55e' 
+            },
+            { 
+              label: 'Pipeline Value', 
+              value: `₹${((filteredLeads.reduce((sum, l) => sum + (l.estimatedValue || 0), 0)) / 100000).toFixed(1)}L`,
+              icon: DollarSign, 
+              color: '#f59e0b' 
+            },
+            { 
+              label: 'This Week', 
+              value: filteredLeads.filter(l => {
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                return new Date(l.createdDate || l.createdAt) > weekAgo;
+              }).length,
+              icon: Calendar, 
+              color: '#8b5cf6' 
+            },
+            { 
+              label: 'Converted', 
+              value: filteredLeads.filter(l => l.status === 'converted' || l.status === 'closed-won').length,
+              icon: CheckCircle, 
+              color: '#10b981' 
+            }
+          ].map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <div key={index} style={{
+                ...cardStyle,
+                padding: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: darkMode ? '#9ca3af' : '#6b7280',
+                      marginBottom: '0.25rem'
+                    }}>
+                      {stat.label}
+                    </p>
+                    <p style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '700',
+                      color: darkMode ? 'white' : '#1f2937'
+                    }}>
+                      {stat.value}
+                    </p>
+                  </div>
+                  <Icon style={{ color: stat.color }} size={28} />
                 </div>
-                <Icon style={{ color: stat.color }} size={isMobile ? 20 : 28} />
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
       {/* Mobile View Toggle */}
       {isMobile && (
@@ -632,153 +664,193 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
         </div>
       )}
 
-      {/* Leads Grid/List - Enhanced Mobile Layout */}
-      <div style={{
-        display: isMobile && viewMode === 'list' ? 'flex' : 'grid',
-        flexDirection: isMobile && viewMode === 'list' ? 'column' : undefined,
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(400px, 1fr))',
-        gap: isMobile ? '0.75rem' : '1.5rem'
-      }} className={isMobile ? 'mobile-grid-1' : ''}>
-        {filteredLeads.map(lead => {
-          const leadId = lead._id || lead.id;
-          const statusColor = getStatusColor(lead.status);
-          return (
-            <div
-              key={leadId}
-              style={{
-                ...cardStyle,
-                padding: isMobile ? (viewMode === 'list' ? '0.75rem' : '1rem') : '1.5rem',
-                position: 'relative',
-                border: selectedLeads.includes(leadId) 
-                  ? '2px solid #3b82f6' 
-                  : `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                minHeight: isMobile ? (viewMode === 'list' ? '80px' : 'auto') : '280px',
-                display: isMobile && viewMode === 'list' ? 'flex' : 'block',
-                alignItems: isMobile && viewMode === 'list' ? 'center' : undefined,
-                gap: isMobile && viewMode === 'list' ? '1rem' : undefined
-              }}
-              className={isMobile ? 'mobile-card mobile-p-2' : ''}
-              onMouseEnter={(e) => {
-                if (!isMobile) {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.15)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isMobile) {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-                }
-              }}
-            >
-              {/* Selection Checkbox */}
-              <div style={{
-                position: 'absolute',
-                top: '0.5rem',
-                left: '0.5rem',
-                zIndex: 10
-              }}>
-                <button
-                  onClick={() => handleSelectLead(leadId)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: selectedLeads.includes(leadId) ? '#3b82f6' : darkMode ? '#9ca3af' : '#6b7280'
-                  }}
-                >
-                  {selectedLeads.includes(leadId) ? 
-                    <CheckSquare size={16} /> : 
-                    <Square size={16} />
-                  }
-                </button>
-              </div>
+        {/* Leads Display */}
+        <div style={{
+          display: viewMode === 'grid' ? 'grid' : 'block',
+          gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(420px, 1fr))' : '1fr',
+          gap: viewMode === 'grid' ? '1.5rem' : '0',
+          backgroundColor: viewMode === 'list' ? (darkMode ? '#374151' : 'white') : 'transparent',
+          borderRadius: viewMode === 'list' ? '16px' : '0',
+          overflow: viewMode === 'list' ? 'hidden' : 'visible',
+          boxShadow: viewMode === 'list' ? (darkMode ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)') : 'none',
+          border: viewMode === 'list' ? (darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb') : 'none'
+        }}>
+          {filteredLeads.length === 0 ? (
+            <div style={{
+              padding: '40px',
+              textAlign: 'center',
+              color: darkMode ? '#9ca3af' : '#6b7280'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>No leads found</h3>
+              <p style={{ margin: 0, fontSize: '14px' }}>
+                {searchTerm || statusFilter !== 'all' ? 'Try adjusting your filters' : 'No leads assigned to you yet'}
+              </p>
+            </div>
+          ) : (
+            filteredLeads.map((lead, index) => {
+              const leadId = lead._id || lead.id;
+              const statusColor = getStatusColor(lead.status);
               
-              {/* Lead Header */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
-                marginBottom: '1rem',
-                marginTop: '1rem'
-              }}>
-                <div>
-                  <h3 style={{
-                    fontSize: isMobile ? '1.125rem' : '1.25rem',
-                    fontWeight: '600',
-                    color: darkMode ? 'white' : '#1f2937',
-                    margin: '0 0 0.25rem 0'
-                  }}>
-                    {lead.companyName}
-                  </h3>
-                  <p style={{
-                    color: darkMode ? '#9ca3af' : '#6b7280',
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    margin: 0
-                  }}>
-                    {lead.contactPerson}
-                  </p>
-                </div>
-                <span style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  textTransform: 'capitalize',
-                  background: statusColor.bg,
-                  color: statusColor.text,
-                  border: `1px solid ${statusColor.border}`
-                }}>
-                  {lead.status}
-                </span>
-              </div>
+              if (viewMode === 'grid') {
+                return (
+                  <div 
+                    key={leadId}
+                    style={{
+                      ...cardStyle,
+                      padding: '24px',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      border: selectedLeads.includes(leadId) 
+                        ? '2px solid #3b82f6' 
+                        : (darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb')
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = darkMode ? '0 8px 25px -8px rgba(0, 0, 0, 0.4)' : '0 8px 25px -8px rgba(0, 0, 0, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = darkMode ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                    }}
+                  >
+                    {/* Priority Indicator */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      width: '4px',
+                      height: '100%',
+                      background: lead.priority === 'high' || lead.priority === 'urgent' ? '#ef4444' : '#22c55e'
+                    }} />
+                    {/* Selection Checkbox */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '12px',
+                      left: '12px',
+                      zIndex: 10
+                    }}>
+                      <button
+                        onClick={() => handleSelectLead(leadId)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: selectedLeads.includes(leadId) ? '#3b82f6' : darkMode ? '#9ca3af' : '#6b7280'
+                        }}
+                      >
+                        {selectedLeads.includes(leadId) ? 
+                          <CheckSquare size={16} /> : 
+                          <Square size={16} />
+                        }
+                      </button>
+                    </div>
+                    
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{
+                          width: '48px',
+                          height: '48px',
+                          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '16px'
+                        }}>
+                          {(lead.contactPerson || lead.name || 'U').split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div>
+                          <h3 style={{
+                            fontSize: '18px',
+                            fontWeight: '600',
+                            color: darkMode ? 'white' : '#111827',
+                            margin: 0,
+                            marginBottom: '4px'
+                          }}>
+                            {lead.contactPerson || lead.name}
+                          </h3>
+                          <p style={{
+                            fontSize: '14px',
+                            color: darkMode ? '#9ca3af' : '#6b7280',
+                            margin: 0
+                          }}>
+                            {lead.companyName || lead.company}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          backgroundColor: statusColor.bg,
+                          color: statusColor.text,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {lead.status?.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Lead Details */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                gap: isMobile ? '0.5rem' : '1rem',
-                marginBottom: '1rem'
-              }} className={isMobile ? 'mobile-grid-1 mobile-gap-1' : ''}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Mail size={16} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    color: darkMode ? '#d1d5db' : '#374151',
-                    wordBreak: 'break-all'
-                  }} className={isMobile ? 'mobile-text-xs mobile-text-ellipsis' : ''}>
-                    {lead.email}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Phone size={16} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    color: darkMode ? '#d1d5db' : '#374151'
-                  }}>
-                    {lead.phone}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <DollarSign size={16} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    color: darkMode ? '#d1d5db' : '#374151',
-                    fontWeight: '600'
-                  }}>
-                    ₹{lead.estimatedValue ? Number(lead.estimatedValue).toLocaleString() : '0'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Clock size={16} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
-                  <span style={{
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    color: darkMode ? '#d1d5db' : '#374151'
-                  }}>
-                    {new Date(lead.createdDate).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
+                    {/* Contact Info */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '12px',
+                        fontSize: '14px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#d1d5db' : '#6b7280' }}>
+                          <Mail size={16} style={{ color: '#3b82f6' }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.email}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#d1d5db' : '#6b7280' }}>
+                          <Phone size={16} style={{ color: '#22c55e' }} />
+                          <span>{lead.phone}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Value & Priority */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '16px',
+                      padding: '12px',
+                      backgroundColor: darkMode ? '#4b556320' : '#f8fafc',
+                      borderRadius: '8px'
+                    }}>
+                      <div>
+                        <p style={{ fontSize: '12px', color: darkMode ? '#9ca3af' : '#6b7280', margin: 0 }}>Estimated Value</p>
+                        <p style={{ fontSize: '16px', fontWeight: '600', color: '#22c55e', margin: 0 }}>
+                          ₹{lead.estimatedValue ? Number(lead.estimatedValue).toLocaleString() : '0'}
+                        </p>
+                      </div>
+                      <div>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          backgroundColor: lead.priority === 'high' || lead.priority === 'urgent' ? '#fee2e2' : '#f3f4f6',
+                          color: lead.priority === 'high' || lead.priority === 'urgent' ? '#dc2626' : '#6b7280',
+                          border: `1px solid ${lead.priority === 'high' || lead.priority === 'urgent' ? '#ef4444' : '#9ca3af'}`
+                        }}>
+                          {lead.priority?.toUpperCase() || 'MEDIUM'}
+                        </span>
+                      </div>
+                    </div>
 
               {/* Progress Bar */}
               <div style={{ marginBottom: '1rem' }}>
@@ -818,85 +890,268 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: isMobile ? '0.25rem' : '0.5rem',
-                justifyContent: 'flex-end',
-                flexWrap: 'wrap'
-              }}>
-                {!isMobile && (
-                  <>
-                    <button
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: darkMode ? '#374151' : '#f3f4f6',
-                        color: darkMode ? '#d1d5db' : '#374151',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                      title="Send Email"
-                    >
-                      <Mail size={16} />
-                    </button>
-                    <button
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: darkMode ? '#374151' : '#f3f4f6',
-                        color: darkMode ? '#d1d5db' : '#374151',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                      title="Make Call"
-                    >
-                      <Phone size={16} />
-                    </button>
-                    <button
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: darkMode ? '#374151' : '#f3f4f6',
-                        color: darkMode ? '#d1d5db' : '#374151',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                      title="View Details"
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={() => handleUpdateLead(lead)}
-                  style={{
-                    padding: isMobile ? '0.5rem' : '0.5rem 1rem',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    fontWeight: '500'
-                  }}
-                  title="Update Status"
-                >
-                  <Edit size={14} />
-                  {!isMobile && 'Update'}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                    {/* Actions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const leadDetails = `Company: ${lead.companyName}\nContact: ${lead.contactPerson}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nStatus: ${lead.status}\nEstimated Value: ₹${lead.estimatedValue ? Number(lead.estimatedValue).toLocaleString() : '0'}\nCreated: ${lead.createdDate ? new Date(lead.createdDate).toLocaleDateString() : 'N/A'}\nNotes: ${lead.notes || 'No notes available'}`;
+                            alert(leadDetails);
+                          }}
+                          style={{
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                          onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                        
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUpdateLead(lead);
+                          }}
+                          style={{
+                            background: '#f59e0b',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = '#d97706'}
+                          onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
+                        >
+                          <Edit size={14} />
+                          Edit
+                        </button>
+                      </div>
+                      
+                      <select
+                        value={lead.status}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          // Add update status functionality here
+                        }}
+                        style={{
+                          padding: '6px 8px',
+                          border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          backgroundColor: darkMode ? '#1f2937' : 'white',
+                          color: darkMode ? 'white' : '#374151',
+                          fontSize: '12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="proposal">Proposal</option>
+                        <option value="negotiation">Negotiation</option>
+                        <option value="converted">Converted</option>
+                        <option value="lost">Lost</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              } else {
+                // List View - Similar to MyLeads
+                return (
+                  <div 
+                    key={leadId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '20px',
+                      borderBottom: index < filteredLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
+                      transition: 'all 0.2s',
+                      position: 'relative'
+                    }}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      marginRight: '16px',
+                      flexShrink: 0
+                    }}>
+                      {(lead.contactPerson || lead.name || 'U').split(' ').map(n => n[0]).join('')}
+                    </div>
+
+                    {/* Lead Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <h3 style={{
+                          fontSize: '18px',
+                          fontWeight: '600',
+                          color: darkMode ? 'white' : '#111827',
+                          margin: 0
+                        }}>
+                          {lead.contactPerson || lead.name}
+                        </h3>
+                        <span style={{
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          backgroundColor: statusColor.bg,
+                          color: statusColor.text
+                        }}>
+                          {lead.status.toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        color: darkMode ? '#d1d5db' : '#6b7280'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Building size={14} />
+                          <span>{lead.companyName || lead.company}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Mail size={14} />
+                          <span>{lead.email}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Phone size={14} />
+                          <span>{lead.phone}</span>
+                        </div>
+                      </div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px',
+                        fontSize: '13px',
+                        color: darkMode ? '#9ca3af' : '#6b7280'
+                      }}>
+                        <span>Value: ₹{lead.estimatedValue ? Number(lead.estimatedValue).toLocaleString() : '0'}</span>
+                        <span>Created: {new Date(lead.createdDate || lead.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div style={{ 
+                      marginLeft: '16px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px'
+                    }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const leadDetails = `Company: ${lead.companyName}\nContact: ${lead.contactPerson}\nEmail: ${lead.email}\nPhone: ${lead.phone}\nStatus: ${lead.status}\nEstimated Value: ₹${lead.estimatedValue ? Number(lead.estimatedValue).toLocaleString() : '0'}\nCreated: ${lead.createdDate ? new Date(lead.createdDate).toLocaleDateString() : 'N/A'}\nNotes: ${lead.notes || 'No notes available'}`;
+                          alert(leadDetails);
+                        }}
+                        style={{
+                          background: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Eye size={14} />
+                        View
+                      </button>
+                      
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateLead(lead);
+                        }}
+                        style={{
+                          background: '#f59e0b',
+                          color: 'white',
+                          border: 'none',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '500',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Edit size={14} />
+                        Edit
+                      </button>
+                      
+                      <select
+                        value={lead.status}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          // Add update status functionality here
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          padding: '8px',
+                          border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                          borderRadius: '6px',
+                          backgroundColor: darkMode ? '#1f2937' : 'white',
+                          color: darkMode ? 'white' : '#374151',
+                          fontSize: '12px',
+                          minWidth: '100px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="proposal">Proposal</option>
+                        <option value="negotiation">Negotiation</option>
+                        <option value="converted">Converted</option>
+                        <option value="lost">Lost</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              }
+            })
+          )}
+        </div>
 
       {filteredLeads.length === 0 && myLeads.length > 0 && (
         <div style={{

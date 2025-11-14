@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/apiService';
+import config from '../config';
 import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield, Settings, Plus, Eye, UserCheck, UserX } from 'lucide-react';
 import BookDemoModal from './BookDemoModal';
 import SuperAdminManagement from './SuperAdminManagement';
@@ -95,7 +96,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5004/api/auth/users', {
+      const response = await fetch(`${config.api.baseUrl}/auth/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -122,7 +123,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
     try {
       console.log('Toggling status for user:', userId, 'Current status:', currentStatus);
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5004/api/auth/users/${userId}/toggle`, {
+      const response = await fetch(`${config.api.baseUrl}/auth/users/${userId}/toggle`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -166,7 +167,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('http://localhost:5004/api/auth/create-employee', {
+      const response = await fetch(`${config.api.baseUrl}/auth/create-employee`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -227,7 +228,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
       
       console.log('Updating employee with data:', updateData);
       
-      const response = await fetch(`http://localhost:5004/api/auth/users/${editingEmployee._id}`, {
+      const response = await fetch(`${config.api.baseUrl}/auth/users/${editingEmployee._id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -274,7 +275,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
     
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`http://localhost:5004/api/auth/users/${employeeId}`, {
+      const response = await fetch(`${config.api.baseUrl}/auth/users/${employeeId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -364,7 +365,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
             fontSize: '0.875rem',
             fontWeight: '600'
           }}>
-            👁️ {currentUser?.role === 'admin' ? 'Admin View' : currentUser?.role === 'manager' ? 'Manager Dashboard' : 'Senior Manager Dashboard'}
+{currentUser?.role === 'admin' ? 'Admin View' : currentUser?.role === 'manager' ? 'Manager Dashboard' : 'Senior Manager Dashboard'}
           </div>
         )}
       </div>
@@ -1693,7 +1694,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
                 borderRadius: '50%',
                 animation: loading ? 'spin 1s linear infinite' : 'none'
               }}>
-                {!loading && '🔄'}
+                {!loading && '↻'}
               </div>
               {loading ? 'Refreshing...' : 'Refresh'}
             </button>
@@ -1841,7 +1842,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
                 <div>
                   <h3 style={{
                     fontSize: '2.5rem',
-                    fontWeight: '800',
+                    fontWeight: '700',
                     color: darkMode ? '#f8fafc' : '#111827',
                     marginBottom: '0.5rem'
                   }}>{stat.value}</h3>

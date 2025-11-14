@@ -35,9 +35,9 @@ import SuperAdminDashboard from './components/SuperAdminDashboard';
 // Lazy loaded components
 const EnhancedSupportCenter = lazy(() => import('./components/EnhancedSupportCenter'));
 const CustomerManagement = lazy(() => import('./components/CustomerManagement'));
-const MyLeads = lazy(() => import('./components/ProfessionalMyLeads'));
+const MyLeads = lazy(() => import('./components/MyLeads'));
 const RoleBasedDashboard = lazy(() => import('./components/RoleBasedDashboard'));
-const LeadHistory = lazy(() => import('./components/ProfessionalLeadHistory'));
+const LeadHistory = lazy(() => import('./components/LeadHistory'));
 const LeadTracker = lazy(() => import('./components/LeadTracker'));
 const AILeadScoring = lazy(() => import('./components/AILeadScoring'));
 const AutoAssignment = lazy(() => import('./components/ProfessionalAutoAssignment'));
@@ -538,7 +538,7 @@ const AppContent = () => {
       case 'customers': return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
           <CustomerManagement darkMode={darkMode} crmData={crmData} userRole={currentUser?.role} />
-          <CustomerTimeline darkMode={darkMode} customer={crmData.customers?.[0]} />
+          <CustomerTimeline darkMode={darkMode} customer={crmData.customers && crmData.customers.length > 0 ? crmData.customers[0] : null} />
         </div>
       );
       case 'company-management':

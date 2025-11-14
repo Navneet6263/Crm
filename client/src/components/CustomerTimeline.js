@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 
 const CustomerTimeline = ({ customer, darkMode }) => {
+  // Safely handle customer object
+  const customerName = customer ? (typeof customer === 'object' ? customer.name || customer.contactPerson || 'Unknown Customer' : customer) : 'No Customer Selected';
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [activityType, setActivityType] = useState('call');
   const [activityNote, setActivityNote] = useState('');
@@ -161,7 +163,7 @@ const CustomerTimeline = ({ customer, darkMode }) => {
           color: darkMode ? 'white' : '#1f2937',
           margin: 0
         }}>
-          Customer Interaction Timeline
+          Customer Timeline - {customerName}
         </h3>
         <button
           onClick={() => setShowAddActivity(!showAddActivity)}
@@ -384,7 +386,7 @@ const CustomerTimeline = ({ customer, darkMode }) => {
                 color: darkMode ? '#9ca3af' : '#6b7280'
               }}>
                 <span>{activity.date} at {activity.time}</span>
-                <span>by {activity.user}</span>
+                <span>by {typeof activity.user === 'object' ? activity.user?.name || 'Unknown User' : activity.user}</span>
               </div>
             </div>
           </div>
