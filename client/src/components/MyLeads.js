@@ -14,9 +14,9 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editData, setEditData] = useState({
     status: '',
-    notes: '',
     priority: ''
   });
+  const [newNote, setNewNote] = useState('');
 
   useEffect(() => {
     const fetchMyLeads = async () => {
@@ -149,34 +149,44 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
     setSelectedLead(lead);
     setEditData({
       status: lead.status || 'new',
-      notes: lead.notes || '',
       priority: lead.priority || 'medium'
     });
+    setNewNote('');
     setShowEditModal(true);
   };
 
   const saveEditLead = async () => {
     try {
+      const leadId = selectedLead._id || selectedLead.id;
+      
+      // Update status and priority
       const updatedLead = {
         status: editData.status,
-        notes: editData.notes,
         priority: editData.priority,
         lastActivity: new Date().toISOString()
       };
-
-      const leadId = selectedLead._id || selectedLead.id;
       
       await apiService.updateLead(leadId, updatedLead);
       
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          (lead._id || lead.id) === leadId ? { ...lead, ...updatedLead } : lead
-        )
-      );
+      // Add note if provided
+      if (newNote.trim()) {
+        await apiService.addLeadNote(leadId, newNote);
+      }
       
       setShowEditModal(false);
       setSelectedLead(null);
-      alert('Lead updated successfully!');
+      setNewNote('');
+      
+      // Refresh leads after modal closes
+      try {
+        const response = await apiService.getMyLeads();
+        const leadsData = Array.isArray(response) ? response : (response.leads || []);
+        setLeads(leadsData);
+        alert('Lead updated successfully!');
+      } catch (refreshError) {
+        console.error('Error refreshing leads:', refreshError);
+        alert('Lead updated but failed to refresh list. Please refresh the page.');
+      }
     } catch (error) {
       console.error('Error updating lead:', error);
       alert(`Error updating lead: ${error.message}`);
@@ -1246,6 +1256,53 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                   </select>
                 </div>
 
+                {/* Notes History */}
+                {selectedLead.notes && selectedLead.notes.length > 0 && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Notes History ({selectedLead.notes.length})
+                    </label>
+                    <div style={{
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '8px',
+                      padding: '0.5rem'
+                    }}>
+                      {selectedLead.notes.slice().reverse().map((note, index) => (
+                        <div key={index} style={{
+                          padding: '0.5rem',
+                          marginBottom: '0.5rem',
+                          background: darkMode ? '#4b5563' : '#f9fafb',
+                          borderRadius: '6px',
+                          borderLeft: '3px solid #3b82f6'
+                        }}>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: darkMode ? '#9ca3af' : '#6b7280',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {note.createdBy?.name || 'User'} • {new Date(note.createdAt).toLocaleString('en-IN')}
+                          </div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            color: darkMode ? '#d1d5db' : '#374151'
+                          }}>
+                            {note.content}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Add New Note */}
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{
                     display: 'block',
@@ -1254,12 +1311,12 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                     color: darkMode ? '#d1d5db' : '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Notes
+                    Add New Note
                   </label>
                   <textarea
-                    value={editData.notes}
-                    onChange={(e) => setEditData({...editData, notes: e.target.value})}
-                    placeholder="Add notes about this lead..."
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="e.g., Called today, no response. Will try again tomorrow."
                     rows="3"
                     style={{
                       width: '100%',
@@ -1272,6 +1329,13 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                       resize: 'vertical'
                     }}
                   />
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    marginTop: '0.25rem'
+                  }}>
+                    💡 Adding notes shows you're actively working on this lead
+                  </div>
                 </div>
 
                 <div style={{

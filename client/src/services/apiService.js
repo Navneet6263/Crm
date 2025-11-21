@@ -433,6 +433,30 @@ const apiService = {
     }
   },
   
+  addLeadNote: async (leadId, noteContent) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/${leadId}/notes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: noteContent })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add note');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error adding note:', error);
+      throw error;
+    }
+  },
+  
   // Bulk operations
   bulkUpdateLeads: async (leadIds, updateData) => {
     if (USE_MOCK) {

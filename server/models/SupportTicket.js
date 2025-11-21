@@ -11,7 +11,7 @@ const ticketReplySchema = new mongoose.Schema({
   },
   repliedByRole: {
     type: String,
-    enum: ['customer', 'admin', 'super-admin', 'support'],
+    enum: ['customer', 'admin', 'super-admin', 'support', 'user'],
     default: 'customer'
   },
   repliedByUserId: {

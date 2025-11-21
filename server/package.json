@@ -4,8 +4,8 @@
   "description": "Backend API for Green Call CRM",
   "main": "server.js",
   "scripts": {
-    "start": "node --max-http-header-size=80000 server.js",
-    "dev": "nodemon --max-http-header-size=80000 server.js",
+    "start": "node --max-http-header-size=200000 --max-old-space-size=4096 server.js",
+    "dev": "nodemon --max-http-header-size=200000 --max-old-space-size=4096 server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -23,6 +23,8 @@
     "mongoose": "^6.12.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.0",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-linkedin-oauth2": "^2.0.0",

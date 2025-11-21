@@ -34,7 +34,9 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
     name: '',
     email: '',
     password: '',
-    role: 'sales'
+    role: 'sales',
+    managerName: '',
+    managerEmail: ''
   });
 
   useEffect(() => {
@@ -187,7 +189,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
         
         // Reset form
         setShowAddForm(false);
-        setFormData({ name: '', email: '', password: '', role: 'sales' });
+        setFormData({ name: '', email: '', password: '', role: 'sales', managerName: '', managerEmail: '' });
         setSuccessMessage(`Employee "${formData.name}" created successfully!`);
       } else {
         const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
@@ -206,7 +208,9 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
       name: employee.name,
       email: employee.email,
       password: '',
-      role: employee.role
+      role: employee.role,
+      managerName: employee.managerName || '',
+      managerEmail: employee.managerEmail || ''
     });
     setShowEditForm(true);
   };
@@ -219,7 +223,9 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
       const updateData = {
         name: formData.name,
         email: formData.email,
-        role: formData.role
+        role: formData.role,
+        managerName: formData.managerName,
+        managerEmail: formData.managerEmail
       };
       
       if (formData.password && formData.password.trim()) {
@@ -252,7 +258,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
         
         setShowEditForm(false);
         setEditingEmployee(null);
-        setFormData({ name: '', email: '', password: '', role: 'sales' });
+        setFormData({ name: '', email: '', password: '', role: 'sales', managerName: '', managerEmail: '' });
         setSuccessMessage(`Employee "${formData.name}" updated successfully!`);
         
         // Refresh from server to ensure consistency
@@ -818,7 +824,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                 />
               </div>
               
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
                 <label style={{
                   display: 'block',
                   fontSize: '0.875rem',
@@ -838,13 +844,75 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                     color: darkMode ? 'white' : '#1f2937'
                   }}
                 >
-                  <option value="sales">Sales</option>
+                  <option value="sales">BD Development</option>
+                  <option value="marketing">Marketing</option>
                   <option value="manager">Manager</option>
                   <option value="senior-manager">Senior Manager</option>
                   <option value="admin">Admin</option>
                   <option value="support">Support</option>
                 </select>
               </div>
+              
+              {formData.role === 'sales' && (
+                <>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>Manager Name</label>
+                    <input
+                      type="text"
+                      value={formData.managerName}
+                      onChange={(e) => setFormData({...formData, managerName: e.target.value})}
+                      placeholder="Enter manager's name"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                        borderRadius: '6px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937'
+                      }}
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>Manager Email</label>
+                    <input
+                      type="email"
+                      value={formData.managerEmail}
+                      onChange={(e) => setFormData({...formData, managerEmail: e.target.value})}
+                      placeholder="manager@company.com"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                        borderRadius: '6px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937'
+                      }}
+                    />
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: darkMode ? '#9ca3af' : '#6b7280',
+                      marginTop: '0.25rem'
+                    }}>
+                      Reminder emails will be sent to this manager if leads are not actioned
+                    </div>
+                  </div>
+                </>
+              )}
+              
+              <div style={{ marginBottom: '1.5rem' }}></div>
               
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button
@@ -1019,7 +1087,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                   onClick={() => {
                     setShowEditForm(false);
                     setEditingEmployee(null);
-                    setFormData({ name: '', email: '', password: '', role: 'sales' });
+                    setFormData({ name: '', email: '', password: '', role: 'sales', managerName: '', managerEmail: '' });
                   }}
                   style={{
                     flex: 1,

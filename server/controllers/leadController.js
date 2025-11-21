@@ -337,6 +337,13 @@ const getLeadById = async (req, res) => {
       return res.status(404).json({ message: 'Lead not found' });
     }
     
+    // Update lastViewedAt if user is the assigned user
+    const userId = req.user._id || req.user.id;
+    if (lead.assignedTo && lead.assignedTo._id.toString() === userId.toString()) {
+      lead.lastViewedAt = new Date();
+      await lead.save();
+    }
+    
     res.json(lead);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -486,6 +493,16 @@ const assignLead = async (req, res) => {
     // Create notification for assigned user
     const { createLeadAssignmentNotification } = require('./notificationController');
     await createLeadAssignmentNotification(leadId, assignedTo, req.user._id || req.user.id);
+    
+    // Send email to assigned user
+    try {
+      const { sendLeadAssignmentEmail } = require('../services/emailService');
+      await sendLeadAssignmentEmail(assignedUser, lead, req.user);
+      console.log('📧 Assignment email sent to:', assignedUser.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send assignment email:', emailError);
+      // Don't fail the assignment if email fails
+    }
     
     console.log('✅ Lead assigned successfully:', {
       leadId: lead._id,

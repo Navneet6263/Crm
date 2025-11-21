@@ -42,6 +42,15 @@ const userSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  managerName: {
+    type: String,
+    trim: true
+  },
+  managerEmail: {
+    type: String,
+    trim: true,
+    lowercase: true
+  },
   loginMethod: {
     type: String,
     enum: ['email', 'otp', 'google', 'linkedin'],

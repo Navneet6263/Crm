@@ -53,8 +53,10 @@ app.set('trust proxy', 1);
 
 // Increase header size limits for Node.js
 app.use((req, res, next) => {
-  req.connection.server.maxHeadersCount = 0;
-  req.connection.server.headersTimeout = 0;
+  if (req.connection && req.connection.server) {
+    req.connection.server.maxHeadersCount = 0;
+    req.connection.server.headersTimeout = 0;
+  }
   next();
 });
 
@@ -95,15 +97,14 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 200
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb', parameterLimit: 50000 }));
 app.use(cookieParser());
 
 // Fix for 431 Request Header Fields Too Large
 app.use((req, res, next) => {
-  // Increase header size limits
-  req.connection.server.maxHeadersCount = 0;
-  req.headers = req.headers || {};
+  // Set response headers to handle large requests
+  res.setHeader('Access-Control-Max-Age', '86400');
   next();
 });
 
@@ -966,10 +967,29 @@ app.post('/api/test-headers', (req, res) => {
   res.json({ message: 'Headers OK', headerCount: Object.keys(req.headers).length });
 });
 
-// Bulk Upload Routes
+// Bulk Upload Routes - Special handling for large requests
 const { bulkUploadLeads, bulkUploadCustomers, handleBulkAuth } = require('./controllers/bulkUploadController');
-app.post('/api/leads/bulk-upload', handleBulkAuth, bulkUploadLeads);
-app.post('/api/customers/bulk-upload', handleBulkAuth, bulkUploadCustomers);
+
+// Middleware to strip large headers for bulk uploads
+const stripHeaders = (req, res, next) => {
+  // Remove potentially large headers
+  delete req.headers['user-agent'];
+  delete req.headers['accept'];
+  delete req.headers['accept-encoding'];
+  delete req.headers['accept-language'];
+  delete req.headers['cache-control'];
+  delete req.headers['sec-fetch-dest'];
+  delete req.headers['sec-fetch-mode'];
+  delete req.headers['sec-fetch-site'];
+  delete req.headers['sec-ch-ua'];
+  delete req.headers['sec-ch-ua-mobile'];
+  delete req.headers['sec-ch-ua-platform'];
+  next();
+};
+
+// Bulk upload with optimized headers and large payload support
+app.post('/api/leads/bulk-upload', stripHeaders, express.json({ limit: '200mb' }), handleBulkAuth, bulkUploadLeads);
+app.post('/api/customers/bulk-upload', stripHeaders, express.json({ limit: '200mb' }), handleBulkAuth, bulkUploadCustomers);
 
 // Auth Routes - Use proper middleware
 app.use('/api/auth', authRoutes);
@@ -1018,6 +1038,11 @@ app.use('/api/calendar', authenticateToken, calendarRoutes);
 // AI Routes
 app.use('/api/ai', require('./routes/ai'));
 
+// Test Routes (for development)
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/test', require('./routes/testRoutes'));
+}
+
 
 
 // Direct routes for frontend compatibility
@@ -1062,11 +1087,22 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
+// Start lead reminder cron jobs
+const { startLeadReminderCron } = require('./utils/leadReminderCron');
+const { startLeadAssignmentReminderCron } = require('./utils/leadAssignmentCron');
+startLeadReminderCron();
+startLeadAssignmentReminderCron();
+
 const PORT = process.env.PORT || 5005;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
 }).on('error', (err) => {
   console.error('Server error:', err);
 });
+
+// Increase server limits for bulk uploads
+server.maxHeadersCount = 0;
+server.headersTimeout = 0;
+server.requestTimeout = 0;

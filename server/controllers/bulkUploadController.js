@@ -8,22 +8,36 @@ const handleBulkAuth = async (req, res, next) => {
   const User = require('../models/User');
   
   try {
+    // Clear any large headers to prevent 431 error
+    delete req.headers['user-agent'];
+    delete req.headers['accept-encoding'];
+    delete req.headers['accept-language'];
+    
     const { token } = req.body;
     if (!token) {
-      return res.status(401).json({ message: 'Token required' });
+      return res.status(401).json({ message: 'Token required in body' });
     }
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select('_id name email role companyId tenantId isActive');
     
-    if (!user) {
-      return res.status(401).json({ message: 'User not found' });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'User not found or inactive' });
     }
     
-    req.user = user;
+    req.user = {
+      _id: user._id,
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId,
+      tenantId: user.tenantId
+    };
+    
     next();
   } catch (error) {
-    return res.status(401).json({ message: 'Invalid token' });
+    return res.status(401).json({ message: 'Invalid token', error: error.message });
   }
 };
 

@@ -11,6 +11,7 @@ const {
 } = require('../controllers/leadController');
 const { auth } = require('../middleware/auth');
 const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
+const { updateLeadViewTime } = require('../middleware/leadViewMiddleware');
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.get('/my-leads', getMyLeads);
 router.post('/assign', handleLeadAssignmentNotification, assignLead);
 
 router.route('/:id')
-  .get(getLeadById)
+  .get(updateLeadViewTime, getLeadById)
   .put(updateLead)
   .delete(deleteLead);
 

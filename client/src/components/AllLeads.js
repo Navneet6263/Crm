@@ -519,6 +519,21 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                   {lead.createdBy && (
                     <span>By: {typeof lead.createdBy === 'object' ? lead.createdBy.name : lead.createdBy}</span>
                   )}
+                  {lead.notes && lead.notes.length > 0 && (
+                    <span style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 8px',
+                      background: darkMode ? '#3b82f620' : '#dbeafe',
+                      color: darkMode ? '#60a5fa' : '#3b82f6',
+                      borderRadius: '12px',
+                      fontWeight: '600'
+                    }}>
+                      <FileText size={12} />
+                      {lead.notes.length} {lead.notes.length === 1 ? 'note' : 'notes'}
+                    </span>
+                  )}
                 </div>
                 
                 {/* Requirements Preview */}
@@ -772,6 +787,52 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                         whiteSpace: 'pre-wrap'
                       }}>
                         {selectedLead.requirements}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Notes History */}
+                  {selectedLead.notes && selectedLead.notes.length > 0 && (
+                    <div>
+                      <label style={{ fontSize: '0.875rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151', display: 'block', marginBottom: '0.5rem' }}>
+                        Activity Notes ({selectedLead.notes.length})
+                      </label>
+                      <div style={{
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        padding: '0.5rem'
+                      }}>
+                        {selectedLead.notes.slice().reverse().map((note, index) => (
+                          <div key={index} style={{
+                            padding: '0.75rem',
+                            marginBottom: '0.5rem',
+                            background: darkMode ? '#4b5563' : '#f9fafb',
+                            borderRadius: '6px',
+                            borderLeft: '3px solid #3b82f6'
+                          }}>
+                            <div style={{
+                              fontSize: '0.75rem',
+                              color: darkMode ? '#9ca3af' : '#6b7280',
+                              marginBottom: '0.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}>
+                              <span style={{ fontWeight: '600' }}>{note.createdBy?.name || 'User'}</span>
+                              <span>•</span>
+                              <span>{new Date(note.createdAt).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div style={{
+                              fontSize: '0.875rem',
+                              color: darkMode ? '#d1d5db' : '#374151',
+                              lineHeight: '1.5'
+                            }}>
+                              {note.content}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
