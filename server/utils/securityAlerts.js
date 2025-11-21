@@ -1,10 +1,7 @@
-const { Resend } = require('resend');
 const User = require('../models/User');
 const { formatResponse, sanitizeInput } = require('./helpers');
 const { securityLogger } = require('./logger');
-
-// Resend email service
-const resend = new Resend(process.env.RESEND_API_KEY);
+const emailService = require('../services/emailService');
 
 // Known IPs/devices storage (use database in production)
 const knownDevices = new Map();
@@ -54,8 +51,7 @@ const sendSecurityAlert = async (alertData) => {
 const sendEmailAlert = async (superAdmins, alertData) => {
   try {
     const emailPromises = superAdmins.map(admin => {
-      return resend.emails.send({
-        from: process.env.FROM_EMAIL || 'noreply@greencrm.com',
+      return emailService.sendEmail({
         to: admin.email,
         subject: `🚨 CRM Security Alert: ${alertData.type}`,
         html: `
