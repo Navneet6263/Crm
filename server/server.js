@@ -659,7 +659,8 @@ app.post('/api/leads/assign', authenticateToken, async (req, res) => {
 app.get('/api/leads/my-leads', authenticateToken, async (req, res) => {
   try {
     console.log('🔍 Fetching leads for user:', req.user.email);
-    const leads = await Lead.find({ assignedTo: req.user.email });
+    const userId = req.user._id || req.user.id;
+    const leads = await Lead.find({ assignedTo: userId });
     console.log('📊 Found', leads.length, 'assigned leads');
     res.json({ leads });
   } catch (error) {
