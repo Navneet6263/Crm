@@ -2,3 +2,7 @@
 {"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T07:20:09.536Z"}
 {"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T07:24:06.018Z"}
 {"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T07:52:58.536Z"}
+{"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T09:01:37.926Z"}
+{"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T09:07:29.446Z"}
+{"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T09:07:44.191Z"}
+{"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2025-11-24T09:07:55.274Z"}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Mail, Phone, Building, Calendar, Star, User, CheckCircle, Clock, Target, Trash2, Upload, Eye, FileText } from 'lucide-react';
+import { Users, Mail, Phone, Building, Calendar, Star, User, CheckCircle, Clock, Target, Trash2, Upload, Eye, FileText, Edit } from 'lucide-react';
 import apiService from '../services/apiService';
 import BulkUpload from './BulkUpload';
 
@@ -14,6 +14,20 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState({
+    contactPerson: '',
+    companyName: '',
+    email: '',
+    phone: '',
+    industry: '',
+    leadSource: '',
+    status: '',
+    priority: '',
+    estimatedValue: '',
+    requirements: ''
+  });
+  const [newNote, setNewNote] = useState('');
 
   // Get current user from localStorage
   useEffect(() => {
@@ -136,6 +150,158 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
           alert('❌ Failed to delete lead. Please try again.');
         }
       }
+    }
+  };
+
+  const handleEditLead = (lead) => {
+    setSelectedLead(lead);
+    setEditData({
+      contactPerson: lead.contactPerson || lead.name || '',
+      companyName: lead.companyName || lead.company || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      industry: lead.industry || '',
+      leadSource: lead.leadSource || '',
+      status: lead.status || 'new',
+      priority: lead.priority || 'medium',
+      estimatedValue: lead.estimatedValue || '',
+      requirements: lead.requirements || ''
+    });
+    setNewNote('');
+    setShowEditModal(true);
+  };
+
+  const saveEditLead = async () => {
+    try {
+      const leadId = selectedLead._id || selectedLead.id;
+      
+      // Track what fields were changed
+      const changes = [];
+      const originalLead = selectedLead;
+      
+      if (editData.contactPerson !== (originalLead.contactPerson || originalLead.name || '')) {
+        changes.push(`Contact Person: "${originalLead.contactPerson || originalLead.name || ''}" → "${editData.contactPerson}"`);
+      }
+      if (editData.companyName !== (originalLead.companyName || originalLead.company || '')) {
+        changes.push(`Company: "${originalLead.companyName || originalLead.company || ''}" → "${editData.companyName}"`);
+      }
+      if (editData.email !== (originalLead.email || '')) {
+        changes.push(`Email: "${originalLead.email || ''}" → "${editData.email}"`);
+      }
+      if (editData.phone !== (originalLead.phone || '')) {
+        changes.push(`Phone: "${originalLead.phone || ''}" → "${editData.phone}"`);
+      }
+      if (editData.industry !== (originalLead.industry || '')) {
+        changes.push(`Industry: "${originalLead.industry || ''}" → "${editData.industry}"`);
+      }
+      if (editData.leadSource !== (originalLead.leadSource || '')) {
+        changes.push(`Lead Source: "${originalLead.leadSource || ''}" → "${editData.leadSource}"`);
+      }
+      if (editData.status !== (originalLead.status || '')) {
+        changes.push(`Status: "${originalLead.status || ''}" → "${editData.status}"`);
+      }
+      if (editData.priority !== (originalLead.priority || '')) {
+        changes.push(`Priority: "${originalLead.priority || ''}" → "${editData.priority}"`);
+      }
+      if (editData.estimatedValue !== (originalLead.estimatedValue || '')) {
+        changes.push(`Estimated Value: "₹${originalLead.estimatedValue || '0'}" → "₹${editData.estimatedValue}"`);
+      }
+      if (editData.requirements !== (originalLead.requirements || '')) {
+        changes.push(`Requirements updated`);
+      }
+      
+      // Create updated lead object with all fields
+      const updatedLeadData = {
+        ...originalLead, // Keep all existing data
+        contactPerson: editData.contactPerson,
+        name: editData.contactPerson, // For backward compatibility
+        companyName: editData.companyName,
+        company: editData.companyName, // For backward compatibility
+        email: editData.email,
+        phone: editData.phone,
+        industry: editData.industry,
+        leadSource: editData.leadSource,
+        status: editData.status,
+        priority: editData.priority,
+        estimatedValue: editData.estimatedValue,
+        requirements: editData.requirements,
+        lastActivity: new Date().toISOString(),
+        lastUpdatedBy: currentUser?.name || currentUser?.email || 'User'
+      };
+      
+      // Update lead in backend
+      await apiService.updateLead(leadId, updatedLeadData);
+      
+      // Update local state immediately (no need to refetch)
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          (lead._id || lead.id) === leadId ? updatedLeadData : lead
+        )
+      );
+      
+      // Add update history note if there were changes
+      if (changes.length > 0) {
+        const updateNote = `Lead updated by ${currentUser?.name || currentUser?.email || 'User'} at ${new Date().toLocaleString('en-IN')}:\n\nChanges made:\n${changes.map(change => `• ${change}`).join('\n')}`;
+        try {
+          await apiService.addLeadNote(leadId, updateNote);
+          // Update notes in local state too
+          const newNoteObj = {
+            content: updateNote,
+            createdAt: new Date().toISOString(),
+            createdBy: { name: currentUser?.name || currentUser?.email || 'User' }
+          };
+          setLeads(prevLeads => 
+            prevLeads.map(lead => {
+              if ((lead._id || lead.id) === leadId) {
+                return {
+                  ...lead,
+                  notes: [...(lead.notes || []), newNoteObj]
+                };
+              }
+              return lead;
+            })
+          );
+        } catch (noteError) {
+          console.error('Error adding update note:', noteError);
+        }
+      }
+      
+      // Add additional note if provided
+      if (newNote.trim()) {
+        try {
+          await apiService.addLeadNote(leadId, newNote);
+          // Update notes in local state
+          const newNoteObj = {
+            content: newNote,
+            createdAt: new Date().toISOString(),
+            createdBy: { name: currentUser?.name || currentUser?.email || 'User' }
+          };
+          setLeads(prevLeads => 
+            prevLeads.map(lead => {
+              if ((lead._id || lead.id) === leadId) {
+                return {
+                  ...lead,
+                  notes: [...(lead.notes || []), newNoteObj]
+                };
+              }
+              return lead;
+            })
+          );
+        } catch (noteError) {
+          console.error('Error adding note:', noteError);
+        }
+      }
+      
+      // Close modal and reset
+      setShowEditModal(false);
+      setSelectedLead(null);
+      setNewNote('');
+      
+      alert('Lead updated successfully!');
+      
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      alert(`Error updating lead: ${error.message}`);
     }
   };
 
@@ -598,6 +764,32 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                 >
                   <Eye size={16} />
                 </button>
+                
+                {/* Edit Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditLead(lead);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    borderRadius: '6px',
+                    color: darkMode ? '#f59e0b' : '#d97706',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = darkMode ? '#f59e0b20' : '#fef3c7';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  title="Edit Lead"
+                >
+                  <Edit size={16} />
+                </button>
                 {lead.assignedTo ? (
                   <div style={{
                     display: 'flex',
@@ -847,6 +1039,328 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                       <p style={{ margin: '0.25rem 0 0 0', color: darkMode ? 'white' : '#1f2937' }}>{selectedLead.createdBy ? (typeof selectedLead.createdBy === 'object' ? selectedLead.createdBy.name : selectedLead.createdBy) : 'N/A'}</p>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Edit Lead Modal */}
+        {showEditModal && selectedLead && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: darkMode ? '#1f2937' : 'white',
+              borderRadius: '16px',
+              width: '90%',
+              maxWidth: '500px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              <div style={{
+                padding: '1.5rem',
+                borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <h3 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '600',
+                  color: darkMode ? 'white' : '#1f2937',
+                  margin: 0
+                }}>
+                  Edit Lead: {selectedLead.companyName}
+                </h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer',
+                    color: darkMode ? '#9ca3af' : '#6b7280'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={{ padding: '1.5rem', maxHeight: '70vh', overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Contact Person *
+                      </label>
+                      <input
+                        type="text"
+                        value={editData.contactPerson}
+                        onChange={(e) => setEditData({...editData, contactPerson: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={editData.companyName}
+                        onChange={(e) => setEditData({...editData, companyName: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={editData.email}
+                        onChange={(e) => setEditData({...editData, email: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        value={editData.phone}
+                        onChange={(e) => setEditData({...editData, phone: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Status
+                      </label>
+                      <select
+                        value={editData.status}
+                        onChange={(e) => setEditData({...editData, status: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="proposal">Proposal</option>
+                        <option value="negotiation">Negotiation</option>
+                        <option value="closed-won">Closed Won</option>
+                        <option value="closed-lost">Closed Lost</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Priority
+                      </label>
+                      <select
+                        value={editData.priority}
+                        onChange={(e) => setEditData({...editData, priority: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Estimated Value (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={editData.estimatedValue}
+                      onChange={(e) => setEditData({...editData, estimatedValue: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Add New Note
+                    </label>
+                    <textarea
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      rows="3"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '1rem',
+                        resize: 'vertical'
+                      }}
+                      placeholder="Add a note about this lead..."
+                    />
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '1rem',
+                  marginTop: '1.5rem'
+                }}>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    style={{
+                      padding: '12px 24px',
+                      border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                      borderRadius: '8px',
+                      background: 'transparent',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      cursor: 'pointer',
+                      fontSize: '16px'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveEditLead}
+                    style={{
+                      padding: '12px 24px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Edit size={16} />
+                    Update Lead
+                  </button>
                 </div>
               </div>
             </div>

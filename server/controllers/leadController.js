@@ -188,6 +188,8 @@ const createLead = async (req, res) => {
     // Get user ID - handle both _id and id properties
     const userId = req.user._id || req.user.id;
     
+    console.log('👤 Setting createdBy to userId:', userId);
+    
     const leadData = {
       ...req.body,
       createdBy: userId,
@@ -223,14 +225,23 @@ const createLead = async (req, res) => {
     
     const lead = await Lead.create(leadData);
     
+    // Populate the lead with user details
     await lead.populate('createdBy assignedTo', 'name email');
-    console.log('Lead created successfully:', lead);
+    
+    console.log('✅ Lead created successfully with createdBy:', {
+      leadId: lead._id,
+      contactPerson: lead.contactPerson,
+      createdBy: lead.createdBy,
+      assignedTo: lead.assignedTo
+    });
+    
     res.status(201).json(lead);
   } catch (error) {
     console.error('Error creating lead:', error);
     
     // If MongoDB is not connected, return mock success
     if (error.message.includes('buffering timed out') || error.message.includes('ECONNREFUSED')) {
+      const userId = req.user._id || req.user.id;
       const mockLead = {
         _id: Date.now().toString(),
         ...req.body,
@@ -529,21 +540,43 @@ const assignLead = async (req, res) => {
 };
 
 const getMyLeads = async (req, res) => {
+  const mongoose = require('mongoose');
   try {
     console.log('\n🔍 === MY LEADS REQUEST ===');
     console.log('👤 User ID:', req.user._id);
     console.log('👤 User Email:', req.user.email);
     console.log('👤 User Role:', req.user.role);
     
-    const { status, priority, search, page = 1, limit = 10 } = req.query;
+    const { status, priority, search, page = 1, limit = 50 } = req.query;
     
     let query = { isActive: true };
     
     // All users (including super admin) get leads created by them or assigned to them
     const userId = req.user._id || req.user.id;
+    console.log('🔑 Using userId for query:', userId, 'Type:', typeof userId);
+    
+    // Convert to ObjectId if it's a string
+    const userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    console.log('🔑 Converted to ObjectId:', userObjectId);
+    
+    // First, let's check all leads this user created
+    const createdLeads = await Lead.find({ createdBy: userObjectId, isActive: true }).select('_id contactPerson createdBy');
+    console.log('📊 Leads created by this user:', createdLeads.length);
+    if (createdLeads.length > 0) {
+      console.log('📊 Sample created lead:', {
+        id: createdLeads[0]._id,
+        contactPerson: createdLeads[0].contactPerson,
+        createdBy: createdLeads[0].createdBy
+      });
+    }
+    
+    // Check leads assigned to this user
+    const assignedLeads = await Lead.find({ assignedTo: userObjectId, isActive: true }).select('_id contactPerson assignedTo');
+    console.log('📊 Leads assigned to this user:', assignedLeads.length);
+    
     query.$or = [
-      { createdBy: userId },  // Leads created by this user
-      { assignedTo: userId }  // Leads assigned to this user
+      { createdBy: userObjectId },  // Leads created by this user
+      { assignedTo: userObjectId }  // Leads assigned to this user
     ];
     
     console.log('🔍 Query:', JSON.stringify(query, null, 2));
@@ -551,7 +584,20 @@ const getMyLeads = async (req, res) => {
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (search) {
-      query.$text = { $search: search };
+      const searchQuery = {
+        $or: [
+          { contactPerson: { $regex: search, $options: 'i' } },
+          { companyName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } }
+        ]
+      };
+      
+      if (query.$and) {
+        query.$and.push(searchQuery);
+      } else {
+        query.$and = [searchQuery];
+      }
     }
 
     const leads = await Lead.find(query)
@@ -565,7 +611,12 @@ const getMyLeads = async (req, res) => {
     console.log('📊 Found leads count:', leads.length);
     console.log('📊 Total leads:', total);
     if (leads.length > 0) {
-      console.log('📊 First lead createdBy:', leads[0].createdBy);
+      console.log('📊 First lead details:', {
+        id: leads[0]._id,
+        contactPerson: leads[0].contactPerson,
+        createdBy: leads[0].createdBy,
+        assignedTo: leads[0].assignedTo
+      });
     }
     console.log('=== END MY LEADS ===\n');
 
@@ -576,6 +627,7 @@ const getMyLeads = async (req, res) => {
       total
     });
   } catch (error) {
+    console.error('❌ Error in getMyLeads:', error);
     res.status(400).json({ message: error.message });
   }
 };
