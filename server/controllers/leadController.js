@@ -263,9 +263,9 @@ const getLeads = async (req, res) => {
     if (req.user.role === 'super-admin') {
       // Super-admin can see all leads from all companies
       console.log('🔑 Super-admin access - showing all leads from all companies');
-    } else if (req.user.role === 'admin') {
-      // Admin can see all leads from their company
-      console.log('🔑 Admin access - showing company leads');
+    } else if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // Admin and Manager can see all leads from their company
+      console.log('🔑 Admin/Manager access - showing company leads');
       const companyInfo = getCompanyInfo(req.user);
       const userCompanyId = companyInfo?._id || companyInfo || req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
       if (userCompanyId) {
