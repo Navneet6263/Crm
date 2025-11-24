@@ -13,8 +13,16 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editData, setEditData] = useState({
+    contactPerson: '',
+    companyName: '',
+    email: '',
+    phone: '',
+    industry: '',
+    leadSource: '',
     status: '',
-    priority: ''
+    priority: '',
+    estimatedValue: '',
+    requirements: ''
   });
   const [newNote, setNewNote] = useState('');
 
@@ -148,8 +156,16 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
   const handleEditLead = (lead) => {
     setSelectedLead(lead);
     setEditData({
+      contactPerson: lead.contactPerson || lead.name || '',
+      companyName: lead.companyName || lead.company || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      industry: lead.industry || '',
+      leadSource: lead.leadSource || '',
       status: lead.status || 'new',
-      priority: lead.priority || 'medium'
+      priority: lead.priority || 'medium',
+      estimatedValue: lead.estimatedValue || '',
+      requirements: lead.requirements || ''
     });
     setNewNote('');
     setShowEditModal(true);
@@ -159,34 +175,130 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
     try {
       const leadId = selectedLead._id || selectedLead.id;
       
-      // Update status and priority
-      const updatedLead = {
-        status: editData.status,
-        priority: editData.priority,
-        lastActivity: new Date().toISOString()
-      };
+      // Track what fields were changed
+      const changes = [];
+      const originalLead = selectedLead;
       
-      await apiService.updateLead(leadId, updatedLead);
-      
-      // Add note if provided
-      if (newNote.trim()) {
-        await apiService.addLeadNote(leadId, newNote);
+      if (editData.contactPerson !== (originalLead.contactPerson || originalLead.name || '')) {
+        changes.push(`Contact Person: "${originalLead.contactPerson || originalLead.name || ''}" → "${editData.contactPerson}"`);
+      }
+      if (editData.companyName !== (originalLead.companyName || originalLead.company || '')) {
+        changes.push(`Company: "${originalLead.companyName || originalLead.company || ''}" → "${editData.companyName}"`);
+      }
+      if (editData.email !== (originalLead.email || '')) {
+        changes.push(`Email: "${originalLead.email || ''}" → "${editData.email}"`);
+      }
+      if (editData.phone !== (originalLead.phone || '')) {
+        changes.push(`Phone: "${originalLead.phone || ''}" → "${editData.phone}"`);
+      }
+      if (editData.industry !== (originalLead.industry || '')) {
+        changes.push(`Industry: "${originalLead.industry || ''}" → "${editData.industry}"`);
+      }
+      if (editData.leadSource !== (originalLead.leadSource || '')) {
+        changes.push(`Lead Source: "${originalLead.leadSource || ''}" → "${editData.leadSource}"`);
+      }
+      if (editData.status !== (originalLead.status || '')) {
+        changes.push(`Status: "${originalLead.status || ''}" → "${editData.status}"`);
+      }
+      if (editData.priority !== (originalLead.priority || '')) {
+        changes.push(`Priority: "${originalLead.priority || ''}" → "${editData.priority}"`);
+      }
+      if (editData.estimatedValue !== (originalLead.estimatedValue || '')) {
+        changes.push(`Estimated Value: "₹${originalLead.estimatedValue || '0'}" → "₹${editData.estimatedValue}"`);
+      }
+      if (editData.requirements !== (originalLead.requirements || '')) {
+        changes.push(`Requirements updated`);
       }
       
+      // Create updated lead object with all fields
+      const updatedLeadData = {
+        ...originalLead, // Keep all existing data
+        contactPerson: editData.contactPerson,
+        name: editData.contactPerson, // For backward compatibility
+        companyName: editData.companyName,
+        company: editData.companyName, // For backward compatibility
+        email: editData.email,
+        phone: editData.phone,
+        industry: editData.industry,
+        leadSource: editData.leadSource,
+        status: editData.status,
+        priority: editData.priority,
+        estimatedValue: editData.estimatedValue,
+        requirements: editData.requirements,
+        lastActivity: new Date().toISOString(),
+        lastUpdatedBy: user?.name || user?.email || 'User'
+      };
+      
+      // Update lead in backend
+      await apiService.updateLead(leadId, updatedLeadData);
+      
+      // Update local state immediately (no need to refetch)
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          (lead._id || lead.id) === leadId ? updatedLeadData : lead
+        )
+      );
+      
+      // Add update history note if there were changes
+      if (changes.length > 0) {
+        const updateNote = `Lead updated by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}:\n\nChanges made:\n${changes.map(change => `• ${change}`).join('\n')}`;
+        try {
+          await apiService.addLeadNote(leadId, updateNote);
+          // Update notes in local state too
+          const newNoteObj = {
+            content: updateNote,
+            createdAt: new Date().toISOString(),
+            createdBy: { name: user?.name || user?.email || 'User' }
+          };
+          setLeads(prevLeads => 
+            prevLeads.map(lead => {
+              if ((lead._id || lead.id) === leadId) {
+                return {
+                  ...lead,
+                  notes: [...(lead.notes || []), newNoteObj]
+                };
+              }
+              return lead;
+            })
+          );
+        } catch (noteError) {
+          console.error('Error adding update note:', noteError);
+        }
+      }
+      
+      // Add additional note if provided
+      if (newNote.trim()) {
+        try {
+          await apiService.addLeadNote(leadId, newNote);
+          // Update notes in local state
+          const newNoteObj = {
+            content: newNote,
+            createdAt: new Date().toISOString(),
+            createdBy: { name: user?.name || user?.email || 'User' }
+          };
+          setLeads(prevLeads => 
+            prevLeads.map(lead => {
+              if ((lead._id || lead.id) === leadId) {
+                return {
+                  ...lead,
+                  notes: [...(lead.notes || []), newNoteObj]
+                };
+              }
+              return lead;
+            })
+          );
+        } catch (noteError) {
+          console.error('Error adding note:', noteError);
+        }
+      }
+      
+      // Close modal and reset
       setShowEditModal(false);
       setSelectedLead(null);
       setNewNote('');
       
-      // Refresh leads after modal closes
-      try {
-        const response = await apiService.getMyLeads();
-        const leadsData = Array.isArray(response) ? response : (response.leads || []);
-        setLeads(leadsData);
-        alert('Lead updated successfully!');
-      } catch (refreshError) {
-        console.error('Error refreshing leads:', refreshError);
-        alert('Lead updated but failed to refresh list. Please refresh the page.');
-      }
+      alert('Lead updated successfully!');
+      
     } catch (error) {
       console.error('Error updating lead:', error);
       alert(`Error updating lead: ${error.message}`);
@@ -1192,68 +1304,336 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
               </div>
 
               {/* Content */}
-              <div style={{ padding: '1.5rem' }}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: darkMode ? '#d1d5db' : '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Status
-                  </label>
-                  <select
-                    value={editData.status}
-                    onChange={(e) => setEditData({...editData, status: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                      borderRadius: '8px',
-                      background: darkMode ? '#374151' : 'white',
-                      color: darkMode ? 'white' : '#1f2937',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    <option value="new">New</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="qualified">Qualified</option>
-                    <option value="proposal">Proposal</option>
-                    <option value="negotiation">Negotiation</option>
-                    <option value="closed-won">Closed Won</option>
-                    <option value="closed-lost">Closed Lost</option>
-                  </select>
+              <div style={{ padding: '1.5rem', maxHeight: '70vh', overflowY: 'auto' }}>
+                {/* Contact Information */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f3f4f6' : '#1f2937',
+                    marginBottom: '1rem',
+                    borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    paddingBottom: '0.5rem'
+                  }}>Contact Information</h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Contact Person *
+                      </label>
+                      <input
+                        type="text"
+                        value={editData.contactPerson}
+                        onChange={(e) => setEditData({...editData, contactPerson: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter contact person name"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={editData.companyName}
+                        onChange={(e) => setEditData({...editData, companyName: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter company name"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={editData.email}
+                        onChange={(e) => setEditData({...editData, email: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter email address"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        value={editData.phone}
+                        onChange={(e) => setEditData({...editData, phone: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+                  </div>
                 </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: darkMode ? '#d1d5db' : '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Priority
-                  </label>
-                  <select
-                    value={editData.priority}
-                    onChange={(e) => setEditData({...editData, priority: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                      borderRadius: '8px',
-                      background: darkMode ? '#374151' : 'white',
-                      color: darkMode ? 'white' : '#1f2937',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                
+                {/* Business Information */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f3f4f6' : '#1f2937',
+                    marginBottom: '1rem',
+                    borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    paddingBottom: '0.5rem'
+                  }}>Business Information</h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Industry
+                      </label>
+                      <input
+                        type="text"
+                        value={editData.industry}
+                        onChange={(e) => setEditData({...editData, industry: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="e.g., Technology, Healthcare"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Lead Source
+                      </label>
+                      <select
+                        value={editData.leadSource}
+                        onChange={(e) => setEditData({...editData, leadSource: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="">Select source</option>
+                        <option value="website">Website</option>
+                        <option value="social-media">Social Media</option>
+                        <option value="referral">Referral</option>
+                        <option value="cold-call">Cold Call</option>
+                        <option value="email-campaign">Email Campaign</option>
+                        <option value="trade-show">Trade Show</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Estimated Value (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={editData.estimatedValue}
+                      onChange={(e) => setEditData({...editData, estimatedValue: e.target.value})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Enter estimated deal value"
+                    />
+                  </div>
+                  
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Requirements / Services Needed
+                    </label>
+                    <textarea
+                      value={editData.requirements}
+                      onChange={(e) => setEditData({...editData, requirements: e.target.value})}
+                      rows="4"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '1rem',
+                        resize: 'vertical'
+                      }}
+                      placeholder="Describe the services or products they need..."
+                    />
+                  </div>
+                </div>
+                
+                {/* Lead Management */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f3f4f6' : '#1f2937',
+                    marginBottom: '1rem',
+                    borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    paddingBottom: '0.5rem'
+                  }}>Lead Management</h4>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Status
+                      </label>
+                      <select
+                        value={editData.status}
+                        onChange={(e) => setEditData({...editData, status: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="proposal">Proposal</option>
+                        <option value="negotiation">Negotiation</option>
+                        <option value="closed-won">Closed Won</option>
+                        <option value="closed-lost">Closed Lost</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>
+                        Priority
+                      </label>
+                      <select
+                        value={editData.priority}
+                        onChange={(e) => setEditData({...editData, priority: e.target.value})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Notes History */}
@@ -1362,6 +1742,24 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                   </button>
                   <button
                     onClick={() => {
+                      // Basic validation
+                      if (!editData.contactPerson.trim()) {
+                        alert('Contact Person is required');
+                        return;
+                      }
+                      if (!editData.companyName.trim()) {
+                        alert('Company Name is required');
+                        return;
+                      }
+                      if (!editData.email.trim()) {
+                        alert('Email is required');
+                        return;
+                      }
+                      if (!editData.phone.trim()) {
+                        alert('Phone is required');
+                        return;
+                      }
+                      
                       console.log('Save clicked');
                       saveEditLead();
                     }}
