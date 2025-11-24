@@ -9,15 +9,17 @@ const { sendSecurityAlert } = require('../utils/securityAlerts');
 const auditLogger = (action) => {
   return async (req, res, next) => {
     try {
-      await AuditLog.create({
-        action,
-        performedBy: req.user?.id,
-        userEmail: req.user?.email,
-        userRole: req.user?.role,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-        timestamp: new Date()
-      });
+      if (req.user?.id) {
+        await AuditLog.create({
+          action,
+          performedBy: req.user.id,
+          userEmail: req.user?.email,
+          userRole: req.user?.role,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+          timestamp: new Date()
+        });
+      }
       
       // Log to security logger
       logger.info('Audit event', {
