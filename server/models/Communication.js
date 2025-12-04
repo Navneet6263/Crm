@@ -16,8 +16,14 @@ const communicationSchema = new mongoose.Schema({
   },
   leadId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Lead',
-    required: true
+    ref: 'Lead'
+  },
+  recipient: {
+    type: String,
+    required: function() { return this.type === 'email' || this.type === 'sms' || this.type === 'whatsapp'; }
+  },
+  sentAt: {
+    type: Date
   },
   customerId: {
     type: mongoose.Schema.Types.ObjectId,

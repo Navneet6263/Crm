@@ -1094,6 +1094,10 @@ const { startLeadAssignmentReminderCron } = require('./utils/leadAssignmentCron'
 startLeadReminderCron();
 startLeadAssignmentReminderCron();
 
+// Start task reminder cron job
+const taskReminderCron = require('./utils/taskReminderCron');
+console.log('✅ Task reminder cron job started');
+
 const PORT = process.env.PORT || 5005;
 
 const server = app.listen(PORT, () => {
@@ -1104,6 +1108,7 @@ const server = app.listen(PORT, () => {
 });
 
 // Increase server limits for bulk uploads
-server.maxHeadersCount = 0;
-server.headersTimeout = 0;
-server.requestTimeout = 0;
+server.maxHeadersCount = 2000;
+server.headersTimeout = 60000;
+server.requestTimeout = 120000;
+server.maxHeaderSize = 16 * 1024; // 16KB for headers

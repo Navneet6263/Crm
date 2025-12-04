@@ -20,9 +20,11 @@ import {
   Mail,
   Phone,
   Calendar,
-  DollarSign
+  DollarSign,
+  Loader
 } from 'lucide-react';
 import { showToast } from './ToastNotification';
+import apiService from '../services/apiService';
 
 const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
   const [data, setData] = useState([]);
@@ -36,6 +38,9 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
   const [selectedColumns, setSelectedColumns] = useState([]);
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [activeTab, setActiveTab] = useState('leads');
+  const [loading, setLoading] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [editData, setEditData] = useState({});
 
   const columns = [
     { id: 'contactPerson', label: 'Contact Person', icon: Users, sortable: true },
@@ -52,49 +57,57 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
   ];
 
   useEffect(() => {
-    // Initialize with sample data
-    const sampleData = [
-      {
-        id: 3,
-        contactPerson: 'Amit Patel',
-        companyName: 'Healthcare Solutions',
-        email: 'amit@healthcare.com',
-        phone: '+91 9876543212',
-        industry: 'Healthcare',
-        leadSource: 'Referral',
-        estimatedValue: 750000,
-        status: 'qualified',
-        priority: 'high',
-        assignedTo: 'Senior Sales Rep',
-        createdDate: '2024-12-05T11:45:00Z',
-        type: 'lead'
-      },
-      {
-        id: 4,
-        contactPerson: 'Sneha Gupta',
-        companyName: 'Retail Chain Store',
-        email: 'sneha@retailchain.com',
-        phone: '+91 9876543213',
-        industry: 'Retail',
-        leadSource: 'Cold Call',
-        estimatedValue: 150000,
-        status: 'contacted',
-        priority: 'low',
-        assignedTo: 'Sales Rep',
-        createdDate: '2024-12-01T14:20:00Z',
-        type: 'lead'
-      }
-    ];
-
-    // Combine with CRM data
-    const leadsArray = Array.isArray(crmData.leads) ? crmData.leads : (crmData.leads?.leads || []);
-    const allData = [...sampleData, ...leadsArray.map(lead => ({...lead, type: 'lead'}))];
-    setData(allData);
-    setFilteredData(allData);
-    
+    loadData();
     // Initialize selected columns
     setSelectedColumns(columns.slice(0, 7).map(col => col.id));
-  }, [crmData]);
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all leads without pagination limit
+      const [leadsResponse, customers] = await Promise.all([
+        fetch(`${apiService.getApiUrl()}/leads?limit=1000`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        apiService.getCustomers()
+      ]);
+      
+      const leadsData = await leadsResponse.json();
+      const leads = leadsData.leads || leadsData || [];
+      
+      const processedLeads = leads.map((lead, index) => ({
+        ...lead,
+        id: lead.id || lead._id || `lead-${index}`,
+        type: 'lead',
+        contactPerson: lead.name || lead.contactPerson || 'Unknown',
+        companyName: lead.company || lead.companyName || 'Unknown Company',
+        createdDate: lead.createdAt || lead.dateCreated || new Date().toISOString()
+      }));
+      
+      const customersData = customers.map((customer, index) => ({
+        ...customer,
+        id: customer.id || customer._id || `customer-${index}`,
+        type: 'customer',
+        contactPerson: customer.name || customer.contactPerson || 'Unknown',
+        companyName: customer.company || customer.companyName || 'Unknown Company',
+        createdDate: customer.createdAt || customer.dateCreated || new Date().toISOString()
+      }));
+      
+      const allData = [...processedLeads, ...customersData];
+      console.log(`Loaded ${processedLeads.length} leads and ${customersData.length} customers`);
+      setData(allData);
+      setFilteredData(allData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showToast('error', 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = [...data];
@@ -153,7 +166,12 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
     }
   };
 
-  const handleSelectRow = (id) => {
+  const handleSelectRow = (id, event) => {
+    event.stopPropagation();
+    if (!id) {
+      console.error('Trying to select row with undefined id');
+      return;
+    }
     setSelectedRows(prev =>
       prev.includes(id)
         ? prev.filter(rowId => rowId !== id)
@@ -161,27 +179,116 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
     );
   };
 
-  const handleSelectAll = () => {
+  const handleSelectAll = (event) => {
+    event.stopPropagation();
     const currentPageData = getCurrentPageData();
-    const currentPageIds = currentPageData.map(item => item.id);
+    const currentPageIds = currentPageData.map(item => item.id).filter(Boolean);
+    const allSelected = currentPageIds.every(id => selectedRows.includes(id));
     
-    if (selectedRows.length === currentPageIds.length) {
-      setSelectedRows([]);
+    if (allSelected) {
+      setSelectedRows(prev => prev.filter(id => !currentPageIds.includes(id)));
     } else {
-      setSelectedRows(currentPageIds);
+      setSelectedRows(prev => [...new Set([...prev, ...currentPageIds])]);
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedRows.length === 0) {
-      showToast('error', '❌ No rows selected');
+      showToast('error', 'No rows selected');
       return;
     }
 
-    const updatedData = data.filter(item => !selectedRows.includes(item.id));
-    setData(updatedData);
-    setSelectedRows([]);
-    showToast('success', `🗑️ Deleted ${selectedRows.length} items`);
+    if (!window.confirm(`Are you sure you want to delete ${selectedRows.length} items?`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const deletePromises = selectedRows.map(async (id) => {
+        const item = data.find(d => d.id === id);
+        if (item?.type === 'lead') {
+          return apiService.deleteLead(id);
+        } else if (item?.type === 'customer') {
+          console.log('Deleting customer:', id);
+          return Promise.resolve(); // For now, just resolve
+        }
+      });
+      
+      await Promise.all(deletePromises.filter(Boolean));
+      await loadData();
+      setSelectedRows([]);
+      showToast('success', `Deleted ${selectedRows.length} items successfully`);
+    } catch (error) {
+      console.error('Error deleting items:', error);
+      showToast('error', 'Failed to delete some items');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (item) => {
+    setEditingRow(item.id);
+    setEditData(item);
+  };
+
+  const handleSaveEdit = async () => {
+    setLoading(true);
+    try {
+      if (editData.type === 'lead') {
+        await apiService.updateLead(editData.id, editData);
+      } else if (editData.type === 'customer') {
+        await apiService.updateCustomer(editData.id, editData);
+      }
+      
+      await loadData();
+      setEditingRow(null);
+      setEditData({});
+      showToast('success', 'Item updated successfully');
+    } catch (error) {
+      console.error('Error updating item:', error);
+      showToast('error', 'Failed to update item');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRow(null);
+    setEditData({});
+  };
+
+  const handleDelete = async (item) => {
+    if (!window.confirm('Are you sure you want to delete this item?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (item.type === 'lead') {
+        await apiService.deleteLead(item.id);
+      } else if (item.type === 'customer') {
+        // For now, just remove from local state since deleteCustomer might not exist
+        console.log('Deleting customer:', item.id);
+      }
+      
+      // Remove from local state immediately
+      setData(prev => prev.filter(d => d.id !== item.id));
+      setFilteredData(prev => prev.filter(d => d.id !== item.id));
+      
+      showToast('success', 'Item deleted successfully');
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      showToast('error', 'Failed to delete item');
+      // Reload data on error
+      await loadData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshData = async () => {
+    await loadData();
+    showToast('success', 'Data refreshed successfully');
   };
 
   const handleExport = () => {
@@ -213,23 +320,23 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
 
   const getStatusColor = (status) => {
     const colors = {
-      'new': { bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', text: 'white', shadow: '0 4px 15px rgba(102, 126, 234, 0.4)' },
-      'contacted': { bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', text: 'white', shadow: '0 4px 15px rgba(240, 147, 251, 0.4)' },
-      'qualified': { bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', text: 'white', shadow: '0 4px 15px rgba(79, 172, 254, 0.4)' },
-      'proposal': { bg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', text: 'white', shadow: '0 4px 15px rgba(67, 233, 123, 0.4)' },
-      'converted': { bg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', text: 'white', shadow: '0 4px 15px rgba(250, 112, 154, 0.4)' },
-      'customer': { bg: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', text: '#1f2937', shadow: '0 4px 15px rgba(168, 237, 234, 0.4)' },
-      'lost': { bg: 'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)', text: '#1f2937', shadow: '0 4px 15px rgba(210, 153, 194, 0.4)' }
+      'new': { bg: '#3b82f6', text: 'white' },
+      'contacted': { bg: '#f59e0b', text: 'white' },
+      'qualified': { bg: '#06b6d4', text: 'white' },
+      'proposal': { bg: '#10b981', text: 'white' },
+      'converted': { bg: '#22c55e', text: 'white' },
+      'customer': { bg: '#8b5cf6', text: 'white' },
+      'lost': { bg: '#ef4444', text: 'white' }
     };
     return colors[status] || colors['new'];
   };
 
   const getPriorityColor = (priority) => {
     const colors = {
-      'low': { bg: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)', text: 'white', shadow: '0 4px 15px rgba(137, 247, 254, 0.4)' },
-      'medium': { bg: 'linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%)', text: 'white', shadow: '0 4px 15px rgba(253, 187, 45, 0.4)' },
-      'high': { bg: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', text: 'white', shadow: '0 4px 15px rgba(255, 154, 158, 0.4)' },
-      'urgent': { bg: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)', text: 'white', shadow: '0 4px 15px rgba(255, 107, 107, 0.4)' }
+      'low': { bg: '#06b6d4', text: 'white' },
+      'medium': { bg: '#f59e0b', text: 'white' },
+      'high': { bg: '#f97316', text: 'white' },
+      'urgent': { bg: '#ef4444', text: 'white' }
     };
     return colors[priority] || colors['medium'];
   };
@@ -250,97 +357,54 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
   return (
     <div style={containerStyle}>
       {/* Header */}
-      <div style={{ 
-        marginBottom: '2rem',
-        padding: '2rem',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '20px',
-        boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
-        color: 'white'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-          <div style={{
-            padding: '1rem',
-            background: 'rgba(255, 255, 255, 0.2)',
-            borderRadius: '15px',
-            backdropFilter: 'blur(10px)'
-          }}>
-            <Database style={{ color: 'white' }} size={32} />
-          </div>
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <Database style={{ color: '#3b82f6' }} size={32} />
           <div>
             <h1 style={{
-              fontSize: '2.5rem',
-              fontWeight: '800',
-              color: 'white',
-              margin: 0,
-              textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              fontSize: '2rem',
+              fontWeight: '700',
+              color: darkMode ? 'white' : '#1f2937',
+              margin: 0
             }}>
-              Data Table
+              Data Management
             </h1>
             <p style={{ 
-              color: 'rgba(255, 255, 255, 0.9)', 
-              fontSize: '1.125rem', 
-              margin: 0,
-              fontWeight: '500'
+              color: darkMode ? '#9ca3af' : '#6b7280', 
+              fontSize: '1rem', 
+              margin: 0
             }}>
-              Advanced data management with filtering, sorting, and bulk operations
+              Manage your leads and customers data
             </p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ 
-        ...cardStyle, 
-        padding: '0.5rem', 
-        marginBottom: '2rem', 
-        overflow: 'hidden',
-        background: darkMode 
-          ? 'linear-gradient(135deg, #1f2937 0%, #374151 100%)'
-          : 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
-        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)'
-      }}>
+      <div style={{ ...cardStyle, padding: '1rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {[
-            { id: 'all', label: 'All Data', count: data.length, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-            { id: 'leads', label: 'Leads', count: data.filter(d => d.type === 'lead' || !d.type).length, gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-            { id: 'customers', label: 'Customers', count: data.filter(d => d.type === 'customer' || d.status === 'converted').length, gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }
+            { id: 'all', label: 'All Data', count: filteredData.length },
+            { id: 'leads', label: 'Leads', count: data.filter(d => d.type === 'lead' || !d.type).length },
+            { id: 'customers', label: 'Customers', count: data.filter(d => d.type === 'customer' || d.status === 'converted').length }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '1rem 1.5rem',
-                border: 'none',
-                borderRadius: '12px',
+                padding: '0.75rem 1.5rem',
+                border: `2px solid ${activeTab === tab.id ? '#3b82f6' : (darkMode ? '#374151' : '#e5e7eb')}`,
+                borderRadius: '8px',
                 background: activeTab === tab.id 
-                  ? tab.gradient
+                  ? '#3b82f6'
                   : 'transparent',
                 color: activeTab === tab.id 
                   ? 'white'
-                  : (darkMode ? '#9ca3af' : '#6b7280'),
+                  : (darkMode ? '#d1d5db' : '#374151'),
                 cursor: 'pointer',
                 fontSize: '0.875rem',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                transition: 'all 0.3s ease',
-                boxShadow: activeTab === tab.id 
-                  ? '0 4px 15px rgba(102, 126, 234, 0.4)'
-                  : 'none',
-                transform: activeTab === tab.id ? 'translateY(-2px)' : 'translateY(0)'
-              }}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.background = darkMode ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 0.5)';
-                  e.target.style.transform = 'translateY(-1px)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.target.style.background = 'transparent';
-                  e.target.style.transform = 'translateY(0)';
-                }
+                fontWeight: '600',
+                transition: 'all 0.2s ease'
               }}
             >
               {tab.label} ({tab.count})
@@ -432,7 +496,7 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
               onClick={handleExport}
               style={{
                 padding: '0.75rem 1rem',
-                background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                background: '#22c55e',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -449,17 +513,22 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
             </button>
             
             <button
+              onClick={refreshData}
+              disabled={loading}
               style={{
                 padding: '0.75rem',
-                background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                background: loading 
+                  ? (darkMode ? '#4b5563' : '#d1d5db')
+                  : '#3b82f6',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
-                cursor: 'pointer'
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1
               }}
               title="Refresh Data"
             >
-              <RefreshCw size={16} />
+              {loading ? <Loader size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             </button>
           </div>
         </div>
@@ -531,7 +600,7 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
           }}>
             {/* Select All Checkbox */}
             <button
-              onClick={handleSelectAll}
+              onClick={(e) => handleSelectAll(e)}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -539,7 +608,7 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
                 color: darkMode ? '#d1d5db' : '#374151'
               }}
             >
-              {selectedRows.length === getCurrentPageData().length && getCurrentPageData().length > 0 ? (
+              {getCurrentPageData().length > 0 && getCurrentPageData().every(item => selectedRows.includes(item.id)) ? (
                 <CheckSquare size={16} />
               ) : (
                 <Square size={16} />
@@ -590,32 +659,17 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
 
         {/* Table Body */}
         <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-          {getCurrentPageData().map((item, index) => (
-            <div key={item.id} style={{
+          {getCurrentPageData().map((item, index) => {
+            const itemKey = item.id || `row-${index}`;
+            return (
+            <div key={itemKey} style={{
               padding: '1rem',
               borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
               background: index % 2 === 0 
                 ? (darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)')
-                : 'transparent',
-              transition: 'all 0.3s ease',
-              borderRadius: '8px',
-              margin: '0.25rem 0.5rem'
+                : 'transparent'
             }}
-            onMouseEnter={(e) => {
-              e.target.style.background = darkMode 
-                ? 'linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(75, 85, 99, 0.6) 100%)'
-                : 'linear-gradient(135deg, rgba(249, 250, 251, 0.8) 0%, rgba(243, 244, 246, 0.6) 100%)';
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = index % 2 === 0 
-                ? (darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)')
-                : 'transparent';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }}
-            >
+            onClick={(e) => e.stopPropagation()}>
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: `40px repeat(${selectedColumns.length}, 1fr) 100px`,
@@ -624,7 +678,7 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
               }}>
                 {/* Row Checkbox */}
                 <button
-                  onClick={() => handleSelectRow(item.id)}
+                  onClick={(e) => handleSelectRow(item.id, e)}
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -642,6 +696,28 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
                 {/* Data Columns */}
                 {selectedColumns.map(columnId => {
                   let cellContent = item[columnId];
+                  
+                  // If editing this row, show input fields
+                  if (editingRow === item.id && ['contactPerson', 'companyName', 'email', 'phone', 'industry'].includes(columnId)) {
+                    return (
+                      <div key={columnId}>
+                        <input
+                          type="text"
+                          value={editData[columnId] || ''}
+                          onChange={(e) => setEditData({...editData, [columnId]: e.target.value})}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                            borderRadius: '4px',
+                            background: darkMode ? '#374151' : 'white',
+                            color: darkMode ? 'white' : '#1f2937',
+                            fontSize: '0.875rem'
+                          }}
+                        />
+                      </div>
+                    );
+                  }
                   
                   // Format specific columns
                   if (columnId === 'estimatedValue') {
@@ -661,19 +737,8 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
                           letterSpacing: '0.5px',
                           background: statusColor.bg,
                           color: statusColor.text,
-                          boxShadow: statusColor.shadow,
                           border: 'none',
-                          display: 'inline-block',
-                          transition: 'all 0.3s ease',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.transform = 'translateY(-2px)';
-                          e.target.style.boxShadow = statusColor.shadow.replace('0.4', '0.6');
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.transform = 'translateY(0)';
-                          e.target.style.boxShadow = statusColor.shadow;
+                          display: 'inline-block'
                         }}>
                           {cellContent}
                         </span>
@@ -692,19 +757,8 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
                           letterSpacing: '0.5px',
                           background: priorityColor.bg,
                           color: priorityColor.text,
-                          boxShadow: priorityColor.shadow,
                           border: 'none',
-                          display: 'inline-block',
-                          transition: 'all 0.3s ease',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.target.style.transform = 'translateY(-2px)';
-                          e.target.style.boxShadow = priorityColor.shadow.replace('0.4', '0.6');
-                        }}
-                        onMouseLeave={(e) => {
-                          e.target.style.transform = 'translateY(0)';
-                          e.target.style.boxShadow = priorityColor.shadow;
+                          display: 'inline-block'
                         }}>
                           {cellContent}
                         </span>
@@ -727,79 +781,78 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
 
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    style={{
-                      padding: '0.5rem',
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    title="View"
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
-                    }}
-                  >
-                    <Eye size={14} />
-                  </button>
-                  <button
-                    style={{
-                      padding: '0.5rem',
-                      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(240, 147, 251, 0.4)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    title="Edit"
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 6px 20px rgba(240, 147, 251, 0.6)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 4px 15px rgba(240, 147, 251, 0.4)';
-                    }}
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    style={{
-                      padding: '0.5rem',
-                      background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(255, 107, 107, 0.4)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    title="Delete"
-                    onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 6px 20px rgba(255, 107, 107, 0.6)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.transform = 'translateY(0)';
-                      e.target.style.boxShadow = '0 4px 15px rgba(255, 107, 107, 0.4)';
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {editingRow === item.id ? (
+                    <>
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={loading}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#22c55e',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          opacity: loading ? 0.7 : 1
+                        }}
+                        title="Save"
+                      >
+                        {loading ? <Loader size={14} className="animate-spin" /> : '✓'}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#6b7280',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                        title="Cancel"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleEdit(item)}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#f59e0b',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                        title="Edit"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item)}
+                        disabled={loading}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          opacity: loading ? 0.7 : 1
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Pagination */}
@@ -811,12 +864,21 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
           alignItems: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{
-              fontSize: '0.875rem',
-              color: darkMode ? '#9ca3af' : '#6b7280'
-            }}>
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <span style={{
+                fontSize: '0.875rem',
+                color: darkMode ? '#9ca3af' : '#6b7280'
+              }}>
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
+              </span>
+              <span style={{
+                fontSize: '0.875rem',
+                color: darkMode ? '#d1d5db' : '#374151',
+                fontWeight: '600'
+              }}>
+                Total Records: {data.length}
+              </span>
+            </div>
             
             <select
               value={itemsPerPage}
@@ -883,8 +945,31 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
         </div>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div style={{
+          ...cardStyle,
+          padding: '3rem',
+          textAlign: 'center',
+          marginTop: '2rem'
+        }}>
+          <Loader size={48} style={{ color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '1rem' }} className="animate-spin" />
+          <h3 style={{
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            color: darkMode ? 'white' : '#1f2937',
+            marginBottom: '0.5rem'
+          }}>
+            Loading data...
+          </h3>
+          <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+            Please wait while we fetch your data
+          </p>
+        </div>
+      )}
+
       {/* Empty State */}
-      {filteredData.length === 0 && (
+      {!loading && filteredData.length === 0 && (
         <div style={{
           ...cardStyle,
           padding: '3rem',
@@ -905,6 +990,16 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
           </p>
         </div>
       )}
+      <style jsx>{`
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

@@ -14,44 +14,8 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
   const [currentUser, setCurrentUser] = useState(null);
 
   // Plans from backend
-  const [plans, setPlans] = useState([
-    {
-      value: 'basic',
-      name: 'Basic Plan',
-      price: 999,
-      features: ['Up to 5 users', '1,000 leads', '2,000 emails/month', 'Basic support', 'Lead management'],
-      popular: false,
-      color: '#22c55e',
-      limits: { users: 5, leads: 1000, emails: 2000 }
-    },
-    {
-      value: 'professional', 
-      name: 'Professional Plan',
-      price: 2999,
-      features: ['Up to 20 users', '5,000 leads', '10,000 emails/month', 'Priority support', 'Advanced analytics', 'WhatsApp integration'],
-      popular: true,
-      color: '#3b82f6',
-      limits: { users: 20, leads: 5000, emails: 10000 }
-    },
-    {
-      value: 'enterprise',
-      name: 'Enterprise Plan', 
-      price: 9999,
-      features: ['Up to 50 users', '10,000 leads', 'Unlimited emails', '24/7 support', 'Custom integrations', 'API access', 'White labeling'],
-      popular: false,
-      color: '#f59e0b',
-      limits: { users: 50, leads: 10000, emails: 'unlimited' }
-    },
-    {
-      value: 'superadmin',
-      name: 'Super Admin Plan', 
-      price: 0,
-      features: ['Unlimited everything', 'Super admin access', 'All features', 'No restrictions', 'Full system control'],
-      popular: false,
-      color: '#dc2626',
-      limits: { users: 'unlimited', leads: 'unlimited', emails: 'unlimited' }
-    }
-  ]);
+  const [plans, setPlans] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
 
   const [invoices, setInvoices] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -263,9 +227,12 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         
         // Get plan configurations from backend
         try {
-          const planResponse = await apiService.get('/companies/plans');
-          if (planResponse.success && planResponse.plans) {
-            const backendPlans = Object.entries(planResponse.plans).map(([key, plan]) => ({
+          const planResponse = await apiService.get('/plans');
+          console.log('Plan configs response:', planResponse);
+          
+          if (planResponse.data || planResponse.plans) {
+            const planData = planResponse.data || planResponse.plans;
+            const backendPlans = Object.entries(planData).map(([key, plan]) => ({
               value: key,
               name: key === 'basic' ? 'Basic Plan' : 
                     key === 'professional' ? 'Professional Plan' : 
@@ -273,7 +240,12 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
               price: key === 'basic' ? 999 : 
                      key === 'professional' ? 2999 : 
                      key === 'enterprise' ? 9999 : 0,
-              features: plan.features || [],
+              features: plan.features || [
+                key === 'basic' ? 'Up to 5 users' : key === 'professional' ? 'Up to 20 users' : 'Up to 50 users',
+                key === 'basic' ? '1,000 leads' : key === 'professional' ? '5,000 leads' : '10,000 leads',
+                key === 'basic' ? '2,000 emails/month' : key === 'professional' ? '10,000 emails/month' : 'Unlimited emails',
+                key === 'basic' ? 'Basic support' : key === 'professional' ? 'Priority support' : '24/7 support'
+              ],
               popular: key === 'professional',
               color: key === 'basic' ? '#22c55e' : 
                      key === 'professional' ? '#3b82f6' : 
@@ -285,9 +257,82 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
               }
             }));
             setPlans(backendPlans);
+          } else {
+            // Fallback plans
+            setPlans([
+              {
+                value: 'basic',
+                name: 'Basic Plan',
+                price: 999,
+                features: ['Up to 5 users', '1,000 leads', '2,000 emails/month', 'Basic support'],
+                popular: false,
+                color: '#22c55e',
+                limits: { users: 5, leads: 1000, emails: 2000 }
+              },
+              {
+                value: 'professional',
+                name: 'Professional Plan',
+                price: 2999,
+                features: ['Up to 20 users', '5,000 leads', '10,000 emails/month', 'Priority support'],
+                popular: true,
+                color: '#3b82f6',
+                limits: { users: 20, leads: 5000, emails: 10000 }
+              },
+              {
+                value: 'enterprise',
+                name: 'Enterprise Plan',
+                price: 9999,
+                features: ['Up to 50 users', '10,000 leads', 'Unlimited emails', '24/7 support'],
+                popular: false,
+                color: '#f59e0b',
+                limits: { users: 50, leads: 10000, emails: 'unlimited' }
+              }
+            ]);
           }
         } catch (error) {
-          console.log('Using default plans, backend plans not available');
+          console.log('Using fallback plans, backend not available');
+          setPlans([
+            {
+              value: 'basic',
+              name: 'Basic Plan',
+              price: 999,
+              features: ['Up to 5 users', '1,000 leads', '2,000 emails/month', 'Basic support'],
+              popular: false,
+              color: '#22c55e',
+              limits: { users: 5, leads: 1000, emails: 2000 }
+            },
+            {
+              value: 'professional',
+              name: 'Professional Plan',
+              price: 2999,
+              features: ['Up to 20 users', '5,000 leads', '10,000 emails/month', 'Priority support'],
+              popular: true,
+              color: '#3b82f6',
+              limits: { users: 20, leads: 5000, emails: 10000 }
+            },
+            {
+              value: 'enterprise',
+              name: 'Enterprise Plan',
+              price: 9999,
+              features: ['Up to 50 users', '10,000 leads', 'Unlimited emails', '24/7 support'],
+              popular: false,
+              color: '#f59e0b',
+              limits: { users: 50, leads: 10000, emails: 'unlimited' }
+            }
+          ]);
+        }
+        
+        // Fetch all users for superadmin plan management
+        if (currentUser?.role === ROLES.SUPER_ADMIN) {
+          try {
+            const usersResponse = await apiService.get('/auth/users');
+            console.log('All users response:', usersResponse);
+            if (usersResponse.users || usersResponse.data) {
+              setAllUsers(usersResponse.users || usersResponse.data || []);
+            }
+          } catch (error) {
+            console.log('Could not fetch all users:', error);
+          }
         }
         
       } catch (error) {
@@ -404,12 +449,14 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
       {/* Tabs */}
       <div style={{ ...cardStyle, padding: '1rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          {[
+          {(currentUser?.role === ROLES.SUPER_ADMIN ? [
+            { id: 'overview', label: 'Plan Management', icon: TrendingUp }
+          ] : [
             { id: 'overview', label: 'Overview', icon: TrendingUp },
             { id: 'invoices', label: 'Invoices', icon: Download },
             { id: 'payment-methods', label: 'Payment Methods', icon: CreditCard },
             { id: 'usage-reports', label: 'Usage Reports', icon: DollarSign }
-          ].map(tab => {
+          ]).map(tab => {
             const Icon = tab.icon;
             return (
               <button
@@ -740,7 +787,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                   fontSize: '0.875rem',
                   fontWeight: '600'
                 }}>
-                {currentUser?.role === ROLES.SUPER_ADMIN ? 'Manage All Plans' : (userRole === 'super-admin' ? 'Upgrade Plan' : 'View Plans')}
+                {currentUser?.role === ROLES.SUPER_ADMIN ? '👑 Manage User Plans' : (userRole === 'super-admin' ? 'Upgrade Plan' : 'View Plans')}
               </button>
               {(userRole === 'super-admin' || currentUser?.role === ROLES.SUPER_ADMIN) && currentPlan.value !== 'unlimited' && (
                 <button 
@@ -1143,8 +1190,8 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         </div>
       )}
 
-      {/* Invoices Tab */}
-      {!loading && activeTab === 'invoices' && (
+      {/* Invoices Tab - Hide for superadmin */}
+      {!loading && activeTab === 'invoices' && currentUser?.role !== ROLES.SUPER_ADMIN && (
         <div style={{ ...cardStyle, padding: '2rem' }}>
           <h2 style={{
             fontSize: '1.5rem',
@@ -1316,8 +1363,8 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         </div>
       )}
 
-      {/* Payment Methods Tab */}
-      {!loading && activeTab === 'payment-methods' && (
+      {/* Payment Methods Tab - Hide for superadmin */}
+      {!loading && activeTab === 'payment-methods' && currentUser?.role !== ROLES.SUPER_ADMIN && (
         <div style={{ ...cardStyle, padding: '2rem' }}>
           <div style={{
             display: 'flex',
@@ -1480,8 +1527,8 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
         </div>
       )}
 
-      {/* Usage Reports Tab */}
-      {!loading && activeTab === 'usage-reports' && (
+      {/* Usage Reports Tab - Hide for superadmin */}
+      {!loading && activeTab === 'usage-reports' && currentUser?.role !== ROLES.SUPER_ADMIN && (
         <div style={{ display: 'grid', gap: '2rem' }}>
           {/* Monthly Usage Report */}
           <div style={{ ...cardStyle, padding: '2rem' }}>
@@ -1784,26 +1831,136 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                 margin: 0,
                 marginBottom: '0.5rem'
               }}>
-                Choose Your Plan
+                {currentUser?.role === ROLES.SUPER_ADMIN ? 'Manage User Plans' : 'Choose Your Plan'}
               </h2>
               <p style={{
                 color: darkMode ? '#9ca3af' : '#6b7280',
                 margin: 0,
                 fontSize: '0.875rem'
               }}>
-                Select the perfect plan for your business needs
+                {currentUser?.role === ROLES.SUPER_ADMIN ? 'Manage plans for all users in the system' : 'Select the perfect plan for your business needs'}
               </p>
             </div>
             
             <div style={{ padding: '1.5rem' }}>
+              {/* Super Admin User Management */}
+              {currentUser?.role === ROLES.SUPER_ADMIN && allUsers.length > 0 && (
+                <div style={{
+                  marginBottom: '2rem',
+                  padding: '1.5rem',
+                  background: darkMode ? '#374151' : '#f9fafb',
+                  borderRadius: '12px',
+                  border: `2px solid #dc2626`
+                }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: darkMode ? 'white' : '#1f2937',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}>
+                    👑 Super Admin: Manage User Plans ({allUsers.length} users)
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gap: '0.75rem',
+                    maxHeight: '300px',
+                    overflowY: 'auto'
+                  }}>
+                    {allUsers.map(user => (
+                      <div key={user._id} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '1rem',
+                        background: darkMode ? '#4b5563' : 'white',
+                        borderRadius: '8px',
+                        border: `1px solid ${darkMode ? '#6b7280' : '#e5e7eb'}`
+                      }}>
+                        <div>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '600',
+                            color: darkMode ? 'white' : '#1f2937'
+                          }}>
+                            {user.name}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: darkMode ? '#9ca3af' : '#6b7280'
+                          }}>
+                            {user.email} • {user.role}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: darkMode ? '#9ca3af' : '#6b7280'
+                          }}>
+                            Current: {user.companyId?.plan?.name || 'basic'}
+                          </div>
+                        </div>
+                        <select
+                          value={user.companyId?.plan?.name || 'basic'}
+                          onChange={async (e) => {
+                            try {
+                              if (user.companyId?._id) {
+                                const response = await apiService.put(`/companies/${user.companyId._id}/plan`, {
+                                  planName: e.target.value
+                                });
+                                console.log('Plan update response:', response);
+                                
+                                // Refresh data
+                                const usersResponse = await apiService.get('/auth/users');
+                                if (usersResponse.users || usersResponse.data) {
+                                  setAllUsers(usersResponse.users || usersResponse.data || []);
+                                }
+                                alert(`✅ Plan updated for ${user.name} to ${e.target.value}`);
+                              } else {
+                                alert('❌ User has no company associated');
+                              }
+                            } catch (error) {
+                              console.error('Error updating user plan:', error);
+                              alert(`❌ Failed to update plan: ${error.message}`);
+                            }
+                          }}
+                          style={{
+                            padding: '0.5rem',
+                            border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                            borderRadius: '6px',
+                            background: darkMode ? '#374151' : 'white',
+                            color: darkMode ? 'white' : '#1f2937',
+                            fontSize: '0.75rem',
+                            minWidth: '120px'
+                          }}
+                        >
+                          <option value="basic">Basic Plan</option>
+                          <option value="professional">Professional Plan</option>
+                          <option value="enterprise">Enterprise Plan</option>
+                          <option value="superadmin">Super Admin Plan</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: currentUser?.role === ROLES.SUPER_ADMIN ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)',
                 gap: '1rem',
-                maxWidth: '800px',
+                maxWidth: currentUser?.role === ROLES.SUPER_ADMIN ? '1000px' : '800px',
                 margin: '0 auto'
               }}>
-                {plans.map((plan, index) => (
+                {(currentUser?.role === ROLES.SUPER_ADMIN ? [...plans, {
+                  value: 'superadmin',
+                  name: 'Super Admin Plan',
+                  price: 0,
+                  features: ['Unlimited everything', 'Super admin access', 'All features', 'No restrictions'],
+                  popular: false,
+                  color: '#dc2626',
+                  limits: { users: 'unlimited', leads: 'unlimited', emails: 'unlimited' }
+                }] : plans).map((plan, index) => (
                   <div key={index} style={{
                     padding: '1.5rem',
                     background: darkMode ? '#374151' : '#f9fafb',
@@ -1884,7 +2041,7 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                     
                     <button 
                       onClick={async () => {
-                        if (currentUser?.role === ROLES.SUPER_ADMIN || userRole === 'super-admin' || userRole === 'admin') {
+                        if (currentUser?.role === ROLES.SUPER_ADMIN) {
                           try {
                             setSelectedPlan(plan);
                             setShowPlanModal(false);
@@ -1892,9 +2049,10 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                             
                             // Update plan via backend API
                             if (companyData?._id) {
-                              await apiService.put(`/companies/${companyData._id}/plan`, {
+                              const response = await apiService.put(`/companies/${companyData._id}/plan`, {
                                 planName: plan.value
                               });
+                              console.log('Plan update response:', response);
                               
                               // Update local state after successful backend update
                               setTimeout(() => {
@@ -1902,8 +2060,8 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                                   value: plan.value,
                                   name: plan.name,
                                   price: plan.price,
-                                  billingCycle: 'monthly',
-                                  nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                  billingCycle: plan.value === 'superadmin' ? 'unlimited' : 'monthly',
+                                  nextBilling: plan.value === 'superadmin' ? 'Never expires' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                   status: 'active'
                                 });
                                 
@@ -1920,15 +2078,25 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                                 };
                                 refreshData();
                               }, 2000);
+                            } else {
+                              console.log('No company ID found, updating current plan locally');
+                              setCurrentPlan({
+                                value: plan.value,
+                                name: plan.name,
+                                price: plan.price,
+                                billingCycle: plan.value === 'superadmin' ? 'unlimited' : 'monthly',
+                                nextBilling: plan.value === 'superadmin' ? 'Never expires' : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                status: 'active'
+                              });
                             }
                           } catch (error) {
                             console.error('Error updating plan:', error);
                             setShowCongrats(false);
                             setSelectedPlan(null);
-                            // TODO: Show proper error notification
+                            alert(`❌ Failed to update plan: ${error.message}`);
                           }
                         } else {
-                          console.log('Plan upgrade requested - contact administrator');
+                          alert('❌ Only Super Admins can change plans. Contact your administrator.');
                           setShowPlanModal(false);
                         }
                       }}
@@ -1958,8 +2126,8 @@ const BillingManagement = ({ darkMode = false, userRole = 'sales-rep' }) => {
                       }}
                       disabled={currentPlan.value === plan.value}
                     >
-                      {currentPlan.value === plan.value ? 'Current Plan' : 
-                       (currentUser?.role === ROLES.SUPER_ADMIN || userRole === 'super-admin') ? 'Switch to This Plan' : 'Contact Admin'}
+                      {currentPlan.value === plan.value ? '✅ Current Plan' : 
+                       currentUser?.role === ROLES.SUPER_ADMIN ? `Switch to ${plan.name}` : '🔒 Admin Only'}
                     </button>
                   </div>
                 ))}

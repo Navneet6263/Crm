@@ -42,7 +42,7 @@ const CalendarSync = ({ darkMode, currentUser }) => {
 
   const fetchEvents = async () => {
     try {
-      const response = await api.get('/api/calendar');
+      const response = await api.get('/calendar');
       if (response.data && response.data.events) {
         setEvents(response.data.events);
       } else {
@@ -51,24 +51,7 @@ const CalendarSync = ({ darkMode, currentUser }) => {
     } catch (error) {
       console.error('Error fetching events:', error);
       showToast('error', '❌ Failed to load events');
-      // Fallback to sample data if API fails
-      const sampleEvents = [
-        {
-          _id: 1,
-          title: 'Client Meeting - Tech Solutions Ltd',
-          description: 'Discuss project requirements and timeline',
-          startDate: '2025-01-20',
-          startTime: '10:00',
-          endDate: '2025-01-20',
-          endTime: '11:00',
-          type: 'meeting',
-          attendees: 'john@techsolutions.com, sarah@company.com',
-          location: 'Conference Room A',
-          createdBy: { name: 'Navneet Kumar' },
-          status: 'confirmed'
-        }
-      ];
-      setEvents(sampleEvents);
+      setEvents([]);
     }
   };
 
@@ -87,7 +70,7 @@ const CalendarSync = ({ darkMode, currentUser }) => {
       };
 
       console.log('Creating event:', eventData);
-      const response = await api.post('/api/calendar', eventData);
+      const response = await api.post('/calendar', eventData);
       
       // Add the new event to local state
       setEvents([...events, response.data]);

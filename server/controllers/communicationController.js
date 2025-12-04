@@ -1,5 +1,6 @@
 const Communication = require('../models/Communication');
 const Lead = require('../models/Lead');
+const emailService = require('../services/emailService');
 
 const createCommunication = async (req, res) => {
   try {
@@ -99,9 +100,56 @@ const deleteCommunication = async (req, res) => {
   }
 };
 
+const sendEmail = async (req, res) => {
+  try {
+    const { to, subject, body, leadId, type = 'email' } = req.body;
+
+    if (!to || !subject || !body) {
+      return res.status(400).json({ message: 'Email recipient, subject, and body are required' });
+    }
+
+    // Send email using email service
+    await emailService.sendEmail({
+      to: to,
+      subject: subject,
+      html: body.replace(/\n/g, '<br>')
+    });
+
+    // Create communication record
+    const communicationData = {
+      type: type,
+      subject: subject,
+      content: body,
+      recipient: to,
+      status: 'sent',
+      sentAt: new Date(),
+      createdBy: req.user._id
+    };
+
+    if (leadId) {
+      communicationData.leadId = leadId;
+    }
+
+    const communication = await Communication.create(communicationData);
+    await communication.populate('leadId createdBy', 'contactPerson companyName name email');
+
+    res.status(200).json({
+      message: 'Email sent successfully',
+      communication
+    });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ 
+      message: 'Failed to send email', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   createCommunication,
   getCommunications,
   updateCommunication,
-  deleteCommunication
+  deleteCommunication,
+  sendEmail
 };

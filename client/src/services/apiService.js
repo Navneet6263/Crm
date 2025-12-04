@@ -227,7 +227,7 @@ const apiService = {
       const token = localStorage.getItem('authToken');
       console.log('🎫 Frontend token for leads:', token ? `${token.substring(0, 20)}...` : 'No token');
       
-      const response = await fetch(`${API_BASE_URL}/leads`, {
+      const response = await fetch(`${API_BASE_URL}/leads?limit=1000`, {
         headers: {
           'Authorization': `Bearer ${token?.trim()}`,
           'Content-Type': 'application/json'
@@ -254,7 +254,7 @@ const apiService = {
       const token = localStorage.getItem('authToken');
       console.log('🔍 Fetching all leads from backend...');
       
-      const response = await fetch(`${API_BASE_URL}/leads`, {
+      const response = await fetch(`${API_BASE_URL}/leads?limit=1000`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -302,16 +302,27 @@ const apiService = {
     }
   },
   
-  assignLead: async (leadId, assignedTo) => {
+  assignLead: async (leadId, assignedTo, isGroupAssignment = false) => {
     try {
       const token = localStorage.getItem('authToken');
+      
+      // For direct assignment (not group), clear group and set status to contacted
+      const updateData = isGroupAssignment ? 
+        { leadId, assignedTo } : 
+        { 
+          leadId, 
+          assignedTo,
+          assignedToGroup: null,
+          status: 'contacted'
+        };
+      
       const response = await fetch(`${API_BASE_URL}/leads/assign`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ leadId, assignedTo })
+        body: JSON.stringify(updateData)
       });
       
       if (!response.ok) {
@@ -1777,6 +1788,183 @@ const apiService = {
     } catch (error) {
       console.error('Error merging duplicate leads:', error);
       throw error;
+    }
+  },
+
+  // Group Assignment APIs
+  assignLeadToGroup: async (leadId, groupType, specificUserId = null) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      // If specific user ID is provided, assign directly to that user
+      if (specificUserId) {
+        const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            assignedTo: specificUserId,
+            assignedToGroup: null,
+            status: 'contacted'
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to assign lead to user');
+        }
+        
+        return await response.json();
+      }
+      
+      // Otherwise assign to group with pending status
+      const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          assignedTo: null,
+          assignedToGroup: groupType,
+          status: 'pending-acceptance'
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to assign lead to group');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error assigning lead to group:', error);
+      throw error;
+    }
+  },
+
+  acceptGroupLead: async (leadId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/${leadId}/accept`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to accept lead');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error accepting lead:', error);
+      throw error;
+    }
+  },
+
+  declineGroupLead: async (leadId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/${leadId}/decline`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to decline lead');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error declining lead:', error);
+      throw error;
+    }
+  },
+
+  // Get pending group leads (shows to all sales role users)
+  getPendingGroupLeads: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/group-pending`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch group leads');
+      }
+      
+      const data = await response.json();
+      return data.leads || data || [];
+    } catch (error) {
+      console.error('Error fetching group leads:', error);
+      return [];
+    }
+  },
+
+  // Bulk assign multiple leads to group
+  bulkAssignToGroup: async (leadIds, groupType = 'sales') => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/bulk-update`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          leadIds,
+          updateData: {
+            assignedTo: null,
+            assignedToGroup: groupType,
+            status: 'pending-acceptance'
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to bulk assign leads to group');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error bulk assigning to group:', error);
+      throw error;
+    }
+  },
+
+  // Get users by role/group for assignment
+  getUsersByRole: async (role = 'sales') => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/auth/users?role=${role}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch users by role');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching users by role:', error);
+      return [];
     }
   }
 

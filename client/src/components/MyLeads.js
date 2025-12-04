@@ -26,15 +26,79 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
   });
   const [newNote, setNewNote] = useState('');
 
+  const handleAcceptLead = async (leadId) => {
+    try {
+      await apiService.acceptGroupLead(leadId);
+      
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          (lead._id || lead.id) === leadId 
+            ? { ...lead, status: 'contacted', assignedTo: user, assignedToGroup: null }
+            : lead
+        )
+      );
+      
+      if (window.showToast) {
+        window.showToast('success', '✅ Lead accepted successfully!');
+      } else {
+        alert('✅ Lead accepted successfully!');
+      }
+    } catch (error) {
+      console.error('Error accepting lead:', error);
+      alert('❌ Failed to accept lead. Please try again.');
+    }
+  };
+
+  const handleDeclineLead = async (leadId) => {
+    if (!window.confirm('Are you sure you want to decline this lead?')) return;
+    
+    try {
+      await apiService.declineGroupLead(leadId);
+      
+      // Remove from current user's view
+      setLeads(prevLeads => 
+        prevLeads.filter(lead => (lead._id || lead.id) !== leadId)
+      );
+      
+      if (window.showToast) {
+        window.showToast('info', '📝 Lead declined and returned to pool');
+      } else {
+        alert('📝 Lead declined and returned to pool');
+      }
+    } catch (error) {
+      console.error('Error declining lead:', error);
+      alert('❌ Failed to decline lead. Please try again.');
+    }
+  };
+
   useEffect(() => {
     const fetchMyLeads = async () => {
       try {
         setLoading(true);
-        // Primary: Use backend API
+        // Primary: Use backend API with no limit
         let leadsData = [];
         try {
-          const response = await apiService.getMyLeads();
-          leadsData = Array.isArray(response) ? response : (response.leads || []);
+          const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=10000`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const data = await response.json();
+          leadsData = Array.isArray(data) ? data : (data.leads || []);
+          
+          // Also fetch group-assigned leads for sales team
+          if (user?.role === 'sales') {
+            const groupLeadsResponse = await fetch(`${apiService.getApiUrl()}/leads/group-leads/sales`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const groupData = await groupLeadsResponse.json();
+            const groupLeads = Array.isArray(groupData) ? groupData : (groupData.leads || []);
+            leadsData = [...leadsData, ...groupLeads];
+          }
           
           // If backend doesn't return leads, try getAllLeads and filter
           if (leadsData.length === 0) {
@@ -771,59 +835,119 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                     
                     {/* Actions */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedLead(lead);
-                            setShowLeadDetails(true);
-                          }}
-                          style={{
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.target.style.background = '#2563eb'}
-                          onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
-                        >
-                          <Eye size={14} />
-                          View
-                        </button>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {/* Accept/Decline buttons for group-assigned leads */}
+                        {lead.assignedToGroup === 'sales' && lead.status === 'pending-acceptance' && user?.role === 'sales' && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAcceptLead(lead._id || lead.id);
+                              }}
+                              style={{
+                                background: '#22c55e',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#16a34a'}
+                              onMouseLeave={(e) => e.target.style.background = '#22c55e'}
+                            >
+                              ✅ Accept
+                            </button>
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeclineLead(lead._id || lead.id);
+                              }}
+                              style={{
+                                background: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#dc2626'}
+                              onMouseLeave={(e) => e.target.style.background = '#ef4444'}
+                            >
+                              ❌ Decline
+                            </button>
+                          </>
+                        )}
                         
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditLead(lead);
-                          }}
-                          style={{
-                            background: '#f59e0b',
-                            color: 'white',
-                            border: 'none',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.target.style.background = '#d97706'}
-                          onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
-                        >
-                          <Edit size={14} />
-                          Edit
-                        </button>
+                        {/* Regular action buttons */}
+                        {(!lead.assignedToGroup || lead.status !== 'pending-acceptance') && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedLead(lead);
+                                setShowLeadDetails(true);
+                              }}
+                              style={{
+                                background: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                              onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
+                            >
+                              <Eye size={14} />
+                              View
+                            </button>
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditLead(lead);
+                              }}
+                              style={{
+                                background: '#f59e0b',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.background = '#d97706'}
+                              onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
+                            >
+                              <Edit size={14} />
+                              Edit
+                            </button>
+                          </>
+                        )}
                       </div>
                       
                       <select

@@ -29,8 +29,20 @@ const taskSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  dueTime: {
+    type: String,
+    trim: true
+  },
   completedDate: {
     type: Date
+  },
+  emailNotification: {
+    type: Boolean,
+    default: false
+  },
+  notificationsSent: {
+    fifteenMin: { type: Boolean, default: false },
+    fiveMin: { type: Boolean, default: false }
   },
   assignedTo: {
     type: String,

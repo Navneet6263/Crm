@@ -949,9 +949,18 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                       
                       <select
                         value={lead.status}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           e.stopPropagation();
-                          // Add update status functionality here
+                          const newStatus = e.target.value;
+                          try {
+                            await apiService.updateLead(leadId, { status: newStatus });
+                            const allLeads = await apiService.getAllLeads();
+                            updateCrmData({ leads: allLeads });
+                            alert('Status updated successfully!');
+                          } catch (error) {
+                            console.error('Error updating status:', error);
+                            alert('Failed to update status');
+                          }
                         }}
                         style={{
                           padding: '6px 8px',
@@ -1121,9 +1130,18 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                       
                       <select
                         value={lead.status}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           e.stopPropagation();
-                          // Add update status functionality here
+                          const newStatus = e.target.value;
+                          try {
+                            await apiService.updateLead(leadId, { status: newStatus });
+                            const allLeads = await apiService.getAllLeads();
+                            updateCrmData({ leads: allLeads });
+                            alert('Status updated successfully!');
+                          } catch (error) {
+                            console.error('Error updating status:', error);
+                            alert('Failed to update status');
+                          }
                         }}
                         onClick={(e) => e.stopPropagation()}
                         style={{

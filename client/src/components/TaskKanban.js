@@ -26,10 +26,12 @@ const TaskKanban = ({ darkMode }) => {
     status: 'pending',
     priority: 'medium',
     dueDate: '',
+    dueTime: '',
     assignee: '',
     type: 'call',
     relatedTo: 'lead',
-    relatedId: ''
+    relatedId: '',
+    emailNotification: false
   });
   const [draggedTask, setDraggedTask] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
@@ -122,6 +124,11 @@ const TaskKanban = ({ darkMode }) => {
       return;
     }
 
+    if (!newTask.dueTime) {
+      showToast('error', '❌ Time is required');
+      return;
+    }
+
     if (!newTask.relatedId) {
       showToast('error', '❌ Please select a related lead');
       return;
@@ -142,10 +149,12 @@ const TaskKanban = ({ darkMode }) => {
         status: 'pending',
         priority: 'medium',
         dueDate: '',
+        dueTime: '',
         assignee: '',
         type: 'call',
         relatedTo: 'lead',
-        relatedId: ''
+        relatedId: '',
+        emailNotification: false
       });
       setShowAddTask(false);
       showToast('success', '✅ Task created successfully');
@@ -1075,11 +1084,12 @@ const TaskKanban = ({ darkMode }) => {
                     color: darkMode ? '#d1d5db' : '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Assignee
+                    Time <span style={{ color: '#ef4444' }}>*</span>
                   </label>
-                  <select
-                    value={newTask.assignee}
-                    onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
+                  <input
+                    type="time"
+                    value={newTask.dueTime}
+                    onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -1089,13 +1099,38 @@ const TaskKanban = ({ darkMode }) => {
                       color: darkMode ? 'white' : '#1f2937',
                       fontSize: '0.875rem'
                     }}
-                  >
-                    <option value="">Select Assignee</option>
-                    {Array.isArray(users) && users.map(user => (
-                      <option key={user._id} value={user.name}>{user.name}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Assignee
+                </label>
+                <select
+                  value={newTask.assignee}
+                  onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    background: darkMode ? '#1f2937' : 'white',
+                    color: darkMode ? 'white' : '#1f2937',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="">Select Assignee</option>
+                  {Array.isArray(users) && users.map(user => (
+                    <option key={user._id} value={user.name}>{user.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
@@ -1128,6 +1163,44 @@ const TaskKanban = ({ darkMode }) => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                background: darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)',
+                borderRadius: '8px',
+                border: `1px solid ${darkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)'}`
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: darkMode ? '#d1d5db' : '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={newTask.emailNotification}
+                    onChange={(e) => setNewTask({ ...newTask, emailNotification: e.target.checked })}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer',
+                      accentColor: '#3b82f6'
+                    }}
+                  />
+                  <span>📧 Send Email Notifications</span>
+                </label>
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: darkMode ? '#9ca3af' : '#6b7280',
+                  margin: '0.5rem 0 0 2rem'
+                }}>
+                  When a task is created, the assigned user (assignee) will automatically receive an email notification with all task details.
+                </p>
               </div>
 
               <div style={{

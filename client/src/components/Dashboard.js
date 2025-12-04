@@ -55,20 +55,12 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
   };
 
   useEffect(() => {
-    // Fetch leads from apiService
-    const fetchLeads = async () => {
-      try {
-        const fetchedLeads = await apiService.getAllLeads();
-        setLeads(fetchedLeads);
-        console.log('📋 Fetched leads for dashboard:', fetchedLeads.length);
-      } catch (error) {
-        console.error('Error fetching leads:', error);
-        setLeads([]);
-      }
-    };
-    
-    fetchLeads();
-  }, []);
+    // Use leads from crmData (parent) instead of fetching separately
+    if (crmData.leads && Array.isArray(crmData.leads)) {
+      setLeads(crmData.leads);
+      console.log('📋 Dashboard using leads from crmData:', crmData.leads.length);
+    }
+  }, [crmData.leads]);
   
   useEffect(() => {
     // Calculate quick stats
@@ -358,7 +350,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                 transition: 'left 0.5s'
               }} />
               <Plus size={24} />
-              🎆 Add New Lead
+               Add New Lead
             </button>
             
             <button
@@ -387,7 +379,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                 e.target.style.transform = 'translateY(0)';
               }}
             >
-              📈 Analytics
+               Analytics
             </button>
           </div>
         </div>
@@ -607,7 +599,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                     color: darkMode ? '#64748b' : '#94a3b8',
                     fontWeight: '500'
                   }}>
-                    🔥 Updated just now
+                     Updated just now
                   </div>
                 </div>
               </div>

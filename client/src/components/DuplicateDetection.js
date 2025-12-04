@@ -1,121 +1,204 @@
-import React, { useState } from 'react';
-import { Search, AlertTriangle, Merge, Eye, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Copy, 
+  Search, 
+  AlertTriangle, 
+  CheckCircle, 
+  Merge, 
+  Trash2,
+  Eye,
+  Filter,
+  RefreshCw,
+  Users,
+  Mail,
+  Phone,
+  Building
+} from 'lucide-react';
+import { showToast } from './ToastNotification';
+import apiService from '../services/apiService';
 
-const DuplicateDetection = ({ crmData, updateCrmData }) => {
+const DuplicateDetection = ({ darkMode, crmData, updateCrmData }) => {
   const [duplicates, setDuplicates] = useState([]);
-  const [isScanning, setIsScanning] = useState(false);
   const [selectedDuplicates, setSelectedDuplicates] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [isScanning, setIsScanning] = useState(false);
 
-  const findDuplicates = () => {
-    setIsScanning(true);
-    
-    setTimeout(() => {
-      const leads = crmData.leads || [];
-      const duplicateGroups = [];
-      
-      // Find duplicates by email
-      const emailGroups = {};
-      leads.forEach(lead => {
-        const email = lead.email.toLowerCase();
+  useEffect(() => {
+    fetchDuplicates();
+  }, []);
+
+  const fetchDuplicates = async () => {
+    try {
+      const leads = await apiService.getLeads();
+      const detectedDuplicates = detectDuplicates(leads);
+      setDuplicates(detectedDuplicates);
+    } catch (error) {
+      console.error('Error fetching leads for duplicate detection:', error);
+      showToast('error', 'Failed to load data for duplicate detection');
+    }
+  };
+
+  const detectDuplicates = (leads) => {
+    const duplicateGroups = [];
+    const processed = new Set();
+    let groupId = 1;
+
+    // First check for exact email matches
+    const emailGroups = {};
+    leads.forEach(lead => {
+      if (lead.email && lead.email.trim()) {
+        const email = lead.email.toLowerCase().trim();
         if (!emailGroups[email]) {
           emailGroups[email] = [];
         }
         emailGroups[email].push(lead);
-      });
-      
-      Object.values(emailGroups).forEach(group => {
-        if (group.length > 1) {
-          duplicateGroups.push({
-            id: Date.now() + Math.random(),
-            type: 'email',
-            field: 'Email Address',
-            value: group[0].email,
-            leads: group,
-            confidence: 100
-          });
-        }
-      });
-      
-      // Find duplicates by phone
-      const phoneGroups = {};
-      leads.forEach(lead => {
-        const phone = lead.phone.replace(/\D/g, '');
+      }
+    });
+
+    Object.values(emailGroups).forEach(group => {
+      if (group.length > 1) {
+        group.forEach(record => processed.add(record.id));
+        duplicateGroups.push({
+          id: groupId++,
+          type: 'email',
+          field: 'email',
+          value: group[0].email,
+          records: group.map(record => ({
+            id: record.id,
+            contactPerson: record.name || record.contactPerson || 'Unknown',
+            companyName: record.company || record.companyName || 'Unknown Company',
+            email: record.email || '',
+            phone: record.phone || '',
+            createdDate: record.createdAt || record.dateCreated || new Date().toISOString(),
+            source: record.source || 'Unknown'
+          })),
+          confidence: 95,
+          status: 'pending'
+        });
+      }
+    });
+
+    // Then check for exact phone matches
+    const phoneGroups = {};
+    leads.forEach(lead => {
+      if (processed.has(lead.id)) return;
+      if (lead.phone && lead.phone.trim()) {
+        const phone = lead.phone.replace(/\D/g, ''); // Remove all non-digits
         if (phone.length >= 10) {
           if (!phoneGroups[phone]) {
             phoneGroups[phone] = [];
           }
           phoneGroups[phone].push(lead);
         }
-      });
-      
-      Object.values(phoneGroups).forEach(group => {
-        if (group.length > 1) {
-          duplicateGroups.push({
-            id: Date.now() + Math.random(),
-            type: 'phone',
-            field: 'Phone Number',
-            value: group[0].phone,
-            leads: group,
-            confidence: 95
-          });
-        }
-      });
-      
-      // Find similar company names
-      const companyGroups = {};
-      leads.forEach(lead => {
-        const company = lead.companyName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const similar = Object.keys(companyGroups).find(key => {
-          const similarity = calculateSimilarity(key, company);
-          return similarity > 0.8;
+      }
+    });
+
+    Object.values(phoneGroups).forEach(group => {
+      if (group.length > 1) {
+        group.forEach(record => processed.add(record.id));
+        duplicateGroups.push({
+          id: groupId++,
+          type: 'phone',
+          field: 'phone',
+          value: group[0].phone,
+          records: group.map(record => ({
+            id: record.id,
+            contactPerson: record.name || record.contactPerson || 'Unknown',
+            companyName: record.company || record.companyName || 'Unknown Company',
+            email: record.email || '',
+            phone: record.phone || '',
+            createdDate: record.createdAt || record.dateCreated || new Date().toISOString(),
+            source: record.source || 'Unknown'
+          })),
+          confidence: 90,
+          status: 'pending'
         });
-        
-        if (similar) {
-          companyGroups[similar].push(lead);
-        } else {
-          companyGroups[company] = [lead];
-        }
+      }
+    });
+
+    // Finally check for similar names/companies with lower threshold
+    leads.forEach((lead, index) => {
+      if (processed.has(lead.id)) return;
+
+      const duplicates = leads.filter((otherLead, otherIndex) => {
+        if (index === otherIndex || processed.has(otherLead.id)) return false;
+        return calculateSimilarity(lead, otherLead) > 0.4; // Lower threshold for name/company similarity
       });
-      
-      Object.values(companyGroups).forEach(group => {
-        if (group.length > 1) {
-          duplicateGroups.push({
-            id: Date.now() + Math.random(),
-            type: 'company',
-            field: 'Company Name',
-            value: group[0].companyName,
-            leads: group,
-            confidence: 85
-          });
-        }
-      });
-      
-      setDuplicates(duplicateGroups);
-      setIsScanning(false);
-    }, 3000);
+
+      if (duplicates.length > 0) {
+        const allRecords = [lead, ...duplicates];
+        allRecords.forEach(record => processed.add(record.id));
+
+        const { type, field, value, confidence } = analyzeDuplicateGroup(allRecords);
+
+        duplicateGroups.push({
+          id: groupId++,
+          type,
+          field,
+          value,
+          records: allRecords.map(record => ({
+            id: record.id,
+            contactPerson: record.name || record.contactPerson || 'Unknown',
+            companyName: record.company || record.companyName || 'Unknown Company',
+            email: record.email || '',
+            phone: record.phone || '',
+            createdDate: record.createdAt || record.dateCreated || new Date().toISOString(),
+            source: record.source || 'Unknown'
+          })),
+          confidence,
+          status: 'pending'
+        });
+      }
+    });
+
+    return duplicateGroups;
   };
 
-  const calculateSimilarity = (str1, str2) => {
+  const calculateSimilarity = (lead1, lead2) => {
+    let score = 0;
+    let factors = 0;
+
+    // Check name similarity
+    const name1 = lead1.name || lead1.contactPerson || '';
+    const name2 = lead2.name || lead2.contactPerson || '';
+    if (name1 && name2) {
+      factors++;
+      const nameSimilarity = stringSimilarity(name1.toLowerCase(), name2.toLowerCase());
+      if (nameSimilarity > 0.7) {
+        score += 0.3;
+      }
+    }
+
+    // Check company similarity
+    const company1 = lead1.company || lead1.companyName || '';
+    const company2 = lead2.company || lead2.companyName || '';
+    if (company1 && company2) {
+      factors++;
+      const companySimilarity = stringSimilarity(company1.toLowerCase(), company2.toLowerCase());
+      if (companySimilarity > 0.7) {
+        score += 0.2;
+      }
+    }
+
+    return factors > 0 ? score : 0;
+  };
+
+  const stringSimilarity = (str1, str2) => {
     const longer = str1.length > str2.length ? str1 : str2;
     const shorter = str1.length > str2.length ? str2 : str1;
-    
     if (longer.length === 0) return 1.0;
-    
-    const editDistance = levenshteinDistance(longer, shorter);
-    return (longer.length - editDistance) / longer.length;
+    return (longer.length - editDistance(longer, shorter)) / longer.length;
   };
 
-  const levenshteinDistance = (str1, str2) => {
+  const editDistance = (str1, str2) => {
     const matrix = [];
-    
     for (let i = 0; i <= str2.length; i++) {
       matrix[i] = [i];
     }
-    
     for (let j = 0; j <= str1.length; j++) {
       matrix[0][j] = j;
     }
-    
     for (let i = 1; i <= str2.length; i++) {
       for (let j = 1; j <= str1.length; j++) {
         if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
@@ -129,196 +212,556 @@ const DuplicateDetection = ({ crmData, updateCrmData }) => {
         }
       }
     }
-    
     return matrix[str2.length][str1.length];
   };
 
-  const mergeDuplicates = (duplicateGroup) => {
-    const leads = crmData.leads || [];
-    const leadsToMerge = duplicateGroup.leads;
+  const analyzeDuplicateGroup = (records) => {
+    // Check for exact email matches
+    const emails = records.map(r => r.email).filter(Boolean);
+    const uniqueEmails = [...new Set(emails.map(e => e.toLowerCase()))];
+    if (uniqueEmails.length === 1 && emails.length > 1) {
+      return { type: 'email', field: 'email', value: emails[0], confidence: 95 };
+    }
+
+    // Check for exact phone matches
+    const phones = records.map(r => r.phone?.replace(/\D/g, '')).filter(Boolean);
+    const uniquePhones = [...new Set(phones)];
+    if (uniquePhones.length === 1 && phones.length > 1) {
+      return { type: 'phone', field: 'phone', value: records.find(r => r.phone)?.phone || '', confidence: 90 };
+    }
+
+    // Check for similar company names
+    const companies = records.map(r => r.company || r.companyName).filter(Boolean);
+    if (companies.length > 1) {
+      return { type: 'company', field: 'companyName', value: companies[0], confidence: 75 };
+    }
+
+    // Default to name similarity
+    const names = records.map(r => r.name || r.contactPerson).filter(Boolean);
+    return { type: 'name', field: 'name', value: names[0] || 'Similar Names', confidence: 70 };
+  };
+
+  const scanForDuplicates = async () => {
+    setIsScanning(true);
+    showToast('info', '🔍 Scanning for duplicates...');
     
-    // Keep the lead with the highest score or most recent
-    const primaryLead = leadsToMerge.reduce((best, current) => {
-      if (current.score > best.score) return current;
-      if (current.score === best.score && new Date(current.createdDate) > new Date(best.createdDate)) {
-        return current;
+    try {
+      await fetchDuplicates();
+      const newDuplicates = detectDuplicates(await apiService.getLeads());
+      setDuplicates(newDuplicates);
+      showToast('success', `✅ Scan complete! Found ${newDuplicates.length} potential duplicates`);
+    } catch (error) {
+      showToast('error', 'Failed to scan for duplicates');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+
+
+  const mergeDuplicates = async (duplicateGroup) => {
+    try {
+      const sortedRecords = duplicateGroup.records.sort((a, b) => 
+        new Date(a.createdDate) - new Date(b.createdDate)
+      );
+      
+      const primaryRecord = sortedRecords[0];
+      const duplicateIds = sortedRecords.slice(1).map(r => r.id);
+      
+      const mergedData = {
+        name: primaryRecord.contactPerson,
+        email: primaryRecord.email || sortedRecords.find(r => r.email)?.email,
+        phone: primaryRecord.phone || sortedRecords.find(r => r.phone)?.phone,
+        company: primaryRecord.companyName
+      };
+      
+      await apiService.updateLead(primaryRecord.id, mergedData);
+      
+      for (const duplicateId of duplicateIds) {
+        await apiService.deleteLead(duplicateId);
       }
-      return best;
-    });
-    
-    // Merge data from other leads
-    const mergedLead = {
-      ...primaryLead,
-      notes: leadsToMerge.map(lead => lead.notes).filter(Boolean).join('\n\n'),
-      activities: leadsToMerge.reduce((all, lead) => [...all, ...(lead.activities || [])], []),
-      mergedFrom: leadsToMerge.filter(lead => lead.id !== primaryLead.id).map(lead => lead.id),
-      mergedDate: new Date().toISOString()
-    };
-    
-    // Remove duplicates and add merged lead
-    const idsToRemove = leadsToMerge.map(lead => lead.id);
-    const updatedLeads = leads.filter(lead => !idsToRemove.includes(lead.id));
-    updatedLeads.push(mergedLead);
-    
-    updateCrmData({ leads: updatedLeads });
-    
-    // Remove from duplicates list
-    setDuplicates(duplicates.filter(dup => dup.id !== duplicateGroup.id));
-    
-    alert(`Merged ${leadsToMerge.length} duplicate leads into one`);
+      
+      setDuplicates(prev => prev.filter(d => d.id !== duplicateGroup.id));
+      showToast('success', `✅ Merged ${duplicateGroup.records.length} duplicate records`);
+    } catch (error) {
+      console.error('Error merging duplicates:', error);
+      showToast('error', 'Failed to merge duplicate records');
+    }
   };
 
   const ignoreDuplicate = (duplicateId) => {
-    setDuplicates(duplicates.filter(dup => dup.id !== duplicateId));
+    setDuplicates(prev => prev.map(d => 
+      d.id === duplicateId ? { ...d, status: 'ignored' } : d
+    ));
+    showToast('info', '👁️ Duplicate marked as ignored');
+  };
+
+  const deleteDuplicate = async (duplicateGroup, recordId) => {
+    try {
+      await apiService.deleteLead(recordId);
+      
+      const updatedRecords = duplicateGroup.records.filter(r => r.id !== recordId);
+      
+      if (updatedRecords.length < 2) {
+        setDuplicates(prev => prev.filter(d => d.id !== duplicateGroup.id));
+      } else {
+        setDuplicates(prev => prev.map(d => 
+          d.id === duplicateGroup.id ? { ...d, records: updatedRecords } : d
+        ));
+      }
+      
+      showToast('success', '🗑️ Record deleted successfully');
+    } catch (error) {
+      console.error('Error deleting record:', error);
+      showToast('error', 'Failed to delete record');
+    }
   };
 
   const getConfidenceColor = (confidence) => {
-    if (confidence >= 95) return 'confidence-high';
-    if (confidence >= 85) return 'confidence-medium';
-    return 'confidence-low';
+    if (confidence >= 90) return { bg: '#fee2e2', text: '#dc2626', border: '#ef4444' };
+    if (confidence >= 70) return { bg: '#fef3c7', text: '#d97706', border: '#f59e0b' };
+    return { bg: '#dbeafe', text: '#1d4ed8', border: '#3b82f6' };
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'email': return <Mail size={16} />;
+      case 'phone': return <Phone size={16} />;
+      case 'company': return <Building size={16} />;
+      default: return <Copy size={16} />;
+    }
+  };
+
+  const filteredDuplicates = duplicates.filter(duplicate => {
+    const matchesSearch = duplicate.value.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         duplicate.records.some(record => 
+                           record.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           record.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+                         );
+    
+    const matchesFilter = filterType === 'all' || 
+                         (filterType === 'high' && duplicate.confidence >= 90) ||
+                         (filterType === 'medium' && duplicate.confidence >= 70 && duplicate.confidence < 90) ||
+                         (filterType === 'low' && duplicate.confidence < 70) ||
+                         (filterType === 'pending' && duplicate.status === 'pending') ||
+                         (filterType === 'ignored' && duplicate.status === 'ignored');
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const containerStyle = {
+    padding: '0',
+    background: darkMode ? '#111827' : '#f9fafb',
+    minHeight: '100vh'
+  };
+
+  const cardStyle = {
+    background: darkMode ? '#1f2937' : 'white',
+    borderRadius: '16px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`
   };
 
   return (
-    <div className="duplicate-detection">
-      <div className="page-header">
-        <h1>Duplicate Lead Detection</h1>
-        <p>Identify and merge duplicate leads to maintain data quality</p>
-      </div>
-
-      <div className="detection-controls">
-        <button 
-          className="btn-primary"
-          onClick={findDuplicates}
-          disabled={isScanning}
-        >
-          {isScanning ? (
-            <>
-              <Search className="spinning" size={16} />
-              Scanning...
-            </>
-          ) : (
-            <>
-              <Search size={16} />
-              Scan for Duplicates
-            </>
-          )}
-        </button>
-
-        {duplicates.length > 0 && (
-          <div className="detection-stats">
-            <span className="stat">
-              Found {duplicates.length} potential duplicate groups
-            </span>
-            <span className="stat">
-              Affecting {duplicates.reduce((sum, dup) => sum + dup.leads.length, 0)} leads
-            </span>
+    <div style={containerStyle}>
+      {/* Header */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Copy style={{ color: '#ef4444' }} size={32} />
+            <div>
+              <h1 style={{
+                fontSize: '2rem',
+                fontWeight: '700',
+                color: darkMode ? 'white' : '#1f2937',
+                margin: 0
+              }}>
+                Duplicate Detection
+              </h1>
+              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '1.125rem', margin: 0 }}>
+                Identify and manage duplicate records in your CRM database
+              </p>
+            </div>
           </div>
-        )}
-      </div>
-
-      {isScanning && (
-        <div className="scanning-progress">
-          <div className="progress-bar">
-            <div className="progress-fill"></div>
-          </div>
-          <p>Analyzing leads for duplicates using fuzzy matching algorithms...</p>
+          
+          <button
+            onClick={scanForDuplicates}
+            disabled={isScanning}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: isScanning 
+                ? (darkMode ? '#4b5563' : '#d1d5db')
+                : 'linear-gradient(135deg, #ef4444, #f87171)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: isScanning ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '1rem',
+              fontWeight: '600'
+            }}
+          >
+            <RefreshCw size={20} style={{ 
+              animation: isScanning ? 'spin 1s linear infinite' : 'none' 
+            }} />
+            {isScanning ? 'Scanning...' : 'Scan for Duplicates'}
+          </button>
         </div>
-      )}
+      </div>
 
-      <div className="duplicates-list">
-        {duplicates.map(duplicate => (
-          <div key={duplicate.id} className="duplicate-group">
-            <div className="duplicate-header">
-              <div className="duplicate-info">
-                <AlertTriangle className="warning-icon" />
+      {/* Stats Cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '1.5rem',
+        marginBottom: '2rem'
+      }}>
+        {[
+          { 
+            label: 'Total Duplicates', 
+            value: duplicates.length,
+            icon: Copy, 
+            color: '#ef4444' 
+          },
+          { 
+            label: 'High Confidence', 
+            value: duplicates.filter(d => d.confidence >= 90).length,
+            icon: AlertTriangle, 
+            color: '#dc2626' 
+          },
+          { 
+            label: 'Pending Review', 
+            value: duplicates.filter(d => d.status === 'pending').length,
+            icon: Eye, 
+            color: '#f59e0b' 
+          },
+          { 
+            label: 'Records Affected', 
+            value: duplicates.reduce((sum, d) => sum + d.records.length, 0),
+            icon: Users, 
+            color: '#8b5cf6' 
+          }
+        ].map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div key={index} style={{ ...cardStyle, padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h3>Duplicate {duplicate.field}</h3>
-                  <p>Value: {duplicate.value}</p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {stat.label}
+                  </p>
+                  <p style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    color: darkMode ? 'white' : '#1f2937'
+                  }}>
+                    {stat.value}
+                  </p>
                 </div>
-              </div>
-              <div className="duplicate-meta">
-                <span className={`confidence-badge ${getConfidenceColor(duplicate.confidence)}`}>
-                  {duplicate.confidence}% Match
-                </span>
-                <span className="leads-count">
-                  {duplicate.leads.length} leads
-                </span>
+                <Icon style={{ color: stat.color }} size={28} />
               </div>
             </div>
-
-            <div className="duplicate-leads">
-              {duplicate.leads.map(lead => (
-                <div key={lead.id} className="duplicate-lead">
-                  <div className="lead-info">
-                    <h4>{lead.companyName}</h4>
-                    <p>{lead.contactPerson}</p>
-                    <p>{lead.email}</p>
-                    <p>{lead.phone}</p>
-                  </div>
-                  <div className="lead-meta">
-                    <span className="created-date">
-                      Created: {new Date(lead.createdDate).toLocaleDateString()}
-                    </span>
-                    <span className="lead-score">
-                      Score: {lead.score || 0}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="duplicate-actions">
-              <button 
-                className="btn-secondary"
-                onClick={() => ignoreDuplicate(duplicate.id)}
-              >
-                <X size={16} />
-                Ignore
-              </button>
-              <button 
-                className="btn-secondary"
-                title="View Details"
-              >
-                <Eye size={16} />
-                Review
-              </button>
-              <button 
-                className="btn-primary"
-                onClick={() => mergeDuplicates(duplicate)}
-              >
-                <Merge size={16} />
-                Merge Leads
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {duplicates.length === 0 && !isScanning && (
-        <div className="no-duplicates">
-          <Search size={48} />
-          <h3>No duplicates found</h3>
-          <p>Your lead database appears to be clean</p>
+      {/* Filters */}
+      <div style={{ ...cardStyle, padding: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Search */}
+          <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
+            <Search size={20} style={{
+              position: 'absolute',
+              left: '1rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#9ca3af'
+            }} />
+            <input
+              type="text"
+              placeholder="Search duplicates..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem 0.75rem 3rem',
+                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                borderRadius: '8px',
+                background: darkMode ? '#374151' : 'white',
+                color: darkMode ? 'white' : '#1f2937',
+                fontSize: '1rem',
+                outline: 'none'
+              }}
+            />
+          </div>
+
+          {/* Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Filter size={20} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              style={{
+                padding: '0.75rem',
+                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                borderRadius: '8px',
+                background: darkMode ? '#374151' : 'white',
+                color: darkMode ? 'white' : '#1f2937',
+                fontSize: '1rem',
+                outline: 'none'
+              }}
+            >
+              <option value="all">All Duplicates</option>
+              <option value="high">High Confidence (90%+)</option>
+              <option value="medium">Medium Confidence (70-89%)</option>
+              <option value="low">Low Confidence (&lt;70%)</option>
+              <option value="pending">Pending Review</option>
+              <option value="ignored">Ignored</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Duplicates List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {filteredDuplicates.map(duplicate => {
+          const confidenceColor = getConfidenceColor(duplicate.confidence);
+          
+          return (
+            <div key={duplicate.id} style={{ ...cardStyle, padding: '1.5rem' }}>
+              {/* Duplicate Header */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: confidenceColor.bg,
+                    borderRadius: '50%',
+                    border: `2px solid ${confidenceColor.border}`
+                  }}>
+                    {getTypeIcon(duplicate.type)}
+                  </div>
+                  
+                  <div>
+                    <h3 style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: darkMode ? 'white' : '#1f2937',
+                      margin: '0 0 0.25rem 0'
+                    }}>
+                      Duplicate {duplicate.type.charAt(0).toUpperCase() + duplicate.type.slice(1)}
+                    </h3>
+                    <p style={{
+                      color: darkMode ? '#9ca3af' : '#6b7280',
+                      fontSize: '0.875rem',
+                      margin: 0
+                    }}>
+                      {duplicate.value} • {duplicate.records.length} records
+                    </p>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '20px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    background: confidenceColor.bg,
+                    color: confidenceColor.text,
+                    border: `1px solid ${confidenceColor.border}`
+                  }}>
+                    {duplicate.confidence}% Match
+                  </span>
+                  
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => mergeDuplicates(duplicate)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <Merge size={14} />
+                      Merge
+                    </button>
+                    
+                    <button
+                      onClick={() => ignoreDuplicate(duplicate.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: darkMode ? '#374151' : '#f3f4f6',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Ignore
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Records Comparison */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: '1rem'
+              }}>
+                {duplicate.records.map((record, index) => (
+                  <div key={record.id} style={{
+                    background: darkMode ? '#374151' : '#f9fafb',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: index === 0 ? '2px solid #22c55e' : `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
+                  }}>
+                    {index === 0 && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginBottom: '0.75rem'
+                      }}>
+                        <CheckCircle size={16} style={{ color: '#22c55e' }} />
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          color: '#22c55e'
+                        }}>
+                          PRIMARY RECORD
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <h4 style={{
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        color: darkMode ? 'white' : '#1f2937',
+                        margin: '0 0 0.25rem 0'
+                      }}>
+                        {record.contactPerson}
+                      </h4>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        color: darkMode ? '#9ca3af' : '#6b7280',
+                        margin: 0
+                      }}>
+                        {record.companyName}
+                      </p>
+                    </div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Mail size={14} style={{ color: '#3b82f6' }} />
+                        <span style={{ color: darkMode ? '#d1d5db' : '#374151' }}>
+                          {record.email}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Phone size={14} style={{ color: '#22c55e' }} />
+                        <span style={{ color: darkMode ? '#d1d5db' : '#374151' }}>
+                          {record.phone}
+                        </span>
+                      </div>
+                      
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '0.5rem',
+                        paddingTop: '0.5rem',
+                        borderTop: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
+                      }}>
+                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                          {new Date(record.createdDate).toLocaleDateString()}
+                        </span>
+                        
+                        {index > 0 && (
+                          <button
+                            onClick={() => deleteDuplicate(duplicate, record.id)}
+                            style={{
+                              padding: '0.25rem',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                            title="Delete Record"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Empty State */}
+      {filteredDuplicates.length === 0 && (
+        <div style={{
+          ...cardStyle,
+          padding: '3rem',
+          textAlign: 'center'
+        }}>
+          <CheckCircle size={48} style={{ color: '#22c55e', marginBottom: '1rem' }} />
+          <h3 style={{
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            color: darkMode ? 'white' : '#1f2937',
+            marginBottom: '0.5rem'
+          }}>
+            No duplicates found
+          </h3>
+          <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+            {searchTerm || filterType !== 'all'
+              ? 'Try adjusting your search or filter criteria'
+              : 'Your database is clean! Run a scan to check for new duplicates.'
+            }
+          </p>
         </div>
       )}
 
-      <div className="detection-info">
-        <h3>Detection Methods</h3>
-        <div className="methods-grid">
-          <div className="method-card">
-            <h4>Email Matching</h4>
-            <p>Exact email address matches (100% confidence)</p>
-          </div>
-          <div className="method-card">
-            <h4>Phone Matching</h4>
-            <p>Phone number matches ignoring formatting (95% confidence)</p>
-          </div>
-          <div className="method-card">
-            <h4>Company Name Similarity</h4>
-            <p>Fuzzy matching for similar company names (85% confidence)</p>
-          </div>
-        </div>
-      </div>
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

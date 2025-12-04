@@ -6,7 +6,8 @@ const emailService = require('../services/emailService');
 // Run every day at 9 AM
 const startLeadReminderCron = () => {
   cron.schedule('0 9 * * *', async () => {
-    console.log('🔔 Running lead reminder cron job...');
+    console.log('🔔 Running automated lead reminder cron job at 9 AM...');
+    console.log('📅 Current time:', new Date().toLocaleString('en-IN'));
     
     try {
       const twoDaysAgo = new Date();
@@ -76,7 +77,8 @@ const startLeadReminderCron = () => {
         }
       }
       
-      console.log('✅ Lead reminder cron job completed');
+      console.log('✅ Automated lead reminder cron job completed successfully');
+      console.log('📅 Next run scheduled for tomorrow at 9 AM');
     } catch (error) {
       console.error('❌ Error in lead reminder cron job:', error);
     }

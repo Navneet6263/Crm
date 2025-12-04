@@ -15,95 +15,21 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     estimatedValue: '',
     priority: 'medium',
     requirements: '',
-    assignedTo: '', // Don't auto-assign
+    assignedTo: '',
     status: 'new',
-    companyId: '' // For SuperAdmin company selection
+    companyId: 'default-greencall'
   });
 
   const [errors, setErrors] = useState({});
-  const [companies, setCompanies] = useState([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [companies] = useState([{ _id: 'default-greencall', name: 'GreenCall CRM' }]);
 
-  // Fetch companies for SuperAdmin and create default if needed
+  // Initialize with default company
   useEffect(() => {
     if (user?.role === 'super-admin') {
-      fetchCompanies();
+      setFormData(prev => ({ ...prev, companyId: 'default-greencall' }));
     }
   }, [user]);
-
-  const fetchCompanies = async () => {
-    try {
-      setLoadingCompanies(true);
-      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-      
-      if (!token) {
-        // Create default company directly if no token
-        const defaultCompany = { _id: 'default-greencall', name: 'GreenCall CRM' };
-        setCompanies([defaultCompany]);
-        setFormData(prev => ({ ...prev, companyId: defaultCompany._id }));
-        showToast('success', 'Using default GreenCall CRM company');
-        return;
-      }
-      
-      // Try to get companies with minimal headers to avoid 431 error
-      let response = await fetch('/api/companies/superadmin/list', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        let companies = data.companies || [];
-        
-        // If no companies exist, create default
-        if (companies.length === 0) {
-          try {
-            const createResponse = await fetch('/api/companies/superadmin/default', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-            
-            if (createResponse.ok) {
-              const defaultData = await createResponse.json();
-              companies = [{ _id: defaultData.company._id, name: 'GreenCall CRM' }];
-              showToast('success', 'Default company created');
-            }
-          } catch (createError) {
-            // Fallback to local default
-            companies = [{ _id: 'default-greencall', name: 'GreenCall CRM' }];
-          }
-        }
-        
-        setCompanies(companies);
-        
-        // Auto-select first company
-        if (companies.length === 1) {
-          setFormData(prev => ({ ...prev, companyId: companies[0]._id }));
-        }
-      } else if (response.status === 431) {
-        // Handle 431 error - use fallback
-        const defaultCompany = { _id: 'default-greencall', name: 'GreenCall CRM' };
-        setCompanies([defaultCompany]);
-        setFormData(prev => ({ ...prev, companyId: defaultCompany._id }));
-        showToast('info', 'Using default company due to connection issue');
-      } else {
-        throw new Error(`HTTP ${response.status}`);
-      }
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      // Always provide fallback
-      const defaultCompany = { _id: 'default-greencall', name: 'GreenCall CRM' };
-      setCompanies([defaultCompany]);
-      setFormData(prev => ({ ...prev, companyId: defaultCompany._id }));
-      showToast('info', 'Using default GreenCall CRM company');
-    } finally {
-      setLoadingCompanies(false);
-    }
-  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -113,7 +39,6 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
     
-    // SuperAdmin must select a company
     if (user?.role === 'super-admin' && !formData.companyId) {
       newErrors.companyId = 'Please select a company';
     }
@@ -122,7 +47,6 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       newErrors.email = 'Please enter a valid email address';
     }
     
-    // Validate phone number (10 digits)
     const phoneDigits = formData.phone.replace(/[^\d]/g, '');
     if (formData.phone && (phoneDigits.length !== 10 || !phoneDigits.match(/^[6-9]/))) {
       newErrors.phone = 'Please enter a valid 10-digit phone number starting with 6-9';
@@ -163,37 +87,45 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     onCancel();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return; // Prevent multiple clicks
+    
     if (!validateForm()) {
       showToast('error', '❌ Please fill all required fields correctly');
       return;
     }
 
-    const leadData = {
-      contactPerson: formData.contactPerson,
-      companyName: formData.companyName,
-      email: formData.email,
-      phone: formData.phone,
-      industry: formData.industry,
-      leadSource: formData.leadSource,
-      customLeadSource: formData.leadSource === 'other' ? formData.customLeadSource : '',
-      followUpDate: formData.followUpDate || null,
-      estimatedValue: formData.estimatedValue ? parseInt(formData.estimatedValue) : 0,
-      priority: formData.priority,
-      requirements: formData.requirements,
-      assignedTo: formData.assignedTo,
-      status: 'new'
-    };
+    setIsSubmitting(true);
     
-    // Always add companyId for SuperAdmin
-    if (user?.role === 'super-admin') {
-      leadData.companyId = formData.companyId || null;
-    }
-    
-    console.log('📝 Final leadData:', leadData);
-    console.log('🏢 CompanyId being sent:', leadData.companyId);
+    try {
+      const leadData = {
+        contactPerson: formData.contactPerson,
+        companyName: formData.companyName,
+        email: formData.email,
+        phone: formData.phone,
+        industry: formData.industry,
+        leadSource: formData.leadSource,
+        customLeadSource: formData.leadSource === 'other' ? formData.customLeadSource : '',
+        followUpDate: formData.followUpDate || null,
+        estimatedValue: formData.estimatedValue ? parseInt(formData.estimatedValue) : 0,
+        priority: formData.priority,
+        requirements: formData.requirements,
+        assignedTo: formData.assignedTo,
+        status: 'new'
+      };
+      
+      if (user?.role === 'super-admin') {
+        leadData.companyId = formData.companyId || null;
+      }
+      
+      console.log('📝 Final leadData:', leadData);
+      console.log('🏢 CompanyId being sent:', leadData.companyId);
 
-    onSave(leadData);
+      await onSave(leadData);
+    } catch (error) {
+      console.error('Error saving lead:', error);
+      setIsSubmitting(false);
+    }
   };
 
   const inputStyle = {
@@ -309,7 +241,6 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
                   value={formData.companyId}
                   onChange={(e) => handleInputChange('companyId', e.target.value)}
                   style={errors.companyId ? errorInputStyle : inputStyle}
-                  disabled={loadingCompanies}
                   required
                 >
                   <option value="">Select Company (Required)</option>
@@ -322,11 +253,6 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
                 {errors.companyId && (
                   <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
                     {errors.companyId}
-                  </p>
-                )}
-                {loadingCompanies && (
-                  <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                    Loading companies...
                   </p>
                 )}
               </div>
@@ -570,25 +496,38 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
           
           <button
             onClick={handleSubmit}
+            disabled={isSubmitting}
             style={{
               padding: '0.75rem 2rem',
               border: 'none',
               borderRadius: '8px',
-              background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+              background: isSubmitting 
+                ? (darkMode ? '#4b5563' : '#d1d5db')
+                : 'linear-gradient(135deg, #22c55e, #4ade80)',
               color: 'white',
-              cursor: 'pointer',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
               fontSize: '1rem',
               fontWeight: '600',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              opacity: isSubmitting ? 0.7 : 1
             }}
           >
-            <Send size={16} />
-            Create Lead
+            <Send size={16} style={{ 
+              animation: isSubmitting ? 'spin 1s linear infinite' : 'none' 
+            }} />
+            {isSubmitting ? 'Creating...' : 'Create Lead'}
           </button>
         </div>
       </div>
+      
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

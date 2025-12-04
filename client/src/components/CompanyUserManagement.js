@@ -93,7 +93,9 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
     email: '',
     role: 'sales',
     department: '',
-    password: ''
+    password: '',
+    managerName: '',
+    managerEmail: ''
   });
 
   const handleAddUser = async () => {
@@ -131,7 +133,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
         showSuccess(`✅ Team member added successfully!\n👤 Name: ${response.user.name}\n📧 Email: ${response.user.email}\n🎭 Role: ${roleDisplay}${tempPasswordMsg}`);
         
         // Reset form
-        setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
+        setNewUser({ name: '', email: '', role: 'sales', department: '', password: '', managerName: '', managerEmail: '' });
         setShowAddModal(false);
         
         // Reload the list
@@ -214,7 +216,9 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
       email: user.email,
       role: user.role,
       department: user.department || '',
-      password: ''
+      password: '',
+      managerName: user.managerName || '',
+      managerEmail: user.managerEmail || ''
     });
   };
 
@@ -244,7 +248,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
         
         // Reset form and close modal
         setEditingUser(null);
-        setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
+        setNewUser({ name: '', email: '', role: 'sales', department: '', password: '', managerName: '', managerEmail: '' });
         
         // Reload the list
         await loadTeamMembers();
@@ -260,7 +264,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
 
   const cancelEdit = () => {
     setEditingUser(null);
-    setNewUser({ name: '', email: '', role: 'sales', department: '', password: '' });
+    setNewUser({ name: '', email: '', role: 'sales', department: '', password: '', managerName: '', managerEmail: '' });
   };
 
   const filteredUsers = users.filter(user => {
@@ -417,6 +421,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
               <th style={{ padding: '0.75rem', textAlign: 'left', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem', fontWeight: '600' }}>Email</th>
               <th style={{ padding: '0.75rem', textAlign: 'left', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem', fontWeight: '600' }}>Role</th>
               <th style={{ padding: '0.75rem', textAlign: 'left', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem', fontWeight: '600' }}>Department</th>
+              <th style={{ padding: '0.75rem', textAlign: 'left', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem', fontWeight: '600' }}>Manager</th>
               <th style={{ padding: '0.75rem', textAlign: 'left', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem', fontWeight: '600' }}>Status</th>
               <th style={{ padding: '0.75rem', textAlign: 'left', color: darkMode ? 'white' : '#1f2937', fontSize: '0.875rem', fontWeight: '600' }}>Actions</th>
             </tr>
@@ -437,6 +442,14 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                     </span>
                   </td>
                   <td style={{ padding: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>{user.department || 'N/A'}</td>
+                  <td style={{ padding: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>
+                    {user.managerName ? (
+                      <div>
+                        <div>{user.managerName}</div>
+                        <div style={{ fontSize: '0.75rem', color: darkMode ? '#6b7280' : '#9ca3af' }}>{user.managerEmail}</div>
+                      </div>
+                    ) : 'N/A'}
+                  </td>
                   <td style={{ padding: '0.75rem' }}>
                     <span style={{
                       padding: '0.25rem 0.5rem',
@@ -656,6 +669,36 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   color: darkMode ? 'white' : '#1f2937'
                 }}
               />
+              
+              <input
+                type="text"
+                placeholder="Manager Name (for lead reminders)"
+                value={newUser.managerName}
+                onChange={(e) => setNewUser({...newUser, managerName: e.target.value})}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                  borderRadius: '8px',
+                  background: darkMode ? '#374151' : 'white',
+                  color: darkMode ? 'white' : '#1f2937'
+                }}
+              />
+              
+              <input
+                type="email"
+                placeholder="Manager Email (for lead reminders)"
+                value={newUser.managerEmail}
+                onChange={(e) => setNewUser({...newUser, managerEmail: e.target.value})}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                  borderRadius: '8px',
+                  background: darkMode ? '#374151' : 'white',
+                  color: darkMode ? 'white' : '#1f2937'
+                }}
+              />
 
               {/* Role Description */}
               <div style={{
@@ -674,6 +717,19 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   {newUser.role === 'sales' && 'Can manage own leads, create new leads, and view basic reports.'}
                   {newUser.role === 'support' && 'Can view leads, provide customer support, and access help desk.'}
                 </p>
+                {(newUser.role === 'sales' || newUser.role === 'support') && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.5rem',
+                    background: darkMode ? '#1f2937' : '#fef3c7',
+                    borderRadius: '4px',
+                    border: '1px solid #f59e0b'
+                  }}>
+                    <p style={{ fontSize: '0.75rem', color: darkMode ? '#fbbf24' : '#92400e', margin: 0 }}>
+                      💡 <strong>Manager Info:</strong> If no activity on assigned leads for 48 hours, reminder emails will be sent to the specified manager.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -709,6 +765,7 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   if (editingUser) {
                     cancelEdit();
                   }
+                  setNewUser({ name: '', email: '', role: 'sales', department: '', password: '', managerName: '', managerEmail: '' });
                 }}
                 style={{
                   flex: 1,

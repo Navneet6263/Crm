@@ -1412,9 +1412,15 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   const handleStatClick = (stat) => {
     console.log('Stat clicked:', stat.title);
     
-    // Navigate to appropriate section based on stat
-    if (stat.title === 'Total Leads' || stat.title === 'Active Leads' || stat.title === 'Pending Leads' || stat.title === 'Closed Won') {
-      onNavigate('leads');
+    // Navigate to appropriate section based on stat with filter
+    if (stat.title === 'Total Leads') {
+      onNavigate('leads', { filter: 'all' });
+    } else if (stat.title === 'Active Leads') {
+      onNavigate('leads', { filter: 'active' });
+    } else if (stat.title === 'Pending Leads') {
+      onNavigate('leads', { filter: 'pending' });
+    } else if (stat.title === 'Closed Won') {
+      onNavigate('leads', { filter: 'closed-won' });
     }
   };
   
@@ -1520,8 +1526,14 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   const fetchLeads = async (showNotification = false) => {
     try {
       setLoading(true);
-      const response = await apiService.getAllLeads();
-      const leadsData = response?.leads || response || [];
+      const response = await fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      const leadsData = data?.leads || data || [];
       setLeads(Array.isArray(leadsData) ? leadsData : []);
       if (showNotification) {
         console.log('✅ Leads refreshed successfully');
@@ -1991,7 +2003,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onNavigate('leads');
+                        onNavigate('leads', { filter: 'all' });
                       }}
                       style={{
                         padding: '0.25rem 0.5rem',
@@ -2015,7 +2027,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onNavigate('leads');
+                      onNavigate('leads', { filter: 'active' });
                     }}
                     style={{
                       padding: '0.25rem 0.5rem',
@@ -2038,7 +2050,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onNavigate('leads');
+                      onNavigate('leads', { filter: 'closed-won' });
                     }}
                     style={{
                       padding: '0.25rem 0.5rem',
@@ -2061,7 +2073,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onNavigate('leads');
+                      onNavigate('leads', { filter: 'pending' });
                     }}
                     style={{
                       padding: '0.25rem 0.5rem',

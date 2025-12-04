@@ -40,8 +40,8 @@ const RoleBasedDashboard = lazy(() => import('./components/RoleBasedDashboard'))
 const LeadHistory = lazy(() => import('./components/LeadHistory'));
 const LeadTracker = lazy(() => import('./components/LeadTracker'));
 const AILeadScoring = lazy(() => import('./components/AILeadScoring'));
-const AutoAssignment = lazy(() => import('./components/ProfessionalAutoAssignment'));
-const DuplicateDetection = lazy(() => import('./components/ProfessionalDuplicateDetection'));
+const AutoAssignment = lazy(() => import('./components/AutoAssignment'));
+const DuplicateDetection = lazy(() => import('./components/DuplicateDetection'));
 const ProfessionalDataTable = lazy(() => import('./components/DataTable'));
 const SalesPipeline = lazy(() => import('./components/SalesPipeline'));
 const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
@@ -98,6 +98,17 @@ const AppContent = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [showAddLead, setShowAddLead] = useState(false);
   const [showCompanySetup, setShowCompanySetup] = useState(false);
+
+  // Browser history management
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const view = event.state?.view || 'landing';
+      setActiveView(view);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Global search term and results
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
@@ -216,8 +227,32 @@ const AppContent = () => {
     setSearchResults(results.slice(0, 8));
   }, [globalSearchTerm, crmData, currentUser]);
 
-  const changeView = (view) => {
+  const [navigationParams, setNavigationParams] = useState(null);
+  
+  const changeView = (view, params = null) => {
     setActiveView(view);
+    setNavigationParams(params);
+    
+    // Update browser history
+    if (isLoggedIn && view !== activeView) {
+      const title = getPageTitle(view);
+      window.history.pushState({ view, params }, title, `#${view}`);
+      document.title = title;
+    }
+  };
+  
+  const getPageTitle = (view) => {
+    const titles = {
+      'dashboard': 'Dashboard - Green Call CRM',
+      'leads': 'All Leads - Green Call CRM',
+      'add-enquiry': 'Add Lead - Green Call CRM',
+      'customers': 'Customers - Green Call CRM',
+      'analytics': 'Analytics - Green Call CRM',
+      'settings': 'Settings - Green Call CRM',
+      'billing': 'Billing - Green Call CRM',
+      'team-management': 'Team Management - Green Call CRM'
+    };
+    return titles[view] || 'Green Call CRM - Premium Customer Management';
   };
 
   useEffect(() => {
@@ -312,7 +347,20 @@ const AppContent = () => {
     };
     
     checkExistingAuth();
+    
+    // Handle initial URL hash
+    const hash = window.location.hash.slice(1);
+    if (hash && isLoggedIn) {
+      setActiveView(hash);
+    }
   }, []);
+  
+  // Update page title when view changes
+  useEffect(() => {
+    if (isLoggedIn) {
+      document.title = getPageTitle(activeView);
+    }
+  }, [activeView, isLoggedIn]);
 
   const handleLogin = async (credentials) => {
     console.log('Login attempt with credentials:', credentials);
@@ -437,16 +485,23 @@ const AppContent = () => {
       const newLead = await apiService.createLead(leadData);
       console.log('✅ Lead created successfully:', newLead);
       
-      // Refresh leads data
-      const allLeads = await apiService.getAllLeads();
-      updateCrmData({ leads: allLeads });
+      // Refresh leads data with no limit
+      const response = await fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      updateCrmData({ leads: data.leads || [] });
       setShowAddLead(false);
       showToast('success', '✅ Lead added successfully!');
+      return true; // Success
     } catch (error) {
       console.error('❌ Error adding lead:', error);
       const errorMessage = error.message || 'Failed to add lead';
       showToast('error', `❌ ${errorMessage}`);
-      throw error;
+      throw error; // Re-throw to let AddLead component handle it
     }
   };
 
@@ -454,15 +509,21 @@ const AppContent = () => {
     const loadData = async () => {
       try {
         console.log('🔄 Loading CRM data...');
-        const [leads, customers] = await Promise.all([
-          apiService.getAllLeads(),
+        const [leadsResponse, customers] = await Promise.all([
+          fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            }
+          }),
           apiService.getCustomers()
         ]);
+        const leadsData = await leadsResponse.json();
+        const leads = leadsData.leads || [];
         console.log('✅ Data loaded:', { leads: leads?.length || 0, customers: customers?.length || 0 });
         updateCrmData({ leads: leads || [], customers: customers || [] });
       } catch (error) {
         console.error('❌ Error loading data:', error);
-        // Set empty arrays to prevent undefined issues
         updateCrmData({ leads: [], customers: [] });
       }
     };
@@ -486,7 +547,7 @@ const AppContent = () => {
             setActiveView={changeView}
           />
         );
-      case 'leads': return <AllLeads crmData={crmData} updateCrmData={updateCrmData} darkMode={darkMode} />;
+      case 'leads': return <AllLeads crmData={crmData} updateCrmData={updateCrmData} darkMode={darkMode} initialFilter={navigationParams?.filter} />;
       case 'add-enquiry': return (
         <SimpleAddLead 
           darkMode={darkMode} 
@@ -656,7 +717,7 @@ const AppContent = () => {
                   // Handle different types of navigation
                   if (id.startsWith('lead-')) {
                     // Navigate to leads page and highlight specific lead
-                    changeView('leads');
+                    changeView('leads', { filter: 'all' });
                   } else if (id.startsWith('customer-')) {
                     // Navigate to customers page and highlight specific customer
                     changeView('customers');

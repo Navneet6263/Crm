@@ -40,12 +40,29 @@ const createSuperAdmin = async (req, res) => {
     });
 
     res.json(formatResponse({
-      _id: newSuperAdmin._id,
-      name: newSuperAdmin.name,
-      email: newSuperAdmin.email,
-      role: newSuperAdmin.role,
-      superAdminCount: superAdminCount + 1
-    }, `Super Admin created successfully. Total Super Admins: ${superAdminCount + 1}/4`));
+      action: 'super_admin_created',
+      newUser: {
+        id: newSuperAdmin._id,
+        name: newSuperAdmin.name,
+        email: newSuperAdmin.email,
+        type: 'Super Admin',
+        role: newSuperAdmin.role,
+        isMainSuperAdmin: false
+      },
+      createdBy: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        type: 'Super Admin',
+        isMainSuperAdmin: req.user.email === 'navneet@greencall.com'
+      },
+      superAdminStats: {
+        total: superAdminCount + 1,
+        maxAllowed: 4,
+        remaining: 4 - (superAdminCount + 1)
+      },
+      timestamp: new Date()
+    }, `Super Admin ${newSuperAdmin.name} created successfully by ${req.user.name}. Total Super Admins: ${superAdminCount + 1}/4`));
 
   } catch (error) {
     res.status(500).json(formatResponse(null, error.message, 500));
@@ -96,10 +113,28 @@ const deactivateUser = async (req, res) => {
 
     const remainingActive = await User.countDocuments({ role: 'super-admin', isActive: true });
     
+    // Enhanced response with clear identification
+    const userType = userToDeactivate.role === 'super-admin' ? 'Super Admin' : 'Admin';
+    const actionBy = `${req.user.name} (${req.user.email})`;
+    
     res.json(formatResponse({
-      deactivatedUser: userToDeactivate.name,
-      remainingActiveSuperAdmins: remainingActive
-    }, `${userToDeactivate.role} deactivated successfully. ${remainingActive} Super Admins remain active.`));
+      action: 'deactivated',
+      targetUser: {
+        id: userToDeactivate._id,
+        name: userToDeactivate.name,
+        email: userToDeactivate.email,
+        type: userType,
+        role: userToDeactivate.role
+      },
+      actionBy: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        type: 'Super Admin'
+      },
+      remainingActiveSuperAdmins: remainingActive,
+      timestamp: new Date()
+    }, `${userType} ${userToDeactivate.name} deactivated by ${actionBy}. ${remainingActive} Super Admins remain active.`));
 
   } catch (error) {
     res.status(500).json(formatResponse(null, error.message, 500));
@@ -141,11 +176,28 @@ const resetUserPassword = async (req, res) => {
     userToReset.lockUntil = undefined; // Remove any account lock
     await userToReset.save();
 
+    // Enhanced response with clear identification
+    const userType = userToReset.role === 'super-admin' ? 'Super Admin' : 'Admin';
+    const actionBy = `${req.user.name} (${req.user.email})`;
+
     res.json(formatResponse({
-      resetBy: req.user.name,
-      resetFor: userToReset.name,
-      timestamp: new Date()
-    }, `Password reset successfully for ${userToReset.name} by ${req.user.name}`));
+      action: 'password_reset',
+      targetUser: {
+        id: userToReset._id,
+        name: userToReset.name,
+        email: userToReset.email,
+        type: userType,
+        role: userToReset.role
+      },
+      actionBy: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        type: 'Super Admin'
+      },
+      timestamp: new Date(),
+      securityNote: 'Login attempts reset and account unlocked'
+    }, `Password reset successfully for ${userType} ${userToReset.name} by ${actionBy}`));
 
   } catch (error) {
     res.status(500).json(formatResponse(null, error.message, 500));
@@ -161,9 +213,22 @@ const getSuperAdminsAndAdmins = async (req, res) => {
 
     const users = await User.find({ 
       role: { $in: ['super-admin', 'admin'] }
-    }).select('-password').sort({ createdAt: -1 });
+    })
+    .select('-password')
+    .populate('createdBy', 'name email role')
+    .populate('deactivatedBy', 'name email role')
+    .sort({ createdAt: -1 });
 
-    res.json(formatResponse(users, 'Users retrieved successfully'));
+    // Add user type indicator for better identification
+    const usersWithType = users.map(user => ({
+      ...user.toObject(),
+      userType: user.role === 'super-admin' ? 'Super Admin' : 'Admin',
+      roleIcon: user.role === 'super-admin' ? '👑' : '🛡️',
+      isMainSuperAdmin: user.email === 'navneet@greencall.com',
+      canBeModified: user.email !== 'navneet@greencall.com' && user._id.toString() !== req.user._id.toString()
+    }));
+
+    res.json(formatResponse(usersWithType, 'Users retrieved successfully'));
 
   } catch (error) {
     res.status(500).json(formatResponse(null, error.message, 500));
@@ -189,7 +254,27 @@ const activateUser = async (req, res) => {
     userToActivate.deactivatedAt = null;
     await userToActivate.save();
 
-    res.json(formatResponse(null, `${userToActivate.role} activated successfully`));
+    // Enhanced response with clear identification
+    const userType = userToActivate.role === 'super-admin' ? 'Super Admin' : 'Admin';
+    const actionBy = `${req.user.name} (${req.user.email})`;
+
+    res.json(formatResponse({
+      action: 'activated',
+      targetUser: {
+        id: userToActivate._id,
+        name: userToActivate.name,
+        email: userToActivate.email,
+        type: userType,
+        role: userToActivate.role
+      },
+      actionBy: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        type: 'Super Admin'
+      },
+      timestamp: new Date()
+    }, `${userType} ${userToActivate.name} activated by ${actionBy}`));
 
   } catch (error) {
     res.status(500).json(formatResponse(null, error.message, 500));
@@ -246,9 +331,20 @@ const getSuperAdminSafetyStatus = async (req, res) => {
     const inactiveSuperAdmins = totalSuperAdmins - activeSuperAdmins;
     
     const superAdminsList = await User.find({ role: 'super-admin' })
-      .select('name email isActive createdAt lastLogin deactivatedBy deactivatedAt')
-      .populate('deactivatedBy', 'name email')
+      .select('name email isActive createdAt lastLogin deactivatedBy deactivatedAt role')
+      .populate('deactivatedBy', 'name email role')
+      .populate('createdBy', 'name email role')
       .sort({ createdAt: 1 });
+
+    // Enhanced super admin list with clear identification
+    const enhancedSuperAdminsList = superAdminsList.map(admin => ({
+      ...admin.toObject(),
+      userType: 'Super Admin',
+      roleIcon: '👑',
+      isMainSuperAdmin: admin.email === 'navneet@greencall.com',
+      statusIcon: admin.isActive ? '✅' : '❌',
+      canBeModified: admin.email !== 'navneet@greencall.com' && admin._id.toString() !== req.user._id.toString()
+    }));
 
     const safetyStatus = {
       isSafe: activeSuperAdmins >= 1,
@@ -258,7 +354,13 @@ const getSuperAdminSafetyStatus = async (req, res) => {
       maxAllowed: 4,
       canCreateMore: activeSuperAdmins < 4,
       safetyLevel: activeSuperAdmins >= 3 ? 'HIGH' : activeSuperAdmins >= 2 ? 'MEDIUM' : 'LOW',
-      superAdminsList
+      superAdminsList: enhancedSuperAdminsList,
+      currentUser: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        isMainSuperAdmin: req.user.email === 'navneet@greencall.com'
+      }
     };
 
     res.json(formatResponse(safetyStatus, 'Super Admin safety status retrieved'));

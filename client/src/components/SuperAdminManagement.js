@@ -444,129 +444,232 @@ const SuperAdminManagement = ({ darkMode = false }) => {
                 padding: '1.5rem',
                 background: darkMode ? '#334155' : '#f8fafc',
                 borderRadius: '8px',
-                border: `1px solid ${admin.isActive ? '#10b981' : '#ef4444'}20`
+                border: `2px solid ${admin.isMainSuperAdmin ? '#fbbf24' : (admin.isActive ? '#10b981' : '#ef4444')}30`,
+                position: 'relative',
+                overflow: 'hidden'
               }}>
+                {/* Main Super Admin Badge */}
+                {admin.isMainSuperAdmin && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '0',
+                    right: '0',
+                    background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                    color: 'white',
+                    padding: '0.25rem 0.75rem',
+                    fontSize: '0.625rem',
+                    fontWeight: '700',
+                    borderBottomLeftRadius: '8px',
+                    boxShadow: '0 2px 8px rgba(251, 191, 36, 0.3)'
+                  }}>
+                    👑 MAIN ADMIN
+                  </div>
+                )}
+                
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <div style={{
-                    width: '50px',
-                    height: '50px',
+                    width: '60px',
+                    height: '60px',
                     borderRadius: '50%',
-                    background: admin.isActive ? 'linear-gradient(135deg, #10b981, #34d399)' : 'linear-gradient(135deg, #ef4444, #f87171)',
+                    background: admin.isMainSuperAdmin 
+                      ? 'linear-gradient(135deg, #fbbf24, #f59e0b)'
+                      : admin.isActive 
+                        ? 'linear-gradient(135deg, #10b981, #34d399)' 
+                        : 'linear-gradient(135deg, #ef4444, #f87171)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
                     fontWeight: '700',
-                    fontSize: '1.25rem'
+                    fontSize: '1.5rem',
+                    boxShadow: admin.isMainSuperAdmin 
+                      ? '0 4px 20px rgba(251, 191, 36, 0.4)'
+                      : admin.isActive 
+                        ? '0 4px 20px rgba(16, 185, 129, 0.3)'
+                        : '0 4px 20px rgba(239, 68, 68, 0.3)'
                   }}>
-                    {admin.name?.charAt(0)?.toUpperCase() || 'S'}
+                    {admin.roleIcon || (admin.name?.charAt(0)?.toUpperCase() || 'S')}
                   </div>
                   <div>
                     <div style={{
-                      fontSize: '1rem',
-                      fontWeight: '600',
+                      fontSize: '1.125rem',
+                      fontWeight: '700',
                       color: darkMode ? '#f8fafc' : '#111827',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem'
+                      gap: '0.5rem',
+                      marginBottom: '0.25rem'
                     }}>
                       {admin.name}
                       {admin.isActive ? (
-                        <CheckCircle size={16} style={{ color: '#10b981' }} />
+                        <CheckCircle size={18} style={{ color: '#10b981' }} />
                       ) : (
-                        <XCircle size={16} style={{ color: '#ef4444' }} />
+                        <XCircle size={18} style={{ color: '#ef4444' }} />
                       )}
                     </div>
+                    
                     <div style={{
                       fontSize: '0.875rem',
-                      color: darkMode ? '#cbd5e1' : '#6b7280'
+                      color: darkMode ? '#cbd5e1' : '#6b7280',
+                      marginBottom: '0.25rem'
                     }}>
                       {admin.email}
                     </div>
+                    
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <span style={{
+                        padding: '0.25rem 0.75rem',
+                        background: admin.userType === 'Super Admin' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        color: admin.userType === 'Super Admin' ? '#ef4444' : '#3b82f6',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem'
+                      }}>
+                        {admin.roleIcon} {admin.userType}
+                      </span>
+                      
+                      {admin.isMainSuperAdmin && (
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          background: 'rgba(251, 191, 36, 0.1)',
+                          color: '#fbbf24',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}>
+                          PROTECTED
+                        </span>
+                      )}
+                    </div>
+                    
                     <div style={{
                       fontSize: '0.75rem',
                       color: darkMode ? '#9ca3af' : '#6b7280',
-                      marginTop: '0.25rem'
+                      display: 'grid',
+                      gap: '0.125rem'
                     }}>
-                      Created: {new Date(admin.createdAt).toLocaleDateString()}
-                      {admin.lastLogin && ` • Last Login: ${new Date(admin.lastLogin).toLocaleDateString()}`}
+                      <div>Created: {new Date(admin.createdAt).toLocaleDateString()}</div>
+                      {admin.lastLogin && <div>Last Login: {new Date(admin.lastLogin).toLocaleDateString()}</div>}
+                      {admin.createdBy && (
+                        <div>Created by: {admin.createdBy.name} ({admin.createdBy.role})</div>
+                      )}
+                      {admin.deactivatedBy && (
+                        <div style={{ color: '#ef4444' }}>
+                          Deactivated by: {admin.deactivatedBy.name} on {new Date(admin.deactivatedAt).toLocaleDateString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
                   <div style={{
                     padding: '0.5rem 1rem',
                     background: admin.isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                     color: admin.isActive ? '#10b981' : '#ef4444',
                     borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: '600'
+                    fontSize: '0.875rem',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: admin.isActive ? '0 2px 8px rgba(16, 185, 129, 0.2)' : '0 2px 8px rgba(239, 68, 68, 0.2)'
                   }}>
-                    {admin.isActive ? 'Active' : 'Inactive'}
+                    {admin.isActive ? '✅ ACTIVE' : '❌ INACTIVE'}
                   </div>
                   
-                  {admin.isActive ? (
-                    <button
-                      onClick={() => handleDeactivateUser(admin._id, admin.name)}
-                      style={{
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {admin.canBeModified ? (
+                      <>
+                        {admin.isActive ? (
+                          <button
+                            onClick={() => handleDeactivateUser(admin._id, admin.name)}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: 'linear-gradient(135deg, #ef4444, #f87171)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                            }}
+                          >
+                            <XCircle size={12} />
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleActivateUser(admin._id, admin.name)}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              background: 'linear-gradient(135deg, #10b981, #34d399)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            <CheckCircle size={12} />
+                            Activate
+                          </button>
+                        )}
+                        
+                        <button
+                          onClick={() => setShowPasswordForm(admin._id)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                          }}
+                        >
+                          <Key size={12} />
+                          Reset Password
+                        </button>
+                      </>
+                    ) : (
+                      <div style={{
                         padding: '0.5rem 1rem',
-                        background: 'linear-gradient(135deg, #ef4444, #f87171)',
-                        color: 'white',
-                        border: 'none',
+                        background: darkMode ? '#4b5563' : '#e5e7eb',
+                        color: darkMode ? '#9ca3af' : '#6b7280',
                         borderRadius: '6px',
-                        cursor: 'pointer',
                         fontSize: '0.75rem',
                         fontWeight: '600',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.25rem'
-                      }}
-                    >
-                      <XCircle size={12} />
-                      Deactivate
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleActivateUser(admin._id, admin.name)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: 'linear-gradient(135deg, #10b981, #34d399)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem'
-                      }}
-                    >
-                      <CheckCircle size={12} />
-                      Activate
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => setShowPasswordForm(admin._id)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem'
-                    }}
-                  >
-                    <Key size={12} />
-                    Reset Password
-                  </button>
+                      }}>
+                        🔒 {admin.isMainSuperAdmin ? 'PROTECTED ACCOUNT' : 'CANNOT MODIFY SELF'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -676,20 +779,99 @@ const SuperAdminManagement = ({ darkMode = false }) => {
         </div>
       )}
 
-      {/* Debug Info */}
+      {/* Enhanced System Info */}
       <div style={{
         marginTop: '2rem',
-        padding: '1rem',
-        background: darkMode ? '#334155' : '#f1f5f9',
-        borderRadius: '8px',
-        fontSize: '0.875rem',
-        color: darkMode ? '#cbd5e1' : '#6b7280'
+        background: darkMode ? '#1e293b' : 'white',
+        borderRadius: '12px',
+        padding: '2rem',
+        boxShadow: darkMode ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 4px 20px rgba(0, 0, 0, 0.08)'
       }}>
-        <strong>Debug Info:</strong><br/>
-        Can Create More: {safetyStatus?.canCreateMore ? 'Yes' : 'No'}<br/>
-        Total Super Admins: {safetyStatus?.totalSuperAdmins || 0}<br/>
-        Active Super Admins: {safetyStatus?.activeSuperAdmins || 0}<br/>
-        Max Allowed: {safetyStatus?.maxAllowed || 4}
+        <h3 style={{
+          fontSize: '1.125rem',
+          fontWeight: '600',
+          color: darkMode ? '#f8fafc' : '#111827',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <Shield size={20} style={{ color: '#10b981' }} />
+          System Information
+        </h3>
+        
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '1rem'
+        }}>
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#334155' : '#f8fafc',
+            borderRadius: '8px',
+            border: `1px solid ${safetyStatus?.canCreateMore ? '#10b981' : '#ef4444'}30`
+          }}>
+            <div style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: darkMode ? '#cbd5e1' : '#6b7280',
+              marginBottom: '0.5rem'
+            }}>Creation Status</div>
+            <div style={{
+              fontSize: '1.125rem',
+              fontWeight: '700',
+              color: safetyStatus?.canCreateMore ? '#10b981' : '#ef4444'
+            }}>
+              {safetyStatus?.canCreateMore ? '✅ Can Create More' : '❌ Limit Reached'}
+            </div>
+          </div>
+          
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#334155' : '#f8fafc',
+            borderRadius: '8px'
+          }}>
+            <div style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: darkMode ? '#cbd5e1' : '#6b7280',
+              marginBottom: '0.5rem'
+            }}>Current User</div>
+            <div style={{
+              fontSize: '1rem',
+              fontWeight: '600',
+              color: darkMode ? '#f8fafc' : '#111827'
+            }}>
+              {safetyStatus?.currentUser?.name}
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: safetyStatus?.currentUser?.isMainSuperAdmin ? '#fbbf24' : (darkMode ? '#9ca3af' : '#6b7280')
+            }}>
+              {safetyStatus?.currentUser?.isMainSuperAdmin ? '👑 Main Super Admin' : 'Super Admin'}
+            </div>
+          </div>
+          
+          <div style={{
+            padding: '1rem',
+            background: darkMode ? '#334155' : '#f8fafc',
+            borderRadius: '8px'
+          }}>
+            <div style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: darkMode ? '#cbd5e1' : '#6b7280',
+              marginBottom: '0.5rem'
+            }}>System Limits</div>
+            <div style={{
+              fontSize: '1rem',
+              color: darkMode ? '#f8fafc' : '#111827'
+            }}>
+              {safetyStatus?.totalSuperAdmins || 0} / {safetyStatus?.maxAllowed || 4} Total<br/>
+              <span style={{ color: '#10b981' }}>{safetyStatus?.activeSuperAdmins || 0} Active</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

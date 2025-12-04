@@ -266,7 +266,7 @@ const getLeads = async (req, res) => {
       role: req.user.role
     });
     
-    const { status, priority, assignedTo, search, page = 1, limit = 50 } = req.query;
+    const { status, priority, assignedTo, search, page = 1, limit = 10000 } = req.query;
     
     let query = { isActive: true };
     
@@ -275,13 +275,8 @@ const getLeads = async (req, res) => {
       // Super-admin can see all leads from all companies
       console.log('🔑 Super-admin access - showing all leads from all companies');
     } else if (req.user.role === 'admin' || req.user.role === 'manager') {
-      // Admin and Manager can see all leads from their company
-      console.log('🔑 Admin/Manager access - showing company leads');
-      const companyInfo = getCompanyInfo(req.user);
-      const userCompanyId = companyInfo?._id || companyInfo || req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
-      if (userCompanyId) {
-        query.companyId = userCompanyId;
-      }
+      // Admin and Manager can see all leads (no company restriction)
+      console.log('🔑 Admin/Manager access - showing all leads');
     } else {
       // Normal users (including sales) can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
@@ -547,7 +542,7 @@ const getMyLeads = async (req, res) => {
     console.log('👤 User Email:', req.user.email);
     console.log('👤 User Role:', req.user.role);
     
-    const { status, priority, search, page = 1, limit = 50 } = req.query;
+    const { status, priority, search, page = 1, limit = 10000 } = req.query;
     
     let query = { isActive: true };
     

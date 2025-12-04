@@ -1,5 +1,8 @@
 const Task = require('../models/Task');
 const Lead = require('../models/Lead');
+const Calendar = require('../models/Calendar');
+const emailService = require('../services/emailService');
+const Notification = require('../models/Notification');
 
 const createTask = async (req, res) => {
   try {
@@ -10,6 +13,59 @@ const createTask = async (req, res) => {
 
     const task = await Task.create(taskData);
     await task.populate('createdBy', 'name email');
+
+    // Calendar me automatically add karo
+    if (task.dueDate) {
+      const taskDate = new Date(task.dueDate);
+      const startTime = task.dueTime || '09:00';
+      const [hours, minutes] = startTime.split(':');
+      const endHours = parseInt(hours) + 1; // Default 1 hour duration
+      const endTime = `${endHours.toString().padStart(2, '0')}:${minutes}`;
+      
+      const calendarEventData = {
+        title: task.title,
+        description: task.description || '',
+        startDate: taskDate,
+        endDate: taskDate,
+        startTime: startTime,
+        endTime: endTime,
+        type: task.type || 'task',
+        relatedTo: task.relatedTo,
+        relatedId: task.relatedId,
+        createdBy: req.user._id
+      };
+      
+      await Calendar.create(calendarEventData);
+    }
+
+    // Email notification bhejo agar enabled hai
+    if (task.emailNotification && task.assignedTo) {
+      try {
+        const assignedUser = await require('../models/User').findOne({ name: task.assignedTo });
+        if (assignedUser && assignedUser.email) {
+          const taskDateTime = new Date(task.dueDate);
+          if (task.dueTime) {
+            const [hours, minutes] = task.dueTime.split(':');
+            taskDateTime.setHours(parseInt(hours), parseInt(minutes));
+          }
+          
+          await emailService.sendEmail({
+            to: assignedUser.email,
+            subject: `New Task Assigned: ${task.title}`,
+            html: `
+              <h2>New Task Assigned</h2>
+              <p><strong>Title:</strong> ${task.title}</p>
+              <p><strong>Description:</strong> ${task.description || 'N/A'}</p>
+              <p><strong>Due Date:</strong> ${taskDateTime.toLocaleString()}</p>
+              <p><strong>Priority:</strong> ${task.priority}</p>
+              <p><strong>Type:</strong> ${task.type}</p>
+            `
+          });
+        }
+      } catch (emailError) {
+        console.error('Email notification error:', emailError);
+      }
+    }
 
     res.status(201).json(task);
   } catch (error) {

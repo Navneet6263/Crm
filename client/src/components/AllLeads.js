@@ -3,12 +3,15 @@ import { Users, Mail, Phone, Building, Calendar, Star, User, CheckCircle, Clock,
 import apiService from '../services/apiService';
 import BulkUpload from './BulkUpload';
 
-const AllLeads = ({ darkMode = false, crmData = {} }) => {
+const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialFilter || 'all');
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
@@ -48,13 +51,18 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
       try {
         setLoading(true);
         const [leadsResponse, usersResponse] = await Promise.all([
-          apiService.getLeads(),
+          fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            }
+          }),
           apiService.getUsers()
         ]);
         
-        // Handle both array and object responses
-        const leadsData = leadsResponse.leads || leadsResponse || [];
-        setLeads(Array.isArray(leadsData) ? leadsData : []);
+        const leadsData = await leadsResponse.json();
+        const leads = leadsData.leads || leadsData || [];
+        setLeads(Array.isArray(leads) ? leads : []);
         setUsers(usersResponse || []);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -68,14 +76,35 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
     fetchData();
   }, [crmData.leads]);
 
-  // Filter leads based on search term
-  const filteredLeads = leads.filter(lead => 
-    (lead.contactPerson || lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (lead.companyName || lead.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (lead.phone || '').includes(searchTerm) ||
-    (lead.status || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter leads based on search term and status filter
+  const filteredLeads = leads.filter(lead => {
+    // First apply search filter
+    const matchesSearch = 
+      (lead.contactPerson || lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.companyName || lead.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.phone || '').includes(searchTerm) ||
+      (lead.status || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Then apply status filter
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = ['qualified', 'proposal', 'negotiation', 'contacted'].includes(lead.status);
+    } else if (statusFilter === 'pending') {
+      matchesStatus = ['new', 'pending'].includes(lead.status);
+    } else if (statusFilter === 'closed-won') {
+      matchesStatus = lead.status === 'closed-won';
+    } else if (statusFilter === 'closed-lost') {
+      matchesStatus = lead.status === 'closed-lost';
+    } else if (statusFilter === 'unassigned') {
+      matchesStatus = !lead.assignedTo;
+    } else if (statusFilter === 'assigned') {
+      matchesStatus = !!lead.assignedTo;
+    }
+    // statusFilter === 'all' shows all leads
+    
+    return matchesSearch && matchesStatus;
+  });
 
   const handleLeadSelect = (leadId) => {
     console.log('Selecting lead ID:', leadId);
@@ -85,6 +114,157 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
     } else {
       setSelectedLeadId(leadId);
       setShowAssignDropdown(true);
+    }
+  };
+
+  const handleBulkSelect = (leadId) => {
+    setSelectedLeads(prev => {
+      if (prev.includes(leadId)) {
+        const newSelection = prev.filter(id => id !== leadId);
+        setShowBulkActions(newSelection.length > 0);
+        return newSelection;
+      } else {
+        const newSelection = [...prev, leadId];
+        setShowBulkActions(newSelection.length > 0);
+        return newSelection;
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedLeads.length === filteredLeads.length) {
+      setSelectedLeads([]);
+      setShowBulkActions(false);
+    } else {
+      const allIds = filteredLeads.map(lead => lead._id || lead.id);
+      setSelectedLeads(allIds);
+      setShowBulkActions(true);
+    }
+  };
+
+  const handleBulkAssign = async (assignedUserId) => {
+    if (!assignedUserId || selectedLeads.length === 0) return;
+    
+    try {
+      const assignedUser = users.find(u => u._id === assignedUserId);
+      
+      // Assign all selected leads
+      await Promise.all(
+        selectedLeads.map(leadId => apiService.assignLead(leadId, assignedUserId))
+      );
+      
+      // Update local state
+      setLeads(prevLeads => 
+        prevLeads.map(lead => {
+          const leadId = lead._id || lead.id;
+          return selectedLeads.includes(leadId)
+            ? { ...lead, assignedTo: assignedUser }
+            : lead;
+        })
+      );
+      
+      if (window.showToast) {
+        window.showToast('success', `✅ ${selectedLeads.length} leads assigned to ${assignedUser?.name} successfully!`);
+      } else {
+        alert(`✅ ${selectedLeads.length} leads assigned to ${assignedUser?.name} successfully!`);
+      }
+      
+      setSelectedLeads([]);
+      setShowBulkActions(false);
+    } catch (error) {
+      console.error('Error bulk assigning leads:', error);
+      if (window.showToast) {
+        window.showToast('error', '❌ Failed to assign leads. Please try again.');
+      } else {
+        alert('❌ Failed to assign leads. Please try again.');
+      }
+    }
+  };
+
+  const handleBulkAssignToGroup = async () => {
+    if (selectedLeads.length === 0) return;
+    
+    try {
+      // Assign all selected leads to BD/Sales group
+      await Promise.all(
+        selectedLeads.map(leadId => apiService.assignLeadToGroup(leadId, 'sales'))
+      );
+      
+      // Update local state
+      setLeads(prevLeads => 
+        prevLeads.map(lead => {
+          const leadId = lead._id || lead.id;
+          return selectedLeads.includes(leadId)
+            ? { ...lead, assignedToGroup: 'sales', status: 'pending-acceptance' }
+            : lead;
+        })
+      );
+      
+      if (window.showToast) {
+        window.showToast('success', `🎯 ${selectedLeads.length} leads assigned to BD/Sales team for acceptance!`);
+      } else {
+        alert(`🎯 ${selectedLeads.length} leads assigned to BD/Sales team for acceptance!`);
+      }
+      
+      setSelectedLeads([]);
+      setShowBulkActions(false);
+    } catch (error) {
+      console.error('Error bulk assigning to group:', error);
+      if (window.showToast) {
+        window.showToast('error', '❌ Failed to assign leads to group. Please try again.');
+      } else {
+        alert('❌ Failed to assign leads to group. Please try again.');
+      }
+    }
+  };
+
+  const handleBulkUnassign = async () => {
+    if (selectedLeads.length === 0) return;
+    
+    if (!window.confirm(`Are you sure you want to unassign ${selectedLeads.length} leads?`)) {
+      return;
+    }
+    
+    try {
+      // Unassign all selected leads by setting assignedTo to null
+      await Promise.all(
+        selectedLeads.map(leadId => 
+          fetch(`${apiService.getApiUrl()}/leads/${leadId}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ assignedTo: null })
+          })
+        )
+      );
+      
+      // Update local state
+      setLeads(prevLeads => 
+        prevLeads.map(lead => {
+          const leadId = lead._id || lead.id;
+          return selectedLeads.includes(leadId)
+            ? { ...lead, assignedTo: null }
+            : lead;
+        })
+      );
+      
+      if (window.showToast) {
+        window.showToast('success', `✅ ${selectedLeads.length} leads unassigned successfully!`);
+      } else {
+        alert(`✅ ${selectedLeads.length} leads unassigned successfully!`);
+      }
+      
+      setSelectedLeads([]);
+      setShowBulkActions(false);
+    } catch (error) {
+      console.error('Error bulk unassigning leads:', error);
+      if (window.showToast) {
+        window.showToast('error', '❌ Failed to unassign leads. Please try again.');
+      } else {
+        alert('❌ Failed to unassign leads. Please try again.');
+      }
     }
   };
 
@@ -349,7 +529,13 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
               color: darkMode ? 'white' : '#111827',
               margin: 0
             }}>
-              All Leads
+              {statusFilter === 'all' ? 'All Leads' :
+               statusFilter === 'active' ? 'Active Leads' :
+               statusFilter === 'pending' ? 'Pending Leads' :
+               statusFilter === 'closed-won' ? 'Closed Won Leads' :
+               statusFilter === 'closed-lost' ? 'Closed Lost Leads' :
+               statusFilter === 'unassigned' ? 'Unassigned Leads' :
+               statusFilter === 'assigned' ? 'Assigned Leads' : 'All Leads'}
             </h1>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -359,9 +545,16 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
                 color: darkMode ? '#d1d5db' : '#6b7280',
                 margin: 0
               }}>
-                {currentUser && ['admin', 'super-admin'].includes(currentUser.role) 
-                  ? 'Select a lead to assign to team members' 
-                  : 'All leads in the system'}
+                {statusFilter === 'all' ? 
+                  (currentUser && ['admin', 'super-admin'].includes(currentUser.role) 
+                    ? 'Select a lead to assign to team members' 
+                    : 'All leads in the system') :
+                 statusFilter === 'active' ? 'Leads that are actively being worked on' :
+                 statusFilter === 'pending' ? 'New leads that need attention' :
+                 statusFilter === 'closed-won' ? 'Successfully closed deals' :
+                 statusFilter === 'closed-lost' ? 'Lost opportunities' :
+                 statusFilter === 'unassigned' ? 'Leads waiting for assignment' :
+                 statusFilter === 'assigned' ? 'Leads assigned to team members' : 'Filtered leads'}
               </p>
               
               {/* Bulk Upload Button */}
@@ -386,36 +579,143 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
               </button>
             </div>
             
-            {/* Search Bar */}
-            <div style={{ position: 'relative', width: '300px' }}>
-              <input
-                type="text"
-                placeholder="Search leads..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+            {/* Filter and Search Bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              {/* Status Filter Dropdown */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
                 style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 36px',
+                  padding: '8px 12px',
                   border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
                   borderRadius: '8px',
                   backgroundColor: darkMode ? '#1f2937' : 'white',
                   color: darkMode ? 'white' : '#374151',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  minWidth: '150px'
                 }}
-              />
-              <div style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: darkMode ? '#9ca3af' : '#6b7280'
-              }}>
-                🔍
+              >
+                <option value="all">All Leads ({leads.length})</option>
+                <option value="active">Active ({leads.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length})</option>
+                <option value="pending">Pending ({leads.filter(l => ['new', 'pending'].includes(l.status)).length})</option>
+                <option value="closed-won">Closed Won ({leads.filter(l => l.status === 'closed-won').length})</option>
+                <option value="closed-lost">Closed Lost ({leads.filter(l => l.status === 'closed-lost').length})</option>
+                <option value="assigned">Assigned ({leads.filter(l => l.assignedTo).length})</option>
+                <option value="unassigned">Unassigned ({leads.filter(l => !l.assignedTo).length})</option>
+              </select>
+              
+              {/* Search Bar */}
+              <div style={{ position: 'relative', width: '300px' }}>
+                <input
+                  type="text"
+                  placeholder="Search leads..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 36px',
+                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                    borderRadius: '8px',
+                    backgroundColor: darkMode ? '#1f2937' : 'white',
+                    color: darkMode ? 'white' : '#374151',
+                    fontSize: '14px'
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: darkMode ? '#9ca3af' : '#6b7280'
+                }}>
+                  🔍
+                </div>
               </div>
             </div>
           </div>
           
-          {/* Assign Dropdown - Only for admin/super-admin */}
+          {/* Bulk Actions - Only for admin/super-admin */}
+          {showBulkActions && currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              backgroundColor: darkMode ? '#4b5563' : '#f3f4f6',
+              borderRadius: '12px',
+              border: `2px solid ${darkMode ? '#60a5fa' : '#3b82f6'}`
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <p style={{
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  margin: 0
+                }}>
+                  {selectedLeads.length} leads selected
+                </p>
+                <select 
+                  onChange={(e) => {
+                    if (e.target.value === 'bd-group') {
+                      handleBulkAssignToGroup();
+                    } else {
+                      handleBulkAssign(e.target.value);
+                    }
+                    e.target.value = '';
+                  }}
+                  style={{
+                    padding: '0.5rem',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '8px',
+                    backgroundColor: darkMode ? '#1f2937' : 'white',
+                    color: darkMode ? 'white' : '#374151'
+                  }}
+                >
+                  <option value="">Bulk assign to...</option>
+                  <option value="bd-group">🎯 BD/Sales Team (Group)</option>
+                  <optgroup label="Individual Assignment">
+                    {users.filter(u => ['sales', 'manager', 'senior-manager'].includes(u.role)).map(user => (
+                      <option key={user._id} value={user._id}>
+                        👤 {user.name} ({user.role})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button
+                  onClick={handleBulkUnassign}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Unassign All
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedLeads([]);
+                    setShowBulkActions(false);
+                  }}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: 'transparent',
+                    color: darkMode ? '#d1d5db' : '#374151',
+                    border: `1px solid ${darkMode ? '#374151' : '#d1d5db'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Single Lead Assign Dropdown - Only for admin/super-admin */}
           {showAssignDropdown && selectedLeadId && currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
             <div style={{
               marginTop: '1rem',
@@ -508,6 +808,51 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
           overflow: 'hidden',
           boxShadow: darkMode ? '0 2px 4px rgba(0,0,0,0.2)' : '0 2px 4px rgba(0,0,0,0.1)'
         }}>
+          {/* Bulk Select Header - Only for admin/super-admin */}
+          {currentUser && ['admin', 'super-admin'].includes(currentUser.role) && filteredLeads.length > 0 && (
+            <div style={{
+              padding: '1rem',
+              borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`,
+              backgroundColor: darkMode ? '#4b5563' : '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: darkMode ? '#d1d5db' : '#374151'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={selectedLeads.length === filteredLeads.length && filteredLeads.length > 0}
+                  onChange={handleSelectAll}
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    cursor: 'pointer'
+                  }}
+                />
+                Select All ({filteredLeads.length} leads)
+              </label>
+              {selectedLeads.length > 0 && (
+                <span style={{
+                  padding: '0.25rem 0.75rem',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}>
+                  {selectedLeads.length} selected
+                </span>
+              )}
+            </div>
+          )}
           {loading ? (
             <div style={{
               padding: '40px',
@@ -535,47 +880,70 @@ const AllLeads = ({ darkMode = false, crmData = {} }) => {
             return (
             <div 
               key={leadId}
-              onClick={() => currentUser && ['admin', 'super-admin'].includes(currentUser.role) ? handleLeadSelect(leadId) : null}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 padding: '20px',
                 borderBottom: index < filteredLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
-                cursor: currentUser && ['admin', 'super-admin'].includes(currentUser.role) ? 'pointer' : 'default',
                 transition: 'all 0.2s',
                 backgroundColor: selectedLeadId === leadId 
                   ? (darkMode ? '#4b5563' : '#f0f9ff') 
+                  : selectedLeads.includes(leadId)
+                  ? (darkMode ? '#3b82f620' : '#dbeafe')
                   : 'transparent',
                 borderLeft: selectedLeadId === leadId 
                   ? `4px solid ${darkMode ? '#60a5fa' : '#3b82f6'}` 
+                  : selectedLeads.includes(leadId)
+                  ? `4px solid ${darkMode ? '#3b82f6' : '#60a5fa'}`
                   : '4px solid transparent'
               }}
               onMouseEnter={(e) => {
-                if (selectedLeadId !== leadId) {
+                if (selectedLeadId !== leadId && !selectedLeads.includes(leadId)) {
                   e.currentTarget.style.backgroundColor = darkMode ? '#4b556320' : '#f9fafb';
                 }
               }}
               onMouseLeave={(e) => {
-                if (selectedLeadId !== leadId) {
+                if (selectedLeadId !== leadId && !selectedLeads.includes(leadId)) {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }
               }}
             >
+              {/* Bulk Select Checkbox - Only for admin/super-admin */}
+              {currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
+                <div style={{ marginRight: '12px' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedLeads.includes(leadId)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleBulkSelect(leadId);
+                    }}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+              )}
               {/* Avatar */}
-              <div style={{
-                width: '48px',
-                height: '48px',
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontWeight: 'bold',
-                fontSize: '16px',
-                marginRight: '16px',
-                flexShrink: 0
-              }}>
+              <div 
+                onClick={() => currentUser && ['admin', 'super-admin'].includes(currentUser.role) ? handleLeadSelect(leadId) : null}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  marginRight: '16px',
+                  flexShrink: 0,
+                  cursor: currentUser && ['admin', 'super-admin'].includes(currentUser.role) ? 'pointer' : 'default'
+                }}>
                 {(lead.contactPerson || lead.name || 'U').split(' ').map(n => n[0]).join('')}
               </div>
 
