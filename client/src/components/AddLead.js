@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Building, Mail, Phone, DollarSign, Save, Send, X } from 'lucide-react';
 import { showToast } from './ToastNotification';
+import { trackLeadCreated } from '../utils/ga';
 
 const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
   const [formData, setFormData] = useState({
@@ -17,19 +18,60 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     requirements: '',
     assignedTo: '',
     status: 'new',
-    companyId: 'default-greencall'
+    companyId: 'default-greencall',
+    product: ''
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [companies] = useState([{ _id: 'default-greencall', name: 'GreenCall CRM' }]);
+  const [products, setProducts] = useState([]);
+  const [userProductHistory, setUserProductHistory] = useState([]);
 
-  // Initialize with default company
+  // Initialize with default company and fetch products
   useEffect(() => {
     if (user?.role === 'super-admin') {
       setFormData(prev => ({ ...prev, companyId: 'default-greencall' }));
     }
+    fetchProducts();
+    fetchUserProductHistory();
   }, [user]);
+
+  const fetchProducts = async () => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+      const response = await fetch(`${apiUrl}/products`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data.products || data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const fetchUserProductHistory = async () => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+      const response = await fetch(`${apiUrl}/leads/user/product-history`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserProductHistory(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching user product history:', error);
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -38,6 +80,7 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     if (!formData.companyName.trim()) newErrors.companyName = 'Company name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    if (!formData.product) newErrors.product = 'Product selection is required';
     
     if (user?.role === 'super-admin' && !formData.companyId) {
       newErrors.companyId = 'Please select a company';
@@ -47,9 +90,9 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       newErrors.email = 'Please enter a valid email address';
     }
     
-    const phoneDigits = formData.phone.replace(/[^\d]/g, '');
-    if (formData.phone && (phoneDigits.length !== 10 || !phoneDigits.match(/^[6-9]/))) {
-      newErrors.phone = 'Please enter a valid 10-digit phone number starting with 6-9';
+    const phoneDigits = formData.phone.replace(/[^\d+]/g, '');
+    if (formData.phone && (phoneDigits.length < 7 || phoneDigits.length > 15)) {
+      newErrors.phone = 'Please enter a valid phone number (7-15 digits)';
     }
     
     setErrors(newErrors);
@@ -111,7 +154,8 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
         priority: formData.priority,
         requirements: formData.requirements,
         assignedTo: formData.assignedTo,
-        status: 'new'
+        status: 'new',
+        product: formData.product
       };
       
       if (user?.role === 'super-admin') {
@@ -122,6 +166,15 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       console.log('🏢 CompanyId being sent:', leadData.companyId);
 
       await onSave(leadData);
+      
+      // Track lead creation in GA4
+      trackLeadCreated({
+        source: leadData.leadSource,
+        status: leadData.status,
+        value: leadData.estimatedValue,
+        priority: leadData.priority,
+        industry: leadData.industry
+      });
     } catch (error) {
       console.error('Error saving lead:', error);
       setIsSubmitting(false);
@@ -257,6 +310,81 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
                 )}
               </div>
             )}
+            
+            {/* Product Selection */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>
+                Select Product/Service <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              {userProductHistory.length > 0 && (
+                <div style={{
+                  marginBottom: '0.5rem',
+                  padding: '0.5rem',
+                  backgroundColor: darkMode ? '#374151' : '#f0f9ff',
+                  borderRadius: '6px',
+                  border: `1px solid ${darkMode ? '#4b5563' : '#bfdbfe'}`
+                }}>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    color: darkMode ? '#60a5fa' : '#3b82f6',
+                    margin: '0 0 0.25rem 0',
+                    fontWeight: '600'
+                  }}>
+                    💡 Your recent products:
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {userProductHistory.slice(0, 3).map(history => (
+                      <button
+                        key={history._id}
+                        type="button"
+                        onClick={() => handleInputChange('product', history._id)}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.75rem',
+                          border: 'none',
+                          borderRadius: '12px',
+                          backgroundColor: history.productColor || '#22c55e',
+                          color: 'white',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem'
+                        }}
+                      >
+                        {history.productIcon} {history.productName} ({history.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <select
+                value={formData.product}
+                onChange={(e) => handleInputChange('product', e.target.value)}
+                style={errors.product ? errorInputStyle : inputStyle}
+                required
+              >
+                <option value="">Choose a product/service</option>
+                {products.map(product => (
+                  <option key={product._id} value={product._id}>
+                    {product.icon} {product.name}
+                  </option>
+                ))}
+              </select>
+              {errors.product && (
+                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                  {errors.product}
+                </p>
+              )}
+              {user?.role === 'super-admin' && (
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: darkMode ? '#9ca3af' : '#6b7280',
+                  marginTop: '0.25rem'
+                }}>
+                  💼 As super admin, you can add new products in Product Management
+                </p>
+              )}
+            </div>
             {/* Contact Person */}
             <div>
               <label style={labelStyle}>

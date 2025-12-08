@@ -7,7 +7,10 @@ const {
   deleteLead,
   addNote,
   assignLead,
-  getMyLeads
+  getMyLeads,
+  getLeadsByProduct,
+  getProductLeadStats,
+  getUserProductHistory
 } = require('../controllers/leadController');
 const { auth } = require('../middleware/auth');
 const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
@@ -22,6 +25,9 @@ router.route('/')
   .post(createLead);
 
 router.get('/my-leads', getMyLeads);
+router.get('/product/:productId', getLeadsByProduct);
+router.get('/stats/products', getProductLeadStats);
+router.get('/user/product-history', getUserProductHistory);
 router.post('/assign', handleLeadAssignmentNotification, assignLead);
 
 router.route('/:id')

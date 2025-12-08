@@ -129,10 +129,8 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                   }
                 }
                 
-                // For admin roles, show all leads
-                if (user.role === 'super-admin' || user.role === 'admin') {
-                  return true;
-                }
+                // For My Leads section, even admin/super-admin should only see their own leads
+                // Remove this block to ensure all users only see their own leads in My Leads
                 
                 return false;
               });
@@ -168,10 +166,8 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
                 }
               }
               
-              // For admin roles, show all leads
-              if (user.role === 'super-admin' || user.role === 'admin') {
-                return true;
-              }
+              // For My Leads section, even admin/super-admin should only see their own leads
+              // Remove this block to ensure all users only see their own leads in My Leads
               
               return false;
             });

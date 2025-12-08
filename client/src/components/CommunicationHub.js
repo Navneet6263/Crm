@@ -192,8 +192,8 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
 
     setSending(true);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004';
-      const response = await fetch(`${apiUrl}/api/communications/send-email`, {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+      const response = await fetch(`${apiUrl}/communications/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

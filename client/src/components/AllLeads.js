@@ -18,6 +18,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [productFilter, setProductFilter] = useState('all');
   const [editData, setEditData] = useState({
     contactPerson: '',
     companyName: '',
@@ -45,25 +47,50 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     }
   }, []);
 
-  // Fetch leads and users on component mount
+  // Fetch leads, users, and products on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [leadsResponse, usersResponse] = await Promise.all([
-          fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
+        console.log('🔄 Fetching data with productFilter:', productFilter);
+        
+        const [leadsResponse, usersResponse, productsResponse] = await Promise.all([
+          fetch(`${apiService.getApiUrl()}/leads?limit=10000${productFilter !== 'all' ? `&product=${productFilter}` : ''}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'
             }
           }),
-          apiService.getUsers()
+          apiService.getUsers(),
+          fetch(`${apiService.getApiUrl()}/products`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            }
+          })
         ]);
         
         const leadsData = await leadsResponse.json();
         const leads = leadsData.leads || leadsData || [];
+        console.log('📊 Fetched leads:', leads.length);
+        console.log('📊 Sample lead statuses:', leads.slice(0, 3).map(l => ({ status: l.status, assignedTo: !!l.assignedTo })));
+        console.log('🎨 Sample lead products:', leads.slice(0, 3).map(l => ({ 
+          id: l._id, 
+          productData: l.product,
+          productColor: l.product?.color,
+          productName: l.product?.name,
+          productIcon: l.product?.icon
+        })));
+        
         setLeads(Array.isArray(leads) ? leads : []);
         setUsers(usersResponse || []);
+        
+        if (productsResponse.ok) {
+          const productsData = await productsResponse.json();
+          const productsList = Array.isArray(productsData) ? productsData : (productsData.products || productsData || []);
+          setProducts(productsList);
+          console.log('📦 Fetched products:', productsList.length);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
         // Fallback to crmData if API fails
@@ -74,12 +101,12 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     };
     
     fetchData();
-  }, [crmData.leads]);
+  }, [productFilter]); // Removed crmData.leads dependency to prevent conflicts
 
-  // Filter leads based on search term and status filter
+  // Filter leads based on search term, status filter, and product filter
   const filteredLeads = leads.filter(lead => {
     // First apply search filter
-    const matchesSearch = 
+    const matchesSearch = !searchTerm || 
       (lead.contactPerson || lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (lead.companyName || lead.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -88,23 +115,61 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     
     // Then apply status filter
     let matchesStatus = true;
-    if (statusFilter === 'active') {
-      matchesStatus = ['qualified', 'proposal', 'negotiation', 'contacted'].includes(lead.status);
-    } else if (statusFilter === 'pending') {
-      matchesStatus = ['new', 'pending'].includes(lead.status);
-    } else if (statusFilter === 'closed-won') {
-      matchesStatus = lead.status === 'closed-won';
-    } else if (statusFilter === 'closed-lost') {
-      matchesStatus = lead.status === 'closed-lost';
-    } else if (statusFilter === 'unassigned') {
-      matchesStatus = !lead.assignedTo;
-    } else if (statusFilter === 'assigned') {
-      matchesStatus = !!lead.assignedTo;
+    if (statusFilter && statusFilter !== 'all') {
+      if (statusFilter === 'active') {
+        matchesStatus = ['qualified', 'proposal', 'negotiation', 'contacted'].includes(lead.status);
+      } else if (statusFilter === 'pending') {
+        matchesStatus = ['new', 'pending'].includes(lead.status);
+      } else if (statusFilter === 'closed-won') {
+        matchesStatus = lead.status === 'closed-won';
+      } else if (statusFilter === 'closed-lost') {
+        matchesStatus = lead.status === 'closed-lost';
+      } else if (statusFilter === 'unassigned') {
+        matchesStatus = !lead.assignedTo;
+      } else if (statusFilter === 'assigned') {
+        matchesStatus = !!lead.assignedTo;
+      }
     }
-    // statusFilter === 'all' shows all leads
     
-    return matchesSearch && matchesStatus;
+    // Apply product filter
+    let matchesProduct = true;
+    if (productFilter && productFilter !== 'all') {
+      const leadProductId = lead.product?._id || lead.product;
+      matchesProduct = leadProductId === productFilter;
+    }
+    
+    return matchesSearch && matchesStatus && matchesProduct;
   });
+  
+  // Debug filter counts
+  console.log('📊 Filter Debug:', {
+    totalLeads: leads.length,
+    filteredLeads: filteredLeads.length,
+    statusFilter,
+    searchTerm,
+    productFilter,
+    activeCount: leads.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length,
+    pendingCount: leads.filter(l => ['new', 'pending'].includes(l.status)).length,
+    assignedCount: leads.filter(l => l.assignedTo).length,
+    unassignedCount: leads.filter(l => !l.assignedTo).length,
+    sampleLeadProducts: leads.slice(0, 3).map(l => ({ 
+      id: l._id, 
+      product: l.product, 
+      productId: l.product?._id || l.product 
+    }))
+  });
+  
+  // Debug product filter specifically
+  if (productFilter && productFilter !== 'all') {
+    console.log('🔍 Product Filter Debug:', {
+      selectedProductId: productFilter,
+      leadsWithThisProduct: leads.filter(l => {
+        const leadProductId = l.product?._id || l.product;
+        return leadProductId === productFilter;
+      }).length,
+      allLeadProducts: leads.map(l => l.product?._id || l.product).filter(Boolean)
+    });
+  }
 
   const handleLeadSelect = (leadId) => {
     console.log('Selecting lead ID:', leadId);
@@ -581,6 +646,38 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
             
             {/* Filter and Search Bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              {/* Product Filter Dropdown */}
+              <select
+                value={productFilter}
+                onChange={(e) => {
+                  console.log('🔄 Product filter changed to:', e.target.value);
+                  setProductFilter(e.target.value);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                  borderRadius: '8px',
+                  backgroundColor: darkMode ? '#1f2937' : 'white',
+                  color: darkMode ? 'white' : '#374151',
+                  fontSize: '14px',
+                  minWidth: '180px',
+                  marginRight: '0.5rem'
+                }}
+              >
+                <option value="all">All Products ({leads.length})</option>
+                {products.map(product => {
+                  const count = leads.filter(l => {
+                    const productId = l.product?._id || l.product;
+                    return productId === product._id;
+                  }).length;
+                  return (
+                    <option key={product._id} value={product._id}>
+                      {product.icon} {product.name} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+              
               {/* Status Filter Dropdown */}
               <select
                 value={statusFilter}
@@ -595,7 +692,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                   minWidth: '150px'
                 }}
               >
-                <option value="all">All Leads ({leads.length})</option>
+                <option value="all">All Status ({leads.length})</option>
                 <option value="active">Active ({leads.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length})</option>
                 <option value="pending">Pending ({leads.filter(l => ['new', 'pending'].includes(l.status)).length})</option>
                 <option value="closed-won">Closed Won ({leads.filter(l => l.status === 'closed-won').length})</option>
@@ -950,6 +1047,29 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
               {/* Lead Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  {/* Product Badge */}
+                  {lead.product && (
+                    <span 
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        backgroundColor: (typeof lead.product === 'object' && lead.product.color) || 
+                                       (products.find(p => p._id === lead.product)?.color) || '#22c55e',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      title={`Product ID: ${typeof lead.product === 'object' ? lead.product._id : lead.product}`}
+                    >
+                      {(typeof lead.product === 'object' && lead.product.icon) || 
+                       (products.find(p => p._id === lead.product)?.icon) || '🔵'} 
+                      {(typeof lead.product === 'object' && lead.product.name) || 
+                       (products.find(p => p._id === lead.product)?.name) || 'Product'}
+                    </span>
+                  )}
                   <h3 style={{
                     fontSize: '18px',
                     fontWeight: '600',

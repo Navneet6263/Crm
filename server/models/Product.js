@@ -3,51 +3,32 @@ const mongoose = require('mongoose');
 const productSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Product name is required'],
+    required: true,
     trim: true
   },
-  description: {
+  color: {
     type: String,
-    trim: true
+    default: '#22c55e'
   },
-  category: {
+  icon: {
     type: String,
-    required: [true, 'Product category is required'],
-    trim: true
-  },
-  price: {
-    type: Number,
-    required: [true, 'Product price is required'],
-    min: 0
-  },
-  currency: {
-    type: String,
-    default: 'INR'
-  },
-  sku: {
-    type: String,
-    unique: true,
-    trim: true
+    default: '🔵'
   },
   isActive: {
     type: Boolean,
     default: true
   },
-  features: [String],
-  specifications: {
-    type: Map,
-    of: String
-  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company'
   }
 }, {
   timestamps: true
 });
-
-productSchema.index({ name: 'text', description: 'text' });
-productSchema.index({ category: 1, isActive: 1 });
 
 module.exports = mongoose.model('Product', productSchema);

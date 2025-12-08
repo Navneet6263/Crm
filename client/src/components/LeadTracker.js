@@ -17,6 +17,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
   // New states for enhanced features
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [productFilter, setProductFilter] = useState('all');
+  const [products, setProducts] = useState([]);
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
@@ -74,8 +76,16 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
       filtered = filtered.filter(lead => lead.status === statusFilter);
     }
     
+    // Product filter
+    if (productFilter !== 'all') {
+      filtered = filtered.filter(lead => {
+        const leadProductId = lead.product?._id || lead.product;
+        return leadProductId === productFilter;
+      });
+    }
+    
     return filtered;
-  }, [myLeads, searchTerm, statusFilter, fuzzyMatch]);
+  }, [myLeads, searchTerm, statusFilter, productFilter, fuzzyMatch]);
 
   // Mobile detection
   useEffect(() => {
@@ -84,9 +94,28 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Optional WebSocket connection (disabled for now)
+  // Fetch products
   useEffect(() => {
-    // WebSocket functionality disabled - can be enabled when WebSocket server is available
+    const fetchProducts = async () => {
+      try {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+        const response = await fetch(`${apiUrl}/products`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const productsList = Array.isArray(data) ? data : (data.products || data || []);
+          setProducts(productsList);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
+    
+    fetchProducts();
     setWsConnection(null);
   }, []);
 
@@ -408,6 +437,36 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
               />
             </div>
 
+            {/* Product Filter */}
+            <select
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+              style={{
+                padding: '0.75rem',
+                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                borderRadius: '8px',
+                background: darkMode ? '#374151' : 'white',
+                color: darkMode ? 'white' : '#1f2937',
+                fontSize: '1rem',
+                outline: 'none',
+                minWidth: '180px',
+                marginRight: '0.5rem'
+              }}
+            >
+              <option value="all">All Products ({leads.length})</option>
+              {products.map(product => {
+                const count = leads.filter(l => {
+                  const leadProductId = l.product?._id || l.product;
+                  return leadProductId === product._id;
+                }).length;
+                return (
+                  <option key={product._id} value={product._id}>
+                    {product.icon} {product.name} ({count})
+                  </option>
+                );
+              })}
+            </select>
+            
             {/* Status Filter */}
             <select
               value={statusFilter}

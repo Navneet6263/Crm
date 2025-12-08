@@ -1,6 +1,7 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
 const Company = require('../models/Company');
+const Product = require('../models/Product');
 const { getCompanyInfo } = require('../utils/authHelpers');
 
 const createLead = async (req, res) => {
@@ -48,6 +49,21 @@ const createLead = async (req, res) => {
     if (!phoneRegex.test(req.body.phone.replace(/[^\d]/g, ''))) {
       return res.status(400).json({ 
         message: 'Please enter a valid 10-digit phone number' 
+      });
+    }
+    
+    // Validate product selection
+    if (!req.body.product) {
+      return res.status(400).json({ 
+        message: 'Product selection is required' 
+      });
+    }
+    
+    // Verify product exists
+    const product = await Product.findById(req.body.product);
+    if (!product) {
+      return res.status(400).json({ 
+        message: 'Selected product not found' 
       });
     }
     
@@ -225,14 +241,17 @@ const createLead = async (req, res) => {
     
     const lead = await Lead.create(leadData);
     
-    // Populate the lead with user details
+    // Populate the lead with user and product details
     await lead.populate('createdBy assignedTo', 'name email');
+    await lead.populate('product', 'name color icon');
     
-    console.log('✅ Lead created successfully with createdBy:', {
+    console.log('✅ Lead created successfully:', {
       leadId: lead._id,
       contactPerson: lead.contactPerson,
       createdBy: lead.createdBy,
-      assignedTo: lead.assignedTo
+      assignedTo: lead.assignedTo,
+      product: lead.product,
+      productColor: lead.product?.color
     });
     
     res.status(201).json(lead);
@@ -266,19 +285,29 @@ const getLeads = async (req, res) => {
       role: req.user.role
     });
     
-    const { status, priority, assignedTo, search, page = 1, limit = 10000 } = req.query;
+    const { status, priority, assignedTo, search, page = 1, limit = 10000, product } = req.query;
     
     let query = { isActive: true };
     
+    // Check if this is a "My Leads" request based on query parameters or route
+    const isMyLeadsRequest = req.query.myLeads === 'true' || req.originalUrl.includes('/my-leads');
+    
     // Role-based filtering
-    if (req.user.role === 'super-admin') {
-      // Super-admin can see all leads from all companies
+    if (isMyLeadsRequest) {
+      // For "My Leads" section, ALL users (including admin/super-admin) see only their own leads
+      console.log('🔒 My Leads request - showing only user\'s own leads for role:', req.user.role);
+      query.$or = [
+        { createdBy: req.user._id || req.user.id },
+        { assignedTo: req.user._id || req.user.id }
+      ];
+    } else if (req.user.role === 'super-admin') {
+      // Super-admin can see all leads from all companies (for All Leads section)
       console.log('🔑 Super-admin access - showing all leads from all companies');
     } else if (req.user.role === 'admin' || req.user.role === 'manager') {
-      // Admin and Manager can see all leads (no company restriction)
+      // Admin and Manager can see all leads (for All Leads section)
       console.log('🔑 Admin/Manager access - showing all leads');
     } else {
-      // Normal users (including sales) can only see leads created by them or assigned to them
+      // Normal users can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
       query.$or = [
         { createdBy: req.user._id || req.user.id },
@@ -288,6 +317,7 @@ const getLeads = async (req, res) => {
     
     if (status) query.status = status;
     if (priority) query.priority = priority;
+    if (product) query.product = product;
     if (assignedTo && ['super-admin', 'admin', 'manager'].includes(req.user.role)) {
       query.assignedTo = assignedTo;
     }
@@ -312,6 +342,7 @@ const getLeads = async (req, res) => {
 
     const leads = await Lead.find(query)
       .populate('createdBy assignedTo', 'name email role')
+      .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -319,6 +350,12 @@ const getLeads = async (req, res) => {
     const total = await Lead.countDocuments(query);
     
     console.log('📊 Found leads:', leads.length);
+    console.log('🎨 Sample product data in leads:', leads.slice(0, 2).map(l => ({
+      leadId: l._id,
+      productData: l.product,
+      productColor: l.product?.color,
+      productName: l.product?.name
+    })));
     console.log('=== END GET ALL LEADS ===\n');
 
     res.json({
@@ -337,6 +374,7 @@ const getLeadById = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id)
       .populate('createdBy assignedTo', 'name email')
+      .populate('product', 'name color icon')
       .populate('notes.createdBy activities.createdBy', 'name');
     
     if (!lead) {
@@ -597,6 +635,7 @@ const getMyLeads = async (req, res) => {
 
     const leads = await Lead.find(query)
       .populate('createdBy assignedTo', 'name email role')
+      .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -627,6 +666,151 @@ const getMyLeads = async (req, res) => {
   }
 };
 
+const getLeadsByProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { page = 1, limit = 10000 } = req.query;
+    
+    let query = { isActive: true, product: productId };
+    
+    // Role-based filtering
+    if (req.user.role === 'super-admin') {
+      // Super-admin can see all leads
+    } else if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // Admin and Manager can see all leads
+    } else {
+      // Normal users can only see leads created by them or assigned to them
+      query.$or = [
+        { createdBy: req.user._id || req.user.id },
+        { assignedTo: req.user._id || req.user.id }
+      ];
+    }
+    
+    const leads = await Lead.find(query)
+      .populate('createdBy assignedTo', 'name email role')
+      .populate('product', 'name color icon')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Lead.countDocuments(query);
+    
+    res.json({
+      leads,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching leads by product:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const getProductLeadStats = async (req, res) => {
+  try {
+    let matchQuery = { isActive: true };
+    
+    // Role-based filtering
+    if (req.user.role === 'super-admin') {
+      // Super-admin can see all leads
+    } else if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // Admin and Manager can see all leads
+    } else {
+      // Normal users can only see leads created by them or assigned to them
+      matchQuery.$or = [
+        { createdBy: req.user._id || req.user.id },
+        { assignedTo: req.user._id || req.user.id }
+      ];
+    }
+    
+    const stats = await Lead.aggregate([
+      { $match: matchQuery },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'product',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: '$productInfo' },
+      {
+        $group: {
+          _id: '$product',
+          productName: { $first: '$productInfo.name' },
+          productColor: { $first: '$productInfo.color' },
+          productIcon: { $first: '$productInfo.icon' },
+          totalLeads: { $sum: 1 },
+          newLeads: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'new'] }, 1, 0]
+            }
+          },
+          qualifiedLeads: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'qualified'] }, 1, 0]
+            }
+          },
+          closedWonLeads: {
+            $sum: {
+              $cond: [{ $eq: ['$status', 'closed-won'] }, 1, 0]
+            }
+          },
+          totalValue: { $sum: '$estimatedValue' },
+          avgValue: { $avg: '$estimatedValue' }
+        }
+      },
+      { $sort: { totalLeads: -1 } }
+    ]);
+    
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching product lead stats:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const getUserProductHistory = async (req, res) => {
+  try {
+    const userId = req.user._id || req.user.id;
+    
+    const history = await Lead.aggregate([
+      {
+        $match: {
+          createdBy: userId,
+          isActive: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'product',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: '$productInfo' },
+      {
+        $group: {
+          _id: '$product',
+          productName: { $first: '$productInfo.name' },
+          productColor: { $first: '$productInfo.color' },
+          productIcon: { $first: '$productInfo.icon' },
+          count: { $sum: 1 },
+          lastUsed: { $max: '$createdAt' }
+        }
+      },
+      { $sort: { count: -1, lastUsed: -1 } }
+    ]);
+    
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching user product history:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -635,5 +819,8 @@ module.exports = {
   deleteLead,
   addNote,
   assignLead,
-  getMyLeads
+  getMyLeads,
+  getLeadsByProduct,
+  getProductLeadStats,
+  getUserProductHistory
 };

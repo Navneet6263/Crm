@@ -41,6 +41,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const communicationRoutes = require('./routes/communicationRoutes');
+const productRoutes = require('./routes/productRoutes');
 const { initializePassport } = require('./controllers/oauthController');
 const { createLeadAssignmentNotification, createLeadCreationNotification } = require('./controllers/notificationController');
 
@@ -1031,10 +1032,14 @@ app.use('/api/security', authenticateToken, require('./routes/securityRoutes'));
 // Super Admin Routes
 app.use('/api/super-admin', authenticateToken, require('./routes/superAdminRoutes'));
 
-// Communication, Task, and Calendar Routes
+// Communication, Task, Calendar, and Product Routes
 app.use('/api/communications', authenticateToken, communicationRoutes);
 app.use('/api/tasks', authenticateToken, taskRoutes);
 app.use('/api/calendar', authenticateToken, calendarRoutes);
+app.use('/api/products', authenticateToken, productRoutes);
+
+// Analytics Routes
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 // AI Routes
 app.use('/api/ai', require('./routes/ai'));

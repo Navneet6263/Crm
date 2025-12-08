@@ -143,6 +143,11 @@ const leadSchema = new mongoose.Schema({
   requirements: {
     type: String,
     trim: true
+  },
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true
   }
 }, {
   timestamps: true

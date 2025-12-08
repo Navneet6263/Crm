@@ -479,10 +479,10 @@ const toggleUserStatus = async (req, res) => {
       role: req.user.role
     });
     
-    // Only super-admin can toggle user status
-    if (req.user.role !== 'super-admin') {
-      console.log('Access denied - not super admin');
-      return res.status(403).json({ message: 'Only super-admin can toggle user status' });
+    // Only super-admin and admin can toggle user status
+    if (!['super-admin', 'admin'].includes(req.user.role)) {
+      console.log('Access denied - not super admin or admin');
+      return res.status(403).json({ message: 'Only super-admin or admin can toggle user status' });
     }
 
     const { userId } = req.params;
@@ -531,10 +531,10 @@ const createEmployee = async (req, res) => {
       companyId: req.user.companyId
     });
 
-    // Only super-admin can create employees
-    if (req.user.role !== 'super-admin') {
-      console.log('❌ Access denied - not super admin');
-      return res.status(403).json({ message: 'Only super-admin can create employees' });
+    // Only super-admin and admin can create employees
+    if (!['super-admin', 'admin'].includes(req.user.role)) {
+      console.log('❌ Access denied - not super admin or admin');
+      return res.status(403).json({ message: 'Only super-admin or admin can create employees' });
     }
 
     const { name, email, password, role } = req.body;
@@ -687,10 +687,10 @@ const deleteUser = async (req, res) => {
       role: req.user.role
     });
     
-    // Only super-admin can delete users
-    if (req.user.role !== 'super-admin') {
-      console.log('Access denied - not super admin');
-      return res.status(403).json({ message: 'Only super-admin can delete users' });
+    // Only super-admin and admin can delete users
+    if (!['super-admin', 'admin'].includes(req.user.role)) {
+      console.log('Access denied - not super admin or admin');
+      return res.status(403).json({ message: 'Only super-admin or admin can delete users' });
     }
 
     const { userId } = req.params;
@@ -734,10 +734,10 @@ const updateUser = async (req, res) => {
       updateData: req.body
     });
     
-    // Only super-admin can update users
-    if (req.user.role !== 'super-admin') {
-      console.log('Access denied - not super admin');
-      return res.status(403).json({ message: 'Only super-admin can update users' });
+    // Only super-admin and admin can update users
+    if (!['super-admin', 'admin'].includes(req.user.role)) {
+      console.log('Access denied - not super admin or admin');
+      return res.status(403).json({ message: 'Only super-admin or admin can update users' });
     }
 
     const { userId } = req.params;

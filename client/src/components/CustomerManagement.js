@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import customerService from '../services/customerService';
 import CustomerFormModal from './CustomerFormModal';
+import { trackCustomerConverted } from '../utils/ga';
 import { 
   Users, 
   Plus, 
@@ -8,6 +9,7 @@ import {
   Filter, 
   Eye, 
   Edit, 
+  Trash2,
   FileText, 
   DollarSign,
   Phone,
@@ -57,67 +59,22 @@ const CustomerManagement = ({ darkMode, crmData, userRole }) => {
         joinDate: customer.createdAt || new Date().toISOString(),
         accountManager: customer.assignedTo?.name || 'Sales Team',
         lastContact: customer.lastInteraction || customer.updatedAt || new Date().toISOString(),
-        documents: [],
-        invoices: [],
+        documents: customer.documents || [],
+        invoices: customer.invoices || [],
         notes: customer.notes || (customer.noteHistory?.map(note => note.content).join('; ')) || 'No notes',
-        rating: Math.floor(Math.random() * 2) + 4 // Random rating between 4-5
+        rating: customer.rating || Math.floor(Math.random() * 2) + 4
       }));
       
-      // Also include converted leads from crmData if available
-      const leadsArray = Array.isArray(crmData?.leads) ? crmData.leads : (crmData?.leads?.leads || []);
-      const convertedLeads = leadsArray
-        .filter(lead => lead.status === 'converted')
-        .map(lead => ({
-          id: `lead_${lead._id || lead.id}`,
-          name: lead.contactPerson,
-          company: lead.companyName,
-          email: lead.email,
-          phone: lead.phone,
-          industry: lead.industry || 'General',
-          location: lead.location || 'Not specified',
-          status: 'active',
-          totalValue: lead.estimatedValue || 0,
-          joinDate: lead.createdDate || new Date().toISOString(),
-          accountManager: lead.assignedTo || 'Sales Team',
-          lastContact: new Date().toISOString(),
-          documents: [],
-          invoices: [],
-          notes: lead.notes || 'Converted from lead',
-          rating: 4
-        }));
-      
-      const allCustomers = [...formattedCustomers, ...convertedLeads];
+      const allCustomers = formattedCustomers;
       setCustomers(allCustomers);
       setFilteredCustomers(allCustomers);
     } catch (err) {
       console.error('Error fetching customers:', err);
       setError(err.message);
       
-      // Fallback to converted leads only
-      const leadsArray = Array.isArray(crmData?.leads) ? crmData.leads : (crmData?.leads?.leads || []);
-      const convertedLeads = leadsArray
-        .filter(lead => lead.status === 'converted')
-        .map(lead => ({
-          id: `lead_${lead._id || lead.id}`,
-          name: lead.contactPerson,
-          company: lead.companyName,
-          email: lead.email,
-          phone: lead.phone,
-          industry: lead.industry || 'General',
-          location: lead.location || 'Not specified',
-          status: 'active',
-          totalValue: lead.estimatedValue || 0,
-          joinDate: lead.createdDate || new Date().toISOString(),
-          accountManager: lead.assignedTo || 'Sales Team',
-          lastContact: new Date().toISOString(),
-          documents: [],
-          invoices: [],
-          notes: lead.notes || 'Converted from lead',
-          rating: 4
-        }));
-      
-      setCustomers(convertedLeads);
-      setFilteredCustomers(convertedLeads);
+      // Fallback to empty array
+      setCustomers([]);
+      setFilteredCustomers([]);
     } finally {
       setLoading(false);
     }
@@ -184,14 +141,21 @@ const CustomerManagement = ({ darkMode, crmData, userRole }) => {
       joinDate: newCustomer.createdAt || new Date().toISOString(),
       accountManager: newCustomer.assignedTo?.name || 'Sales Team',
       lastContact: newCustomer.updatedAt || new Date().toISOString(),
-      documents: [],
-      invoices: [],
+      documents: newCustomer.documents || [],
+      invoices: newCustomer.invoices || [],
       notes: newCustomer.notes || 'New customer',
-      rating: 4
+      rating: newCustomer.rating || 4
     };
     
     setCustomers(prev => [formattedCustomer, ...prev]);
     setFilteredCustomers(prev => [formattedCustomer, ...prev]);
+    
+    // Track customer conversion in GA4
+    trackCustomerConverted({
+      value: formattedCustomer.totalValue,
+      source: 'manual_entry',
+      industry: formattedCustomer.industry
+    });
   };
 
   const handleCustomerUpdated = (updatedCustomer) => {
@@ -210,10 +174,10 @@ const CustomerManagement = ({ darkMode, crmData, userRole }) => {
       joinDate: updatedCustomer.createdAt || new Date().toISOString(),
       accountManager: updatedCustomer.assignedTo?.name || 'Sales Team',
       lastContact: updatedCustomer.updatedAt || new Date().toISOString(),
-      documents: [],
-      invoices: [],
+      documents: updatedCustomer.documents || [],
+      invoices: updatedCustomer.invoices || [],
       notes: updatedCustomer.notes || 'Updated customer',
-      rating: 4
+      rating: updatedCustomer.rating || 4
     };
     
     setCustomers(prev => prev.map(c => c.id === formattedCustomer.id ? formattedCustomer : c));
@@ -223,6 +187,23 @@ const CustomerManagement = ({ darkMode, crmData, userRole }) => {
   const handleEditCustomer = (customer) => {
     setEditingCustomer(customer);
     setShowAddModal(true);
+  };
+
+  const handleDeleteCustomer = async (customer) => {
+    if (window.confirm(`Are you sure you want to delete customer "${customer.name}"? This action cannot be undone.`)) {
+      try {
+        await customerService.deleteCustomer(customer.id);
+        
+        // Remove from local state
+        setCustomers(prev => prev.filter(c => c.id !== customer.id));
+        setFilteredCustomers(prev => prev.filter(c => c.id !== customer.id));
+        
+        alert('Customer deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting customer:', error);
+        alert(`Failed to delete customer: ${error.message}`);
+      }
+    }
   };
 
   const getStatusColor = (status) => {
@@ -580,8 +561,7 @@ const CustomerManagement = ({ darkMode, crmData, userRole }) => {
               {/* Action Buttons */}
               <div style={{
                 display: 'flex',
-                gap: '0.5rem',
-                justifyContent: 'space-between'
+                gap: '0.5rem'
               }}>
                 <button
                   onClick={() => handleViewCustomer(customer)}
@@ -602,30 +582,51 @@ const CustomerManagement = ({ darkMode, crmData, userRole }) => {
                   }}
                 >
                   <Eye size={16} />
-                  View Details
+                  View
                 </button>
                 {(userRole === 'super-admin' || userRole === 'admin' || userRole === 'sales-manager') && (
-                  <button
-                    onClick={() => handleEditCustomer(customer)}
-                    style={{
-                      flex: 1,
-                      padding: '0.75rem',
-                      background: 'linear-gradient(135deg, #22c55e, #4ade80)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem',
-                      fontWeight: '500'
-                    }}
-                  >
-                    <Edit size={16} />
-                    Edit Customer
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleEditCustomer(customer)}
+                      style={{
+                        flex: 1,
+                        padding: '0.75rem',
+                        background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCustomer(customer)}
+                      style={{
+                        padding: '0.75rem',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
                 )}
               </div>
             </div>

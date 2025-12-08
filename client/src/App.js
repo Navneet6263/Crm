@@ -6,6 +6,7 @@ import './styles/mobile.css';
 import rbacService from './services/rbacService';
 import { menuSections } from './config/navigationConfig';
 import apiService from './services/apiService';
+import { trackPageView, trackUserLogin, trackUserSignup } from './utils/ga';
 
 import { initTokenCleanup } from './utils/tokenUtils';
 
@@ -35,6 +36,7 @@ import SuperAdminDashboard from './components/SuperAdminDashboard';
 // Lazy loaded components
 const EnhancedSupportCenter = lazy(() => import('./components/EnhancedSupportCenter'));
 const CustomerManagement = lazy(() => import('./components/CustomerManagement'));
+const ProductManagement = lazy(() => import('./components/ProductManagement'));
 const MyLeads = lazy(() => import('./components/MyLeads'));
 const RoleBasedDashboard = lazy(() => import('./components/RoleBasedDashboard'));
 const LeadHistory = lazy(() => import('./components/LeadHistory'));
@@ -233,6 +235,11 @@ const AppContent = () => {
     setActiveView(view);
     setNavigationParams(params);
     
+    // Track page view for GA4
+    if (isLoggedIn) {
+      trackPageView(`/${view}`);
+    }
+    
     // Update browser history
     if (isLoggedIn && view !== activeView) {
       const title = getPageTitle(view);
@@ -380,6 +387,9 @@ const AppContent = () => {
       setIsLoggedIn(true);
       setActiveView('dashboard');
       
+      // Track login event
+      trackUserLogin(user.role);
+      
       showToast('success', `Welcome back, ${user.name}!`);
       return true;
     } catch (error) {
@@ -422,6 +432,9 @@ const AppContent = () => {
       localStorage.setItem('authToken', token);
       setCurrentUser(user);
       setIsLoggedIn(true);
+      
+      // Track signup event
+      trackUserSignup(user.role);
       
       // Show company setup if needed
       if (needsCompanySetup) {
@@ -602,6 +615,11 @@ const AppContent = () => {
           <CustomerTimeline darkMode={darkMode} customer={crmData.customers && crmData.customers.length > 0 ? crmData.customers[0] : null} />
         </div>
       );
+      case 'product-management': 
+        if (!['super-admin', 'admin', 'manager', 'senior-manager'].includes(currentUser?.role)) {
+          return <AccessDenied darkMode={darkMode} message="You need Admin or Manager role to access Product Management" />;
+        }
+        return <ProductManagement darkMode={darkMode} />;
       case 'company-management':
         if (currentUser?.role !== 'super-admin') {
           return <AccessDenied darkMode={darkMode} message="Only Super Admin can access Company Management" />;

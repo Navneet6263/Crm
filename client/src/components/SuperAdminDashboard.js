@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../services/apiService';
 import config from '../config';
-import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield, Settings, Plus, Eye, UserCheck, UserX } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield, Settings, Plus, Eye, UserCheck, UserX, BarChart3, Activity, Clock, Download } from 'lucide-react';
 import BookDemoModal from './BookDemoModal';
 import SuperAdminManagement from './SuperAdminManagement';
+import CRMAnalytics from './CRMAnalytics';
 
 // Employee Management Component
 const EmployeeManagement = ({ darkMode, currentUser }) => {
@@ -341,8 +342,8 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
           margin: 0
         }}>Employee Management ({filteredEmployees.length}/{employees.length})</h2>
         
-        {/* Only Super Admin can add employees */}
-        {currentUser?.role === 'super-admin' && (
+        {/* Super Admin and Admin can add employees */}
+        {(currentUser?.role === 'super-admin' || currentUser?.role === 'admin') && (
           <button
             onClick={() => setShowAddForm(true)}
             style={{
@@ -360,8 +361,8 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
           </button>
         )}
         
-        {/* Admin can only view */}
-        {(currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.role === 'senior-manager') && (
+        {/* Manager and Senior Manager view only */}
+        {(currentUser?.role === 'manager' || currentUser?.role === 'senior-manager') && (
           <div style={{
             padding: '0.5rem 1rem',
             background: darkMode ? '#374151' : '#f3f4f6',
@@ -371,7 +372,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
             fontSize: '0.875rem',
             fontWeight: '600'
           }}>
-{currentUser?.role === 'admin' ? 'Admin View' : currentUser?.role === 'manager' ? 'Manager Dashboard' : 'Senior Manager Dashboard'}
+{currentUser?.role === 'manager' ? 'Manager Dashboard' : 'Senior Manager Dashboard'}
           </div>
         )}
       </div>
@@ -555,7 +556,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                   </td>
                   <td style={{ padding: '1rem' }}>
                     {/* Role-based actions */}
-                    {currentUser?.role === 'super-admin' ? (
+                    {(currentUser?.role === 'super-admin' || currentUser?.role === 'admin') ? (
                       <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => handleEditEmployee(employee)}
@@ -646,8 +647,7 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                         borderRadius: '6px',
                         fontSize: '0.75rem'
                       }}>
-                        {currentUser?.role === 'admin' ? 'Admin View' : 
-                         currentUser?.role === 'manager' ? 'Manager View' : 
+                        {currentUser?.role === 'manager' ? 'Manager View' : 
                          currentUser?.role === 'senior-manager' ? 'Sr. Manager View' : 'View Only'}
                       </span>
                     )}
@@ -1828,6 +1828,25 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
               <Shield size={16} />
               Super Admin Management
             </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: activeTab === 'analytics' ? 'linear-gradient(135deg, #10b981, #34d399)' : 'transparent',
+                color: activeTab === 'analytics' ? 'white' : (darkMode ? '#cbd5e1' : '#6b7280'),
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <BarChart3 size={16} />
+              CRM Users & Analytics
+            </button>
           </div>
         )}
       </div>
@@ -1835,6 +1854,8 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
       {/* Render based on active tab */}
       {activeTab === 'management' && currentUser?.role === 'super-admin' ? (
         <SuperAdminManagement darkMode={darkMode} />
+      ) : activeTab === 'analytics' && currentUser?.role === 'super-admin' ? (
+        <CRMAnalytics darkMode={darkMode} />
       ) : (
         <>
           {/* Loading State */}
