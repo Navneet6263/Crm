@@ -42,6 +42,7 @@ const taskSchema = new mongoose.Schema({
   },
   notificationsSent: {
     fifteenMin: { type: Boolean, default: false },
+    tenMin: { type: Boolean, default: false },
     fiveMin: { type: Boolean, default: false }
   },
   assignedTo: {

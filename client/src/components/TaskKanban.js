@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   X, 
@@ -12,7 +12,18 @@ import {
   Trash,
   AlertCircle,
   ChevronDown,
-  Search
+  Search,
+  Bell,
+  BellOff,
+  Repeat,
+  BarChart3,
+  Filter,
+  Download,
+  TrendingUp,
+  Target,
+  Zap,
+  MessageSquare,
+  Paperclip
 } from 'lucide-react';
 import apiService from '../services/apiService';
 import { showToast } from './ToastNotification';
@@ -31,7 +42,12 @@ const TaskKanban = ({ darkMode }) => {
     type: 'call',
     relatedTo: 'lead',
     relatedId: '',
-    emailNotification: false
+    emailNotification: false,
+    browserNotification: true,
+    reminderTime: '15',
+    isRecurring: false,
+    recurringPattern: 'daily',
+    recurringEndDate: ''
   });
   const [draggedTask, setDraggedTask] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
@@ -40,6 +56,108 @@ const TaskKanban = ({ darkMode }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState([]);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [viewMode, setViewMode] = useState('kanban');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [upcomingTasks, setUpcomingTasks] = useState([]);
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  // Request notification permission
+  useEffect(() => {
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        setNotificationsEnabled(true);
+        console.log('✅ Browser notifications are enabled');
+      } else if (Notification.permission === 'default') {
+        // Don't auto-request, let user click the bell icon
+        console.log('🔔 Notification permission not requested yet');
+      } else {
+        console.log('❌ Notification permission denied');
+        setNotificationsEnabled(false);
+      }
+    } else {
+      console.log('❌ Browser does not support notifications');
+    }
+  }, []);
+
+  // Check for upcoming tasks and send notifications
+  useEffect(() => {
+    const checkUpcomingTasks = async () => {
+      const now = new Date();
+      
+      const upcoming = tasks.filter(task => {
+        if (task.status === 'completed') return false;
+        
+        // Fix date parsing
+        let taskDateTime;
+        try {
+          if (task.dueDate && task.dueTime) {
+            const dateStr = task.dueDate.includes('T') ? task.dueDate.split('T')[0] : task.dueDate;
+            taskDateTime = new Date(`${dateStr}T${task.dueTime}`);
+          } else if (task.dueDate) {
+            const dateStr = task.dueDate.includes('T') ? task.dueDate.split('T')[0] : task.dueDate;
+            taskDateTime = new Date(`${dateStr}T00:00:00`);
+          } else {
+            return false;
+          }
+        } catch (error) {
+          return false;
+        }
+        
+        if (isNaN(taskDateTime.getTime())) {
+          return false;
+        }
+        
+        const timeDiff = taskDateTime - now;
+        const minutesDiff = Math.floor(timeDiff / 60000);
+        
+        return minutesDiff > 0 && minutesDiff <= 60;
+      });
+      
+      setUpcomingTasks(upcoming);
+
+      // Send browser notifications
+      if (notificationsEnabled) {
+        for (const task of upcoming) {
+          let taskDateTime;
+          try {
+            const dateStr = task.dueDate.includes('T') ? task.dueDate.split('T')[0] : task.dueDate;
+            taskDateTime = new Date(`${dateStr}T${task.dueTime || '00:00:00'}`);
+          } catch (error) {
+            continue;
+          }
+          
+          if (isNaN(taskDateTime.getTime())) {
+            continue;
+          }
+          
+          const timeDiff = taskDateTime - now;
+          const minutesDiff = Math.floor(timeDiff / 60000);
+          
+          // 15 minute notification
+          if (minutesDiff <= 15 && minutesDiff > 10 && !task.notificationsSent?.fifteenMin) {
+            showBrowserNotification(task, '15 minutes');
+            await updateTaskNotificationStatus(task._id, 'fifteenMin');
+          } 
+          // 10 minute notification
+          else if (minutesDiff <= 10 && minutesDiff > 5 && !task.notificationsSent?.tenMin) {
+            showBrowserNotification(task, '10 minutes');
+            await updateTaskNotificationStatus(task._id, 'tenMin');
+          }
+          // 5 minute notification
+          else if (minutesDiff <= 5 && minutesDiff > 0 && !task.notificationsSent?.fiveMin) {
+            showBrowserNotification(task, '5 minutes');
+            await updateTaskNotificationStatus(task._id, 'fiveMin');
+          }
+        }
+      }
+    };
+
+    const interval = setInterval(checkUpcomingTasks, 30000);
+    checkUpcomingTasks();
+    return () => clearInterval(interval);
+  }, [tasks, notificationsEnabled]);
 
   // Load data from backend API
   useEffect(() => {
@@ -47,6 +165,63 @@ const TaskKanban = ({ darkMode }) => {
     loadUsers();
     loadLeads();
   }, []);
+
+  const showBrowserNotification = (task, timeLeft) => {
+    if (Notification.permission === 'granted') {
+      try {
+        const notification = new Notification('⏰ Task Reminder', {
+          body: `"${task.title}" is due in ${timeLeft}!`,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: `task-${task._id}-${timeLeft.replace(' ', '')}`,
+          requireInteraction: true,
+          silent: false,
+          vibrate: [200, 100, 200]
+        });
+        
+        notification.onclick = () => {
+          window.focus();
+          setEditingTask(task);
+          notification.close();
+        };
+        
+        setTimeout(() => {
+          notification.close();
+        }, 15000);
+        
+        showToast('info', `🔔 Reminder: ${task.title} due in ${timeLeft}`);
+      } catch (error) {
+        showToast('error', '❌ Notification failed to send');
+      }
+    } else {
+      showToast('warning', `⏰ Task due in ${timeLeft}: ${task.title}`);
+    }
+  };
+  
+  const updateTaskNotificationStatus = async (taskId, notificationType) => {
+    try {
+      await apiService.updateTask(taskId, {
+        [`notificationsSent.${notificationType}`]: true
+      });
+      
+      // Update local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task._id === taskId 
+            ? {
+                ...task,
+                notificationsSent: {
+                  ...task.notificationsSent,
+                  [notificationType]: true
+                }
+              }
+            : task
+        )
+      );
+    } catch (error) {
+      // Silent fail
+    }
+  };
 
   const loadTasks = async () => {
     try {
@@ -137,11 +312,22 @@ const TaskKanban = ({ darkMode }) => {
     try {
       const taskData = {
         ...newTask,
-        status: newTask.status === 'todo' ? 'pending' : newTask.status
+        status: newTask.status === 'todo' ? 'pending' : newTask.status,
+        browserNotification: newTask.browserNotification && notificationsEnabled,
+        notificationsSent: {
+          fifteenMin: false,
+          tenMin: false,
+          fiveMin: false
+        }
       };
       
       const createdTask = await apiService.createTask(taskData);
       setTasks([...tasks, createdTask]);
+      
+      // Show success notification
+      if (notificationsEnabled && newTask.browserNotification) {
+        showBrowserNotification(createdTask, 'Task created successfully!');
+      }
       
       setNewTask({
         title: '',
@@ -154,7 +340,12 @@ const TaskKanban = ({ darkMode }) => {
         type: 'call',
         relatedTo: 'lead',
         relatedId: '',
-        emailNotification: false
+        emailNotification: false,
+        browserNotification: true,
+        reminderTime: '15',
+        isRecurring: false,
+        recurringPattern: 'daily',
+        recurringEndDate: ''
       });
       setShowAddTask(false);
       showToast('success', '✅ Task created successfully');
@@ -162,6 +353,21 @@ const TaskKanban = ({ darkMode }) => {
       console.error('Error creating task:', error);
       showToast('error', '❌ Failed to create task');
     }
+  };
+
+  const getTaskAnalytics = () => {
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === 'completed').length;
+    const pending = tasks.filter(t => t.status === 'pending').length;
+    const inProgress = tasks.filter(t => t.status === 'in-progress').length;
+    const overdue = tasks.filter(t => {
+      if (t.status === 'completed') return false;
+      const dueDate = new Date(t.dueDate);
+      return dueDate < new Date();
+    }).length;
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return { total, completed, pending, inProgress, overdue, completionRate };
   };
 
   const handleUpdateTask = async () => {
@@ -247,6 +453,16 @@ const TaskKanban = ({ darkMode }) => {
         return false;
       }
       
+      // Apply priority filter
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter) {
+        return false;
+      }
+      
+      // Apply type filter
+      if (typeFilter !== 'all' && task.type !== typeFilter) {
+        return false;
+      }
+      
       // Apply search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -259,6 +475,29 @@ const TaskKanban = ({ darkMode }) => {
       
       return true;
     });
+  };
+
+  const exportTasks = () => {
+    const csv = [
+      ['Title', 'Description', 'Status', 'Priority', 'Type', 'Due Date', 'Assignee'],
+      ...filteredTasks.map(t => [
+        t.title,
+        t.description || '',
+        t.status,
+        t.priority,
+        t.type,
+        new Date(t.dueDate).toLocaleDateString(),
+        t.assignee || 'Unassigned'
+      ])
+    ].map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tasks-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    showToast('success', '✅ Tasks exported successfully');
   };
 
   const filteredTasks = getFilteredTasks();
@@ -284,7 +523,7 @@ const TaskKanban = ({ darkMode }) => {
     <div style={containerStyle}>
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Calendar style={{ color: '#8b5cf6' }} size={32} />
             <div>
@@ -301,26 +540,160 @@ const TaskKanban = ({ darkMode }) => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowAddTask(true)}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '1rem',
-              fontWeight: '500'
-            }}
-          >
-            <Plus size={18} />
-            Add Task
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={async () => {
+                if ('Notification' in window) {
+                  if (Notification.permission === 'granted') {
+                    setNotificationsEnabled(!notificationsEnabled);
+                    showToast('info', notificationsEnabled ? '🔕 Notifications disabled' : '🔔 Notifications enabled');
+                  } else if (Notification.permission === 'default') {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                      setNotificationsEnabled(true);
+                      showToast('success', '✅ Notifications enabled! You will get reminders 15, 10, and 5 minutes before tasks.');
+                    } else {
+                      showToast('error', '❌ Notification permission denied');
+                    }
+                  } else {
+                    showToast('error', '❌ Notifications are blocked. Please enable them in browser settings.');
+                  }
+                } else {
+                  showToast('error', '❌ Your browser does not support notifications');
+                }
+              }}
+              style={{
+                padding: '0.75rem',
+                background: notificationsEnabled ? '#10b981' : (darkMode ? '#374151' : '#f3f4f6'),
+                color: notificationsEnabled ? 'white' : (darkMode ? '#9ca3af' : '#6b7280'),
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              title={notificationsEnabled ? 'Notifications ON - Click to disable' : 'Notifications OFF - Click to enable'}
+            >
+              {notificationsEnabled ? <Bell size={18} /> : <BellOff size={18} />}
+            </button>
+            <button
+              onClick={() => setShowAnalytics(!showAnalytics)}
+              style={{
+                padding: '0.75rem 1rem',
+                background: darkMode ? '#374151' : '#f3f4f6',
+                color: darkMode ? '#d1d5db' : '#374151',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <BarChart3 size={18} />
+              Analytics
+            </button>
+            <button
+              onClick={exportTasks}
+              style={{
+                padding: '0.75rem 1rem',
+                background: darkMode ? '#374151' : '#f3f4f6',
+                color: darkMode ? '#d1d5db' : '#374151',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <Download size={18} />
+              Export
+            </button>
+
+            <button
+              onClick={() => setShowAddTask(true)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '1rem',
+                fontWeight: '500'
+              }}
+            >
+              <Plus size={18} />
+              Add Task
+            </button>
+          </div>
         </div>
+
+        {/* Analytics Dashboard */}
+        {showAnalytics && (() => {
+          const analytics = getTaskAnalytics();
+          return (
+            <div style={{
+              ...cardStyle,
+              padding: '1.5rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#3b82f6' }}>{analytics.total}</div>
+                  <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Total Tasks</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#10b981' }}>{analytics.completed}</div>
+                  <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Completed</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#8b5cf6' }}>{analytics.inProgress}</div>
+                  <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>In Progress</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#f59e0b' }}>{analytics.pending}</div>
+                  <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Pending</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#ef4444' }}>{analytics.overdue}</div>
+                  <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Overdue</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', fontWeight: '700', color: '#22c55e' }}>{analytics.completionRate}%</div>
+                  <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Completion Rate</div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Upcoming Tasks Alert */}
+        {upcomingTasks.length > 0 && (
+          <div style={{
+            ...cardStyle,
+            padding: '1rem',
+            marginBottom: '1rem',
+            background: darkMode ? 'rgba(251, 191, 36, 0.1)' : 'rgba(251, 191, 36, 0.05)',
+            borderLeft: '4px solid #f59e0b'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <Zap size={20} style={{ color: '#f59e0b' }} />
+              <div>
+                <div style={{ fontWeight: '600', color: darkMode ? 'white' : '#1f2937' }}>
+                  {upcomingTasks.length} task{upcomingTasks.length > 1 ? 's' : ''} due within 1 hour
+                </div>
+                <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                  {upcomingTasks.map(t => t.title).join(', ')}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -328,42 +701,41 @@ const TaskKanban = ({ darkMode }) => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '1.5rem'
+        marginBottom: '1.5rem',
+        gap: '1rem',
+        flexWrap: 'wrap'
       }}>
         <div style={{
           display: 'flex',
-          gap: '0.5rem'
+          gap: '0.5rem',
+          flexWrap: 'wrap'
         }}>
           <button
             onClick={() => setFilter('all')}
             style={{
               padding: '0.5rem 1rem',
-              background: filter === 'all' ? 
-                (darkMode ? '#374151' : '#f3f4f6') : 
-                'transparent',
-              color: darkMode ? '#d1d5db' : '#374151',
-              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              background: filter === 'all' ? '#3b82f6' : 'transparent',
+              color: filter === 'all' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+              border: `1px solid ${filter === 'all' ? '#3b82f6' : (darkMode ? '#374151' : '#e5e7eb')}`,
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.875rem',
-              fontWeight: filter === 'all' ? '600' : '500'
+              fontWeight: '500'
             }}
           >
-            All Tasks
+            All
           </button>
           <button
             onClick={() => setFilter('todo')}
             style={{
               padding: '0.5rem 1rem',
-              background: filter === 'todo' ? 
-                (darkMode ? '#374151' : '#f3f4f6') : 
-                'transparent',
-              color: darkMode ? '#d1d5db' : '#374151',
-              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              background: filter === 'todo' ? '#3b82f6' : 'transparent',
+              color: filter === 'todo' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+              border: `1px solid ${filter === 'todo' ? '#3b82f6' : (darkMode ? '#374151' : '#e5e7eb')}`,
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.875rem',
-              fontWeight: filter === 'todo' ? '600' : '500'
+              fontWeight: '500'
             }}
           >
             To Do
@@ -372,15 +744,13 @@ const TaskKanban = ({ darkMode }) => {
             onClick={() => setFilter('in-progress')}
             style={{
               padding: '0.5rem 1rem',
-              background: filter === 'in-progress' ? 
-                (darkMode ? '#374151' : '#f3f4f6') : 
-                'transparent',
-              color: darkMode ? '#d1d5db' : '#374151',
-              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              background: filter === 'in-progress' ? '#8b5cf6' : 'transparent',
+              color: filter === 'in-progress' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+              border: `1px solid ${filter === 'in-progress' ? '#8b5cf6' : (darkMode ? '#374151' : '#e5e7eb')}`,
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.875rem',
-              fontWeight: filter === 'in-progress' ? '600' : '500'
+              fontWeight: '500'
             }}
           >
             In Progress
@@ -389,19 +759,59 @@ const TaskKanban = ({ darkMode }) => {
             onClick={() => setFilter('done')}
             style={{
               padding: '0.5rem 1rem',
-              background: filter === 'done' ? 
-                (darkMode ? '#374151' : '#f3f4f6') : 
-                'transparent',
-              color: darkMode ? '#d1d5db' : '#374151',
-              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              background: filter === 'done' ? '#10b981' : 'transparent',
+              color: filter === 'done' ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+              border: `1px solid ${filter === 'done' ? '#10b981' : (darkMode ? '#374151' : '#e5e7eb')}`,
               borderRadius: '6px',
               cursor: 'pointer',
               fontSize: '0.875rem',
-              fontWeight: filter === 'done' ? '600' : '500'
+              fontWeight: '500'
             }}
           >
             Done
           </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '6px',
+              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '0.875rem'
+            }}
+          >
+            <option value="all">All Priorities</option>
+            <option value="urgent">🔴 Urgent</option>
+            <option value="high">🟠 High</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="low">🟢 Low</option>
+          </select>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '6px',
+              border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '0.875rem'
+            }}
+          >
+            <option value="all">All Types</option>
+            <option value="call">📞 Call</option>
+            <option value="email">📧 Email</option>
+            <option value="meeting">🤝 Meeting</option>
+            <option value="follow-up">🔄 Follow-up</option>
+            <option value="demo">🎯 Demo</option>
+            <option value="other">📋 Other</option>
+          </select>
         </div>
 
         <div style={{
@@ -1179,7 +1589,8 @@ const TaskKanban = ({ darkMode }) => {
                   cursor: 'pointer',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  color: darkMode ? '#d1d5db' : '#374151'
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.75rem'
                 }}>
                   <input
                     type="checkbox"
@@ -1194,13 +1605,97 @@ const TaskKanban = ({ darkMode }) => {
                   />
                   <span>📧 Send Email Notifications</span>
                 </label>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: darkMode ? '#d1d5db' : '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={newTask.browserNotification}
+                    onChange={(e) => setNewTask({ ...newTask, browserNotification: e.target.checked })}
+                    disabled={!notificationsEnabled}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: notificationsEnabled ? 'pointer' : 'not-allowed',
+                      accentColor: '#10b981'
+                    }}
+                  />
+                  <span>🔔 Browser Notifications {!notificationsEnabled && '(Enable in header)'}</span>
+                </label>
                 <p style={{
                   fontSize: '0.75rem',
                   color: darkMode ? '#9ca3af' : '#6b7280',
                   margin: '0.5rem 0 0 2rem'
                 }}>
-                  When a task is created, the assigned user (assignee) will automatically receive an email notification with all task details.
+                  Get reminders 15, 10, and 5 minutes before task due time
                 </p>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: darkMode ? '#d1d5db' : '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={newTask.isRecurring}
+                    onChange={(e) => setNewTask({ ...newTask, isRecurring: e.target.checked })}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer',
+                      accentColor: '#8b5cf6'
+                    }}
+                  />
+                  <Repeat size={16} />
+                  <span>Recurring Task</span>
+                </label>
+                {newTask.isRecurring && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginLeft: '2rem' }}>
+                    <select
+                      value={newTask.recurringPattern}
+                      onChange={(e) => setNewTask({ ...newTask, recurringPattern: e.target.value })}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        background: darkMode ? '#1f2937' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={newTask.recurringEndDate}
+                      onChange={(e) => setNewTask({ ...newTask, recurringEndDate: e.target.value })}
+                      placeholder="End Date"
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        background: darkMode ? '#1f2937' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div style={{

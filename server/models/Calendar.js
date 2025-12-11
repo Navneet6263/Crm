@@ -28,7 +28,7 @@ const calendarSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['meeting', 'call', 'demo', 'email', 'task', 'other'],
+    enum: ['meeting', 'call', 'demo', 'email', 'follow-up', 'task', 'other'],
     default: 'meeting'
   },
   status: {

@@ -34,6 +34,13 @@ const taskReminderCron = cron.schedule('* * * * *', async () => {
         await task.save();
       }
 
+      // 10 minute reminder
+      if (minutesDiff === 10 && !task.notificationsSent.tenMin) {
+        await sendReminder(task, '10 minutes');
+        task.notificationsSent.tenMin = true;
+        await task.save();
+      }
+
       // 5 minute reminder
       if (minutesDiff === 5 && !task.notificationsSent.fiveMin) {
         await sendReminder(task, '5 minutes');

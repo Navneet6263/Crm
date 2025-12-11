@@ -163,22 +163,76 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
 
   const allTemplates = [...defaultTemplates, ...customTemplates];
 
-  const handleCall = () => {
+  const handleCall = async () => {
     if (lead?.phone) {
-      // In a real app, this would integrate with a calling service
-      window.open(`tel:${lead.phone}`);
-      showToast('info', `📞 Initiating call to ${lead.contactPerson}...`);
+      try {
+        // Log call activity
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+        await fetch(`${apiUrl}/communications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          },
+          body: JSON.stringify({
+            type: 'call',
+            subject: `Call to ${lead.contactPerson}`,
+            content: `Initiated call to ${lead.phone}`,
+            recipient: lead.phone,
+            leadId: lead._id || lead.id,
+            status: 'initiated'
+          })
+        });
+        
+        // Open dialer
+        window.open(`tel:${lead.phone}`);
+        showToast('success', `📞 Call initiated to ${lead.contactPerson}`);
+      } catch (error) {
+        console.error('Error logging call:', error);
+        window.open(`tel:${lead.phone}`);
+        showToast('info', `📞 Initiating call to ${lead.contactPerson}...`);
+      }
     } else {
       showToast('error', '❌ No phone number available');
     }
   };
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = async () => {
     if (lead?.phone) {
-      const message = customMessage || `Hi ${lead.contactPerson}, this is regarding your inquiry about our CRM solutions. I'd love to discuss how we can help ${lead.companyName} grow!`;
-      const whatsappUrl = `https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
-      showToast('success', '💬 WhatsApp message sent!');
+      try {
+        const message = customMessage || `Hi ${lead.contactPerson}, this is regarding your inquiry about our CRM solutions. I'd love to discuss how we can help ${lead.companyName} grow!`;
+        
+        // Log WhatsApp activity
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+        await fetch(`${apiUrl}/communications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          },
+          body: JSON.stringify({
+            type: 'whatsapp',
+            subject: `WhatsApp to ${lead.contactPerson}`,
+            content: message,
+            recipient: lead.phone,
+            leadId: lead._id || lead.id,
+            status: 'sent'
+          })
+        });
+        
+        const cleanPhone = lead.phone.replace(/[^0-9]/g, '');
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        showToast('success', '💬 WhatsApp opened successfully!');
+        setCustomMessage(''); // Clear message after sending
+      } catch (error) {
+        console.error('Error logging WhatsApp:', error);
+        const message = customMessage || `Hi ${lead.contactPerson}, this is regarding your inquiry about our CRM solutions.`;
+        const cleanPhone = lead.phone.replace(/[^0-9]/g, '');
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        showToast('success', '💬 WhatsApp opened!');
+      }
     } else {
       showToast('error', '❌ No phone number available');
     }
@@ -286,16 +340,46 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
       .replace(/\[Calendar Link\]/g, '[Calendar Link]');
   };
 
-  const generateMeetingLink = () => {
-    // Generate a mock meeting link
-    const meetingId = Math.random().toString(36).substring(2, 15);
-    const meetingLink = `https://meet.google.com/${meetingId}`;
-    
-    navigator.clipboard.writeText(meetingLink).then(() => {
+  const generateMeetingLink = async () => {
+    try {
+      // Generate meeting link
+      const meetingId = Math.random().toString(36).substring(2, 15);
+      const meetingLink = `https://meet.google.com/${meetingId}`;
+      
+      // Log meeting activity
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+      await fetch(`${apiUrl}/communications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          type: 'meeting',
+          subject: `Meeting scheduled with ${lead.contactPerson}`,
+          content: `Meeting link generated: ${meetingLink}`,
+          recipient: lead.email,
+          leadId: lead._id || lead.id,
+          status: 'scheduled'
+        })
+      });
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(meetingLink);
       setCopied(true);
-      showToast('success', '🔗 Meeting link copied to clipboard!');
-      setTimeout(() => setCopied(false), 2000);
-    });
+      showToast('success', '🔗 Meeting link copied! Share with ' + lead.contactPerson);
+      setTimeout(() => setCopied(false), 3000);
+    } catch (error) {
+      console.error('Error generating meeting link:', error);
+      const meetingId = Math.random().toString(36).substring(2, 15);
+      const meetingLink = `https://meet.google.com/${meetingId}`;
+      
+      navigator.clipboard.writeText(meetingLink).then(() => {
+        setCopied(true);
+        showToast('success', '🔗 Meeting link copied!');
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
   };
 
   const containerStyle = {
@@ -1047,7 +1131,7 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
                 Generate a meeting link to share with {lead?.contactPerson}
               </p>
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                 <button
                   onClick={generateMeetingLink}
                   style={{
@@ -1061,13 +1145,67 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
                     fontWeight: '600',
                     display: 'flex',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: '0.5rem'
                   }}
                 >
                   {copied ? <Check size={20} /> : <Copy size={20} />}
-                  {copied ? 'Copied!' : 'Generate Link'}
+                  {copied ? 'Copied!' : 'Generate Google Meet'}
                 </button>
                 
+                <button
+                  onClick={() => {
+                    const zoomUrl = `https://zoom.us/start/videomeeting`;
+                    window.open(zoomUrl, '_blank');
+                    showToast('info', '📹 Zoom meeting started!');
+                  }}
+                  style={{
+                    padding: '1rem 1.5rem',
+                    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Video size={20} />
+                  Start Zoom
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const teamsUrl = `https://teams.microsoft.com/l/meetup-join/19%3ameeting_${Math.random().toString(36).substring(2, 15)}%40thread.v2/0?context=%7b%22Tid%22%3a%22${Math.random().toString(36).substring(2, 15)}%22%2c%22Oid%22%3a%22${Math.random().toString(36).substring(2, 15)}%22%7d`;
+                    navigator.clipboard.writeText(teamsUrl).then(() => {
+                      showToast('success', '💼 Teams link copied!');
+                    });
+                  }}
+                  style={{
+                    padding: '1rem 1.5rem',
+                    background: 'linear-gradient(135deg, #6264a7, #8b5cf6)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Copy size={20} />
+                  Copy Teams Link
+                </button>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                 <button
                   onClick={() => window.open('https://calendar.google.com', '_blank')}
                   style={{
@@ -1084,8 +1222,8 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
                     gap: '0.5rem'
                   }}
                 >
-                  <ExternalLink size={20} />
-                  Open Calendar
+                  <Calendar size={20} />
+                  Schedule in Calendar
                 </button>
               </div>
             </div>
