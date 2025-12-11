@@ -283,6 +283,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
       'contacted': { bg: darkMode ? '#7c2d12' : '#fed7aa', text: darkMode ? '#fb923c' : '#ea580c', border: '#f97316' },
       'qualified': { bg: darkMode ? '#065f46' : '#dcfce7', text: darkMode ? '#34d399' : '#059669', border: '#10b981' },
       'converted': { bg: darkMode ? '#14532d' : '#bbf7d0', text: darkMode ? '#4ade80' : '#16a34a', border: '#22c55e' },
+      'closed-won': { bg: darkMode ? '#14532d' : '#bbf7d0', text: darkMode ? '#4ade80' : '#16a34a', border: '#22c55e' },
+      'closed-lost': { bg: darkMode ? '#7f1d1d' : '#fee2e2', text: darkMode ? '#f87171' : '#dc2626', border: '#ef4444' },
       'lost': { bg: darkMode ? '#7f1d1d' : '#fee2e2', text: darkMode ? '#f87171' : '#dc2626', border: '#ef4444' },
       'proposal': { bg: darkMode ? '#581c87' : '#f3e8ff', text: darkMode ? '#c084fc' : '#9333ea', border: '#a855f7' },
       'negotiation': { bg: darkMode ? '#78350f' : '#fef3c7', text: darkMode ? '#fbbf24' : '#d97706', border: '#f59e0b' }
@@ -488,6 +490,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
               <option value="proposal">Proposal</option>
               <option value="negotiation">Negotiation</option>
               <option value="converted">Converted</option>
+              <option value="closed-won">Closed Won</option>
+              <option value="closed-lost">Closed Lost</option>
               <option value="lost">Lost</option>
             </select>
           </div>
@@ -530,6 +534,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
               <option value="proposal">Proposal</option>
               <option value="negotiation">Negotiation</option>
               <option value="converted">Converted</option>
+              <option value="closed-won">Closed Won</option>
+              <option value="closed-lost">Closed Lost</option>
               <option value="lost">Lost</option>
             </select>
             
@@ -1037,6 +1043,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                         <option value="proposal">Proposal</option>
                         <option value="negotiation">Negotiation</option>
                         <option value="converted">Converted</option>
+                        <option value="closed-won">Closed Won</option>
+                        <option value="closed-lost">Closed Lost</option>
                         <option value="lost">Lost</option>
                       </select>
                     </div>
@@ -1220,6 +1228,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                         <option value="proposal">Proposal</option>
                         <option value="negotiation">Negotiation</option>
                         <option value="converted">Converted</option>
+                        <option value="closed-won">Closed Won</option>
+                        <option value="closed-lost">Closed Lost</option>
                         <option value="lost">Lost</option>
                       </select>
                     </div>
@@ -1357,6 +1367,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                   <option value="proposal">Proposal</option>
                   <option value="negotiation">Negotiation</option>
                   <option value="converted">Converted</option>
+                  <option value="closed-won">Closed Won</option>
+                  <option value="closed-lost">Closed Lost</option>
                   <option value="lost">Lost</option>
                 </select>
               </div>

@@ -27,7 +27,18 @@ const DocumentManager = ({ darkMode, currentUser }) => {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    // Initialize with sample documents and folders
+    // Load saved documents from localStorage
+    const savedDocs = localStorage.getItem('documents');
+    if (savedDocs) {
+      try {
+        const parsed = JSON.parse(savedDocs);
+        setDocuments(parsed);
+      } catch (e) {
+        console.error('Failed to load documents:', e);
+      }
+    }
+    
+    // Initialize with sample folders
     const sampleFolders = [
       { id: 'contracts', name: 'Contracts', parent: 'root', createdDate: new Date().toISOString() },
       { id: 'proposals', name: 'Proposals', parent: 'root', createdDate: new Date().toISOString() },
@@ -35,55 +46,58 @@ const DocumentManager = ({ darkMode, currentUser }) => {
       { id: 'kyc', name: 'KYC Documents', parent: 'root', createdDate: new Date().toISOString() }
     ];
 
-    const sampleDocuments = [
-      {
-        id: 1,
-        name: 'Service Agreement - Tech Solutions Ltd.pdf',
-        type: 'pdf',
-        size: '2.5 MB',
-        folder: 'contracts',
-        uploadedBy: 'Navneet Kumar',
-        uploadDate: new Date().toISOString(),
-        starred: true,
-        tags: ['contract', 'tech-solutions']
-      },
-      {
-        id: 2,
-        name: 'Proposal - Digital Marketing Campaign.docx',
-        type: 'docx',
-        size: '1.8 MB',
-        folder: 'proposals',
-        uploadedBy: 'Sales Manager',
-        uploadDate: new Date().toISOString(),
-        starred: false,
-        tags: ['proposal', 'marketing']
-      },
-      {
-        id: 3,
-        name: 'Invoice - INV-2025-001.xlsx',
-        type: 'xlsx',
-        size: '0.5 MB',
-        folder: 'invoices',
-        uploadedBy: 'Admin User',
-        uploadDate: new Date().toISOString(),
-        starred: false,
-        tags: ['invoice', '2025']
-      },
-      {
-        id: 4,
-        name: 'Company Logo.png',
-        type: 'png',
-        size: '0.3 MB',
-        folder: 'root',
-        uploadedBy: 'Navneet Kumar',
-        uploadDate: new Date().toISOString(),
-        starred: true,
-        tags: ['logo', 'branding']
-      }
-    ];
+    // Only add sample documents if no saved documents exist
+    if (!savedDocs) {
+      const sampleDocuments = [
+        {
+          id: 1,
+          name: 'Service Agreement - Tech Solutions Ltd.pdf',
+          type: 'pdf',
+          size: '2.5 MB',
+          folder: 'contracts',
+          uploadedBy: 'Navneet Kumar',
+          uploadDate: new Date().toISOString(),
+          starred: true,
+          tags: ['contract', 'tech-solutions']
+        },
+        {
+          id: 2,
+          name: 'Proposal - Digital Marketing Campaign.docx',
+          type: 'docx',
+          size: '1.8 MB',
+          folder: 'proposals',
+          uploadedBy: 'Sales Manager',
+          uploadDate: new Date().toISOString(),
+          starred: false,
+          tags: ['proposal', 'marketing']
+        },
+        {
+          id: 3,
+          name: 'Invoice - INV-2025-001.xlsx',
+          type: 'xlsx',
+          size: '0.5 MB',
+          folder: 'invoices',
+          uploadedBy: 'Admin User',
+          uploadDate: new Date().toISOString(),
+          starred: false,
+          tags: ['invoice', '2025']
+        },
+        {
+          id: 4,
+          name: 'Company Logo.png',
+          type: 'png',
+          size: '0.3 MB',
+          folder: 'root',
+          uploadedBy: 'Navneet Kumar',
+          uploadDate: new Date().toISOString(),
+          starred: true,
+          tags: ['logo', 'branding']
+        }
+      ];
+      setDocuments(sampleDocuments);
+    }
 
     setFolders(sampleFolders);
-    setDocuments(sampleDocuments);
   }, []);
 
   const getFileIcon = (type) => {
@@ -101,22 +115,41 @@ const DocumentManager = ({ darkMode, currentUser }) => {
   };
 
   const handleFileUpload = (files) => {
+    if (!files || files.length === 0) return;
+    
     Array.from(files).forEach(file => {
+      // Create file URL for preview
+      const fileUrl = URL.createObjectURL(file);
+      
       const newDoc = {
         id: Date.now() + Math.random(),
         name: file.name,
-        type: file.name.split('.').pop(),
-        size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        type: file.name.split('.').pop().toLowerCase(),
+        size: file.size < 1024 * 1024 
+          ? `${(file.size / 1024).toFixed(1)} KB`
+          : `${(file.size / 1024 / 1024).toFixed(1)} MB`,
         folder: currentFolder,
         uploadedBy: currentUser?.name || 'Unknown',
         uploadDate: new Date().toISOString(),
         starred: false,
-        tags: []
+        tags: [],
+        fileUrl: fileUrl,
+        file: file
       };
 
       setDocuments(prev => [newDoc, ...prev]);
       showToast('success', `✅ ${file.name} uploaded successfully!`);
     });
+    
+    // Save to localStorage
+    setTimeout(() => {
+      const docsToSave = documents.map(doc => ({
+        ...doc,
+        fileUrl: undefined,
+        file: undefined
+      }));
+      localStorage.setItem('documents', JSON.stringify(docsToSave));
+    }, 100);
   };
 
   const handleDrop = (e) => {
@@ -144,13 +177,39 @@ const DocumentManager = ({ darkMode, currentUser }) => {
   };
 
   const deleteDocument = (docId) => {
-    setDocuments(prev => prev.filter(doc => doc.id !== docId));
+    const doc = documents.find(d => d.id === docId);
+    if (doc?.fileUrl) {
+      URL.revokeObjectURL(doc.fileUrl);
+    }
+    
+    const updatedDocs = documents.filter(doc => doc.id !== docId);
+    setDocuments(updatedDocs);
+    
+    // Update localStorage
+    const docsToSave = updatedDocs.map(doc => ({
+      ...doc,
+      fileUrl: undefined,
+      file: undefined
+    }));
+    localStorage.setItem('documents', JSON.stringify(docsToSave));
+    
     showToast('success', '🗑️ Document deleted successfully');
   };
 
   const downloadDocument = (doc) => {
-    // Mock download
-    showToast('info', `📥 Downloading ${doc.name}...`);
+    if (doc.file) {
+      // Real download for uploaded files
+      const link = document.createElement('a');
+      link.href = doc.fileUrl;
+      link.download = doc.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('success', `✅ ${doc.name} downloaded!`);
+    } else {
+      // Mock download for sample files
+      showToast('info', `📥 Downloading ${doc.name}...`);
+    }
   };
 
   const shareDocument = (doc) => {
@@ -512,6 +571,13 @@ const DocumentManager = ({ darkMode, currentUser }) => {
                     </button>
                     
                     <button
+                      onClick={() => {
+                        if (item.fileUrl) {
+                          window.open(item.fileUrl, '_blank');
+                        } else {
+                          showToast('info', 'Preview not available for sample files');
+                        }
+                      }}
                       style={{
                         padding: '0.5rem',
                         background: darkMode ? '#374151' : '#f3f4f6',

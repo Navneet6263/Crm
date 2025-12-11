@@ -254,6 +254,14 @@ const createLead = async (req, res) => {
       productColor: lead.product?.color
     });
     
+    // Create notification for managers/admins
+    try {
+      const { createLeadCreationNotification } = require('./notificationController');
+      await createLeadCreationNotification(lead._id, userId);
+    } catch (notifError) {
+      console.error('❌ Failed to create notification:', notifError);
+    }
+    
     res.status(201).json(lead);
   } catch (error) {
     console.error('Error creating lead:', error);

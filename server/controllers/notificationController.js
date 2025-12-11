@@ -141,7 +141,7 @@ const createLeadAssignmentNotification = async (leadId, assignedToUserId, assign
     // Create notification for assigned user
     const notification = await createNotification({
       title: '🎯 New Lead Assigned to You',
-      message: `Lead "${lead.companyName}" (${lead.contactPerson}) has been assigned to you by ${assignedByUser?.name || 'Admin'}`,
+      message: `Lead "${lead.companyName || lead.contactPerson}" has been assigned to you by ${assignedByUser?.name || 'Admin'}`,
       type: 'lead_assigned',
       userId: assignedToUserId,
       leadId: leadId,
@@ -176,11 +176,13 @@ const createLeadCreationNotification = async (leadId, createdByUserId) => {
       role: { $in: ['admin', 'manager', 'super-admin'] } 
     });
     
+    const createdByUser = await User.findById(createdByUserId);
+    
     for (const manager of managers) {
       if (manager._id.toString() !== createdByUserId.toString()) {
         await createNotification({
           title: 'New Lead Created',
-          message: `New lead "${lead.companyName}" created by ${lead.createdBy}`,
+          message: `New lead "${lead.companyName || lead.contactPerson}" created by ${createdByUser?.name || 'User'}`,
           type: 'lead_created',
           userId: manager._id,
           leadId: leadId,

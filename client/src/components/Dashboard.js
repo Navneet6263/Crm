@@ -11,7 +11,10 @@ import {
   Activity,
   UserCheck,
   Check,
-  X
+  X,
+  UserPlus,
+  Trophy,
+  Star
 } from 'lucide-react';
 import apiService from '../services/apiService';
 
@@ -24,6 +27,10 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
   const [modalItems, setModalItems] = useState([]);
   const [demoRequests, setDemoRequests] = useState([]);
   const [leads, setLeads] = useState([]);
+  const [performanceScore, setPerformanceScore] = useState(0);
+  
+  // Check if user is sales/support (not admin)
+  const isSalesUser = user?.role && !['super-admin', 'admin', 'manager', 'senior-manager'].includes(user.role);
 
   const handleStatCardClick = (stat) => {
     console.log('Stat card clicked:', stat.title);
@@ -66,6 +73,10 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
     // Calculate quick stats
     const customers = crmData.customers || [];
     
+    const wonCount = Array.isArray(leads) ? leads.filter(l => l.status === 'closed-won' || l.status === 'converted').length : 0;
+    const totalCount = leads.length;
+    const score = totalCount > 0 ? Math.round((wonCount / totalCount) * 100) : 0;
+    
     const stats = {
       totalLeads: leads.length,
       totalCustomers: customers.length,
@@ -76,24 +87,37 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
         weekAgo.setDate(weekAgo.getDate() - 7);
         return new Date(l.createdDate) > weekAgo;
       }).length : 0,
-      hotLeads: Array.isArray(leads) ? leads.filter(l => l.priority === 'high' && l.status !== 'converted').length : 0
+      hotLeads: Array.isArray(leads) ? leads.filter(l => l.priority === 'high' && l.status !== 'converted').length : 0,
+      activeLeads: Array.isArray(leads) ? leads.filter(l => ['qualified', 'proposal', 'negotiation'].includes(l.status)).length : 0,
+      pendingLeads: Array.isArray(leads) ? leads.filter(l => ['new', 'contacted'].includes(l.status)).length : 0
     };
     
     setQuickStats(stats);
+    setPerformanceScore(score);
 
-    // Generate activities from real data
+    // Generate activities from today's assigned leads only
     const activities = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    // Add recent lead activities
     const leadsArray = Array.isArray(leads) ? leads : [];
-    leadsArray.slice(0, 4).forEach((lead, index) => {
+    const todaysAssignedLeads = leadsArray.filter(lead => {
+      if (!lead.assignedTo) return false;
+      const assignDate = new Date(lead.assignedDate || lead.updatedAt || lead.createdDate);
+      assignDate.setHours(0, 0, 0, 0);
+      return assignDate.getTime() === today.getTime();
+    });
+    
+    todaysAssignedLeads.slice(0, 5).forEach((lead, index) => {
+      const assignedUser = lead.assignedTo?.name || lead.assignedTo || 'Team member';
       activities.push({
         id: index + 1,
-        type: 'lead_created',
-        message: `New lead: ${lead.companyName}`,
-        time: new Date(lead.createdDate).toLocaleDateString(),
-        icon: Users,
-        color: '#22c55e'
+        type: 'lead_assigned',
+        message: `${lead.companyName} assigned to ${assignedUser}`,
+        time: new Date(lead.assignedDate || lead.updatedAt || lead.createdDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        icon: UserPlus,
+        color: '#3b82f6',
+        leadId: lead.id
       });
     });
     
@@ -284,10 +308,11 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '24px',
                 animation: 'pulse 2s infinite'
-              }}>👋</div>
-              <div>
+              }}>
+                <Users size={32} color="white" />
+              </div>
+              <div style={{ flex: 1 }}>
                 <h1 style={{
                   fontSize: '2.5rem',
                   fontWeight: '800',
@@ -305,9 +330,35 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                   margin: 0,
                   fontWeight: '500'
                 }}>
-                  🚀 Here's your sales empire today
+                  Here's your sales empire today
                 </p>
               </div>
+              
+              {/* Performance Score Badge for Sales Users */}
+              {isSalesUser && (
+                <div style={{
+                  padding: '20px 24px',
+                  background: performanceScore >= 70 
+                    ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                    : performanceScore >= 40
+                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                    : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  borderRadius: '16px',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', justifyContent: 'center' }}>
+                    <Trophy size={20} color="white" />
+                    <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>Performance</span>
+                  </div>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white' }}>
+                    {performanceScore}%
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.9)', marginTop: '4px' }}>
+                    {performanceScore >= 70 ? 'Excellent!' : performanceScore >= 40 ? 'Good Job!' : 'Keep Going!'}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
@@ -545,7 +596,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}>
-                    <span>{stat.change.startsWith('+') ? '📈' : '📉'}</span>
+                    <TrendingUp size={14} />
                     {stat.change}
                   </div>
                 </div>
@@ -608,6 +659,63 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
         })}
       </div>
       </div>
+
+      {/* Today's Goals for Sales Users */}
+      {isSalesUser && (
+        <div style={{
+          backgroundColor: darkMode ? '#1e293b' : 'white',
+          borderRadius: '16px',
+          padding: '24px',
+          marginBottom: '32px',
+          boxShadow: darkMode ? '0 2px 4px rgba(0,0,0,0.2)' : '0 2px 4px rgba(0,0,0,0.1)',
+          border: `1px solid ${darkMode ? '#334155' : '#e5e7eb'}`
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+            <Star size={24} color="#f59e0b" />
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: 'bold',
+              color: darkMode ? 'white' : '#111827',
+              margin: 0
+            }}>Today's Goals</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div style={{
+              padding: '16px',
+              background: darkMode ? '#0f172a' : '#f9fafb',
+              borderRadius: '12px',
+              borderLeft: '4px solid #3b82f6'
+            }}>
+              <div style={{ fontSize: '14px', color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '4px' }}>Follow-ups</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: darkMode ? 'white' : '#111827' }}>
+                {quickStats.pendingLeads || 0} pending
+              </div>
+            </div>
+            <div style={{
+              padding: '16px',
+              background: darkMode ? '#0f172a' : '#f9fafb',
+              borderRadius: '12px',
+              borderLeft: '4px solid #22c55e'
+            }}>
+              <div style={{ fontSize: '14px', color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '4px' }}>Close Deals</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: darkMode ? 'white' : '#111827' }}>
+                {quickStats.activeLeads || 0} active
+              </div>
+            </div>
+            <div style={{
+              padding: '16px',
+              background: darkMode ? '#0f172a' : '#f9fafb',
+              borderRadius: '12px',
+              borderLeft: '4px solid #f59e0b'
+            }}>
+              <div style={{ fontSize: '14px', color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '4px' }}>Target Progress</div>
+              <div style={{ fontSize: '24px', fontWeight: 'bold', color: darkMode ? 'white' : '#111827' }}>
+                {quickStats.conversionRate || 0}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{
         display: 'grid',
@@ -691,9 +799,13 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                     <p style={{
                       fontSize: '0.75rem',
                       color: darkMode ? '#9ca3af' : '#6b7280',
-                      margin: 0
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
                     }}>
-                      {activity.time}
+                      <Clock size={10} />
+                      Today at {activity.time}
                     </p>
                   </div>
                 </div>

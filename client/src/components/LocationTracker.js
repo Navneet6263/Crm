@@ -49,16 +49,41 @@ const LocationTracker = ({ darkMode, currentUser }) => {
   };
 
   const reverseGeocode = async (lat, lng) => {
-    // Mock reverse geocoding - in real app, use Google Maps API
-    const mockAddresses = [
-      'Green Valley Business Park, Sector 18, Gurgaon',
-      'Cyber City, DLF Phase 2, Gurgaon',
-      'MG Road, Connaught Place, New Delhi',
-      'Bandra Kurla Complex, Mumbai',
-      'Electronic City, Bangalore'
-    ];
-    
-    return mockAddresses[Math.floor(Math.random() * mockAddresses.length)];
+    try {
+      // Using OpenStreetMap Nominatim API (free, no API key needed)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'GreenCallCRM/1.0'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Geocoding failed');
+      }
+      
+      const data = await response.json();
+      
+      // Format address from response
+      const address = data.address;
+      const parts = [];
+      
+      if (address.road) parts.push(address.road);
+      if (address.suburb) parts.push(address.suburb);
+      if (address.city || address.town || address.village) {
+        parts.push(address.city || address.town || address.village);
+      }
+      if (address.state) parts.push(address.state);
+      if (address.postcode) parts.push(address.postcode);
+      
+      return parts.length > 0 ? parts.join(', ') : data.display_name;
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      // Fallback to coordinates if geocoding fails
+      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
   };
 
   const handleCheckIn = async () => {
@@ -311,6 +336,29 @@ const LocationTracker = ({ darkMode, currentUser }) => {
               }}>
                 {currentAddress || 'Getting address...'}
               </p>
+              {location && (
+                <a
+                  href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    marginTop: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                    color: 'white',
+                    textDecoration: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  <MapPin size={16} />
+                  View on Google Maps
+                </a>
+              )}
             </div>
           </div>
         ) : (

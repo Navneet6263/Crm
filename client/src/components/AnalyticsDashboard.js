@@ -12,7 +12,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ComposedChart
 } from 'recharts';
 import {
   TrendingUp,
@@ -83,19 +84,29 @@ const AnalyticsDashboard = ({ darkMode }) => {
 
   const processAnalyticsData = (leads, customers, communications, range) => {
     const now = new Date();
+    const currentMonth = now.getMonth();
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
+    // Get last 6 months
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthIndex = (currentMonth - i + 12) % 12;
+      last6Months.push({ name: months[monthIndex], index: monthIndex });
+    }
+    
     // Lead conversion data
-    const leadConversion = months.slice(0, 7).map((month, index) => {
-      const monthLeads = leads.filter(lead => {
+    const leadConversion = last6Months.map(({ name, index }) => {
+      const monthLeads = (leads || []).filter(lead => {
         const leadDate = new Date(lead.createdAt || lead.dateCreated);
         return leadDate.getMonth() === index;
       });
-      const conversions = monthLeads.filter(lead => lead.status === 'converted' || lead.status === 'closed').length;
+      const conversions = monthLeads.filter(lead => 
+        lead.status === 'converted' || lead.status === 'closed' || lead.status === 'closed-won'
+      ).length;
       const rate = monthLeads.length > 0 ? Math.round((conversions / monthLeads.length) * 100) : 0;
       
       return {
-        name: month,
+        name,
         leads: monthLeads.length,
         conversions,
         rate
@@ -103,16 +114,17 @@ const AnalyticsDashboard = ({ darkMode }) => {
     });
 
     // Sales performance data
-    const salesPerformance = months.slice(0, 7).map((month, index) => {
-      const monthLeads = leads.filter(lead => {
+    const salesPerformance = last6Months.map(({ name, index }) => {
+      const monthLeads = (leads || []).filter(lead => {
         const leadDate = new Date(lead.createdAt || lead.dateCreated);
-        return leadDate.getMonth() === index && (lead.status === 'converted' || lead.status === 'closed');
+        return leadDate.getMonth() === index && 
+          (lead.status === 'converted' || lead.status === 'closed' || lead.status === 'closed-won');
       });
       const actual = monthLeads.reduce((sum, lead) => sum + (parseFloat(lead.value) || 0), 0);
-      const target = actual * 1.2; // Set target 20% higher than actual
+      const target = actual > 0 ? actual * 1.2 : 50000;
       
       return {
-        name: month,
+        name,
         target: Math.round(target),
         actual: Math.round(actual)
       };
@@ -400,7 +412,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
           </h3>
           <div style={{ height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
+              <ComposedChart
                 data={analyticsData.leadConversion}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
@@ -418,7 +430,7 @@ const AnalyticsDashboard = ({ darkMode }) => {
                 <Bar dataKey="leads" name="Total Leads" fill="#3b82f6" />
                 <Bar dataKey="conversions" name="Conversions" fill="#10b981" />
                 <Line type="monotone" dataKey="rate" name="Rate (%)" stroke="#f59e0b" strokeWidth={2} />
-              </BarChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>

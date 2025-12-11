@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle } from 'lucide-react';
 import apiService from '../services/apiService';
 
-const MyLeads = ({ darkMode = false, crmData, user }) => {
+const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -200,13 +200,32 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
 
   const updateLeadStatus = async (leadId, newStatus) => {
     try {
+      const lead = leads.find(l => (l._id || l.id) === leadId);
+      const oldStatus = lead?.status;
+      
       await apiService.updateLead(leadId, { status: newStatus });
+      
+      // Refresh global data
+      if (updateCrmData) {
+        const allLeads = await apiService.getAllLeads();
+        updateCrmData({ leads: allLeads });
+      }
       
       setLeads(prevLeads => 
         prevLeads.map(lead => 
           (lead._id || lead.id) === leadId ? { ...lead, status: newStatus } : lead
         )
       );
+      
+      // Add history note for status change
+      if (oldStatus !== newStatus) {
+        const statusNote = `Status changed from "${oldStatus}" to "${newStatus}" by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}`;
+        try {
+          await apiService.addLeadNote(leadId, statusNote);
+        } catch (noteError) {
+          console.error('Error adding status change note:', noteError);
+        }
+      }
     } catch (error) {
       console.error('Error updating lead status:', error);
       alert(`Failed to update lead status: ${error.message}`);
@@ -291,6 +310,12 @@ const MyLeads = ({ darkMode = false, crmData, user }) => {
       
       // Update lead in backend
       await apiService.updateLead(leadId, updatedLeadData);
+      
+      // Refresh global data
+      if (updateCrmData) {
+        const allLeads = await apiService.getAllLeads();
+        updateCrmData({ leads: allLeads });
+      }
       
       // Update local state immediately (no need to refetch)
       setLeads(prevLeads => 
