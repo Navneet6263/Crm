@@ -38,6 +38,7 @@ const EnhancedSupportCenter = lazy(() => import('./components/EnhancedSupportCen
 const CustomerManagement = lazy(() => import('./components/CustomerManagement'));
 const ProductManagement = lazy(() => import('./components/ProductManagement'));
 const MyLeads = lazy(() => import('./components/MyLeads'));
+const GroupLeads = lazy(() => import('./components/GroupLeads'));
 const LeadHistory = lazy(() => import('./components/LeadHistory'));
 const LeadTracker = lazy(() => import('./components/LeadTracker'));
 const AILeadScoring = lazy(() => import('./components/AILeadScoring'));
@@ -569,6 +570,7 @@ const AppContent = () => {
         />
       );
       case 'my-leads': return <MyLeads crmData={crmData} user={currentUser} darkMode={darkMode} updateCrmData={updateCrmData} />;
+      case 'group-leads': return <GroupLeads darkMode={darkMode} currentUser={currentUser} />;
       case 'lead-history': return <LeadHistory crmData={crmData} darkMode={darkMode} />;
       case 'lead-tracker': return <LeadTracker crmData={crmData} updateCrmData={updateCrmData} user={currentUser} darkMode={darkMode} />;
       case 'lead-scoring': 

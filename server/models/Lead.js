@@ -70,6 +70,11 @@ const leadSchema = new mongoose.Schema({
     type: String,
     default: 'new'
   },
+  assignedToGroup: {
+    type: String,
+    enum: ['sales', 'marketing', 'support', null],
+    default: null
+  },
   priority: {
     type: String,
     default: 'medium'

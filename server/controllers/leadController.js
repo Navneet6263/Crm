@@ -44,11 +44,11 @@ const createLead = async (req, res) => {
       });
     }
     
-    // Validate phone number (should be 10 digits)
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(req.body.phone.replace(/[^\d]/g, ''))) {
+    // Validate phone number (international format with country code)
+    const phoneDigits = req.body.phone.replace(/[^\d]/g, '');
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
       return res.status(400).json({ 
-        message: 'Please enter a valid 10-digit phone number' 
+        message: 'Please enter a valid phone number' 
       });
     }
     
@@ -819,6 +819,125 @@ const getUserProductHistory = async (req, res) => {
   }
 };
 
+const acceptGroupLead = async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    const userId = req.user._id || req.user.id;
+    
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+    
+    // Check if lead is in pending-acceptance status
+    if (lead.status !== 'pending-acceptance') {
+      return res.status(400).json({ message: 'Lead is not available for acceptance' });
+    }
+    
+    // Assign lead to current user and change status
+    lead.assignedTo = userId;
+    lead.assignedToGroup = null;
+    lead.status = 'contacted';
+    lead.assignedAt = new Date();
+    
+    await lead.save();
+    await lead.populate('assignedTo', 'name email role');
+    
+    res.json({ success: true, message: 'Lead accepted successfully', lead });
+  } catch (error) {
+    console.error('Error accepting lead:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const declineGroupLead = async (req, res) => {
+  try {
+    const leadId = req.params.id;
+    
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+    
+    // Just return success - lead remains in group pool
+    res.json({ success: true, message: 'Lead declined' });
+  } catch (error) {
+    console.error('Error declining lead:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const getPendingGroupLeads = async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    
+    // Determine which group leads to show based on user role
+    let groupFilter = 'sales'; // Default to sales
+    if (userRole === 'sales' || userRole === 'sales-rep' || userRole === 'senior-manager' || userRole === 'sales-manager') {
+      groupFilter = 'sales';
+    } else if (userRole === 'marketing') {
+      groupFilter = 'marketing';
+    } else if (userRole === 'support') {
+      groupFilter = 'support';
+    }
+    
+    const query = {
+      isActive: true,
+      status: 'pending-acceptance',
+      assignedToGroup: groupFilter
+    };
+    
+    const leads = await Lead.find(query)
+      .populate('createdBy', 'name email')
+      .populate('product', 'name color icon')
+      .sort({ createdAt: -1 });
+    
+    res.json({ leads });
+  } catch (error) {
+    console.error('Error fetching pending group leads:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getSalesTeamStats = async (req, res) => {
+  try {
+    // Get all sales users
+    const salesUsers = await User.find({
+      role: { $in: ['sales', 'sales-rep', 'sales-manager', 'senior-manager'] },
+      isActive: true
+    }).select('name email role');
+    
+    // Get stats for each user
+    const stats = await Promise.all(salesUsers.map(async (user) => {
+      // Count accepted leads (assigned to this user)
+      const acceptedCount = await Lead.countDocuments({
+        assignedTo: user._id,
+        isActive: true
+      });
+      
+      return {
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        acceptedLeads: acceptedCount
+      };
+    }));
+    
+    // Get pending group leads count
+    const pendingCount = await Lead.countDocuments({
+      status: 'pending-acceptance',
+      assignedToGroup: 'sales',
+      isActive: true
+    });
+    
+    res.json({ stats, pendingLeads: pendingCount });
+  } catch (error) {
+    console.error('Error fetching sales team stats:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -830,5 +949,9 @@ module.exports = {
   getMyLeads,
   getLeadsByProduct,
   getProductLeadStats,
-  getUserProductHistory
+  getUserProductHistory,
+  acceptGroupLead,
+  declineGroupLead,
+  getPendingGroupLeads,
+  getSalesTeamStats
 };

@@ -44,6 +44,7 @@ export const menuSections = [
     items: [
       { id: 'add-enquiry', icon: UserPlus, label: 'Add Lead', color: '#22c55e' },
       { id: 'my-leads', icon: Users, label: 'My Leads', color: '#8b5cf6' },
+      { id: 'group-leads', icon: Target, label: 'Group Leads', color: '#f59e0b', salesOnly: true },
       { id: 'leads', icon: Target, label: 'All Leads', color: '#f59e0b' },
       { id: 'lead-history', icon: Clock, label: 'Lead History', color: '#6b7280' },
       { id: 'lead-tracker', icon: Activity, label: 'Lead Tracker', color: '#ef4444' }

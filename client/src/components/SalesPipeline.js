@@ -32,11 +32,15 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
   useEffect(() => {
     if (crmData?.leads) {
       const leadsArray = Array.isArray(crmData.leads) ? crmData.leads : (crmData.leads?.leads || []);
-      setLeads(leadsArray.map((lead, index) => ({
-        ...lead,
-        id: lead.id || lead._id || `lead-${index}`,
-        status: lead.leadStatus || lead.status || 'new'
-      })));
+      setLeads(leadsArray.map((lead, index) => {
+        const uniqueId = String(lead._id || lead.id || `lead-${index}`);
+        return {
+          ...lead,
+          id: uniqueId,
+          _id: lead._id || uniqueId,
+          status: lead.leadStatus || lead.status || 'new'
+        };
+      }));
     }
   }, [crmData]);
 
@@ -321,7 +325,7 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
                       }}
                     >
                       {stageLeads.map((lead, index) => {
-                        const leadId = lead.id || lead._id || `lead-${stage.id}-${index}`;
+                        const leadId = String(lead._id || lead.id || `lead-${stage.id}-${index}`);
                         return (
                         <Draggable
                           key={leadId}
@@ -408,7 +412,9 @@ const SalesPipeline = ({ darkMode = false, crmData, updateCrmData }) => {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                   <Clock size={12} />
-                                  {new Date(lead.createdDate).toLocaleDateString()}
+                                  {lead.createdDate && !isNaN(new Date(lead.createdDate)) 
+                                    ? new Date(lead.createdDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                                    : 'N/A'}
                                 </div>
                               </div>
 

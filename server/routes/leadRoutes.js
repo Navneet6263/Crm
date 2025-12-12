@@ -10,7 +10,11 @@ const {
   getMyLeads,
   getLeadsByProduct,
   getProductLeadStats,
-  getUserProductHistory
+  getUserProductHistory,
+  acceptGroupLead,
+  declineGroupLead,
+  getPendingGroupLeads,
+  getSalesTeamStats
 } = require('../controllers/leadController');
 const { auth } = require('../middleware/auth');
 const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
@@ -25,10 +29,14 @@ router.route('/')
   .post(createLead);
 
 router.get('/my-leads', getMyLeads);
+router.get('/group-pending', getPendingGroupLeads);
+router.get('/stats/sales-team', getSalesTeamStats);
 router.get('/product/:productId', getLeadsByProduct);
 router.get('/stats/products', getProductLeadStats);
 router.get('/user/product-history', getUserProductHistory);
 router.post('/assign', handleLeadAssignmentNotification, assignLead);
+router.put('/:id/accept', acceptGroupLead);
+router.put('/:id/decline', declineGroupLead);
 
 router.route('/:id')
   .get(updateLeadViewTime, getLeadById)

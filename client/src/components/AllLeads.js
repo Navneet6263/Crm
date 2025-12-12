@@ -611,7 +611,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                 margin: 0
               }}>
                 {statusFilter === 'all' ? 
-                  (currentUser && ['admin', 'super-admin'].includes(currentUser.role) 
+                  (currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) 
                     ? 'Select a lead to assign to team members' 
                     : 'All leads in the system') :
                  statusFilter === 'active' ? 'Leads that are actively being worked on' :
@@ -731,8 +731,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
             </div>
           </div>
           
-          {/* Bulk Actions - Only for admin/super-admin */}
-          {showBulkActions && currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
+          {/* Bulk Actions - Only for admin/super-admin/manager */}
+          {showBulkActions && currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) && (
             <div style={{
               marginTop: '1rem',
               padding: '1rem',
@@ -812,8 +812,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
             </div>
           )}
           
-          {/* Single Lead Assign Dropdown - Only for admin/super-admin */}
-          {showAssignDropdown && selectedLeadId && currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
+          {/* Single Lead Assign Dropdown - Only for admin/super-admin/manager */}
+          {showAssignDropdown && selectedLeadId && currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) && (
             <div style={{
               marginTop: '1rem',
               padding: '1rem',
@@ -905,8 +905,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
           overflow: 'hidden',
           boxShadow: darkMode ? '0 2px 4px rgba(0,0,0,0.2)' : '0 2px 4px rgba(0,0,0,0.1)'
         }}>
-          {/* Bulk Select Header - Only for admin/super-admin */}
-          {currentUser && ['admin', 'super-admin'].includes(currentUser.role) && filteredLeads.length > 0 && (
+          {/* Bulk Select Header - Only for admin/super-admin/manager */}
+          {currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) && filteredLeads.length > 0 && (
             <div style={{
               padding: '1rem',
               borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`,
@@ -1005,8 +1005,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                 }
               }}
             >
-              {/* Bulk Select Checkbox - Only for admin/super-admin */}
-              {currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
+              {/* Bulk Select Checkbox - Only for admin/super-admin/manager */}
+              {currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) && (
                 <div style={{ marginRight: '12px' }}>
                   <input
                     type="checkbox"
@@ -1025,7 +1025,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
               )}
               {/* Avatar */}
               <div 
-                onClick={() => currentUser && ['admin', 'super-admin'].includes(currentUser.role) ? handleLeadSelect(leadId) : null}
+                onClick={() => currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) ? handleLeadSelect(leadId) : null}
                 style={{
                   width: '48px',
                   height: '48px',
@@ -1039,7 +1039,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                   fontSize: '16px',
                   marginRight: '16px',
                   flexShrink: 0,
-                  cursor: currentUser && ['admin', 'super-admin'].includes(currentUser.role) ? 'pointer' : 'default'
+                  cursor: currentUser && ['admin', 'super-admin', 'manager'].includes(currentUser.role) ? 'pointer' : 'default'
                 }}>
                 {(lead.contactPerson || lead.name || 'U').split(' ').map(n => n[0]).join('')}
               </div>
@@ -1303,9 +1303,9 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                   </div>
                 )}
                 
-                {/* Delete Button - Only show if user is admin/super-admin OR owner of the lead */}
+                {/* Delete Button - Only show if user is admin/super-admin/manager OR owner of the lead */}
                 {currentUser && (
-                  (['admin', 'super-admin'].includes(currentUser.role) || 
+                  (['admin', 'super-admin', 'manager'].includes(currentUser.role) || 
                    (lead.createdBy && (lead.createdBy._id || lead.createdBy) === currentUser.id))
                 ) && (
                   <button

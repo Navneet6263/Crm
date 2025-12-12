@@ -45,6 +45,7 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
       items: [
         { id: 'add-enquiry', icon: UserPlus, label: 'Add Lead', color: '#22c55e' },
         { id: 'my-leads', icon: Users, label: 'My Leads', color: '#8b5cf6' },
+        { id: 'group-leads', icon: Target, label: 'Group Leads', color: '#f59e0b', salesOnly: true },
         { id: 'leads', icon: Target, label: 'All Leads', color: '#f59e0b' },
         { id: 'lead-history', icon: Clock, label: 'Lead History', color: '#6b7280' },
         { id: 'lead-tracker', icon: Activity, label: 'Lead Tracker', color: '#ef4444' }
@@ -102,6 +103,7 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
   const hasAccess = (item) => {
     if (item.superAdminOnly && userRole !== 'super-admin') return false;
     if (item.adminOnly && !['super-admin', 'admin', 'manager', 'senior-manager'].includes(userRole)) return false;
+    if (item.salesOnly && !['sales', 'sales-rep', 'senior-manager', 'sales-manager'].includes(userRole)) return false;
     return true;
   };
 

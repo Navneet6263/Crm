@@ -1792,7 +1792,7 @@ const apiService = {
   },
 
   // Group Assignment APIs
-  assignLeadToGroup: async (leadId, groupType, specificUserId = null) => {
+  assignLeadToGroup: async (leadId, groupType = 'sales', specificUserId = null) => {
     try {
       const token = localStorage.getItem('authToken');
       
@@ -1965,6 +1965,28 @@ const apiService = {
     } catch (error) {
       console.error('Error fetching users by role:', error);
       return [];
+    }
+  },
+
+  // Get sales team stats
+  getSalesTeamStats: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/stats/sales-team`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch sales team stats');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching sales team stats:', error);
+      return { stats: [], pendingLeads: 0 };
     }
   }
 

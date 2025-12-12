@@ -1408,6 +1408,8 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
+  const [salesStats, setSalesStats] = useState({ stats: [], pendingLeads: 0 });
+  const [showSalesStatsModal, setShowSalesStatsModal] = useState(false);
   
   const handleStatClick = (stat) => {
     console.log('Stat clicked:', stat.title);
@@ -1483,6 +1485,7 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
     fetchLeads();
     fetchCustomers();
     fetchUsers();
+    fetchSalesStats();
     
     // Auto-refresh data every 30 seconds
     const refreshInterval = setInterval(() => {
@@ -1583,13 +1586,24 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
     }
   };
 
+  const fetchSalesStats = async () => {
+    try {
+      const statsData = await apiService.getSalesTeamStats();
+      setSalesStats(statsData || { stats: [], pendingLeads: 0 });
+    } catch (error) {
+      console.error('Error fetching sales stats:', error);
+      setSalesStats({ stats: [], pendingLeads: 0 });
+    }
+  };
+
   const handleRefreshAll = async () => {
     try {
       await Promise.all([
         fetchLeads(true),
         fetchCustomers(true),
         fetchUsers(true),
-        fetchDemoRequests()
+        fetchDemoRequests(),
+        fetchSalesStats()
       ]);
       console.log('🔄 Dashboard data refreshed successfully!');
     } catch (error) {
@@ -2226,6 +2240,337 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
           Last updated: {new Date().toLocaleString()}
         </div>
       </div>
+
+      {/* Sales Team Performance - Only for Admin/Manager/SuperAdmin */}
+      {['super-admin', 'admin', 'manager', 'senior-manager'].includes(currentUser?.role) && salesStats.stats.length > 0 && (
+        <div style={{
+          background: darkMode ? '#1e293b' : 'white',
+          borderRadius: '0.5rem',
+          padding: '1.5rem',
+          boxShadow: darkMode ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+          marginBottom: '2rem'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            color: darkMode ? '#f8fafc' : '#111827',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            📈 Sales Team Performance
+            <span style={{
+              fontSize: '0.875rem',
+              fontWeight: '400',
+              color: darkMode ? '#9ca3af' : '#6b7280',
+              marginLeft: 'auto'
+            }}>
+              {salesStats.pendingLeads} Pending Group Leads
+            </span>
+            <button
+              onClick={() => setShowSalesStatsModal(true)}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+              title="View All Sales Team Stats"
+            >
+              <Eye size={16} />
+              View All
+            </button>
+          </h2>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '1rem'
+          }}>
+            {salesStats.stats.slice(0, 3).map((stat) => (
+              <div key={stat.userId} style={{
+                padding: '1.5rem',
+                background: darkMode ? '#374151' : '#f9fafb',
+                borderRadius: '12px',
+                border: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`,
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = darkMode ? '0 8px 16px rgba(0, 0, 0, 0.3)' : '0 8px 16px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: '700',
+                    fontSize: '1.25rem'
+                  }}>
+                    {stat.name.charAt(0)}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      fontSize: '1rem',
+                      fontWeight: '600',
+                      color: darkMode ? 'white' : '#111827'
+                    }}>
+                      {stat.name}
+                    </div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: darkMode ? '#9ca3af' : '#6b7280'
+                    }}>
+                      {stat.email}
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '1rem',
+                  background: darkMode ? '#4b5563' : 'white',
+                  borderRadius: '8px'
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: darkMode ? '#9ca3af' : '#6b7280',
+                      marginBottom: '0.25rem'
+                    }}>
+                      Accepted Leads
+                    </div>
+                    <div style={{
+                      fontSize: '2rem',
+                      fontWeight: '700',
+                      color: '#22c55e'
+                    }}>
+                      {stat.acceptedLeads}
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '0.75rem',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    borderRadius: '8px'
+                  }}>
+                    <UserCheck size={24} style={{ color: '#22c55e' }} />
+                  </div>
+                </div>
+                
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.5rem',
+                  background: darkMode ? '#1f2937' : '#f3f4f6',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  color: darkMode ? '#9ca3af' : '#6b7280',
+                  textAlign: 'center'
+                }}>
+                  {stat.role.toUpperCase()}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sales Stats Modal */}
+      {showSalesStatsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => setShowSalesStatsModal(false)}>
+          <div style={{
+            background: darkMode ? '#1f2937' : 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            width: '90%',
+            maxWidth: '900px',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: darkMode ? 'white' : '#1f2937',
+                margin: 0
+              }}>
+                📈 Sales Team Performance Details
+              </h3>
+              <button
+                onClick={() => setShowSalesStatsModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: darkMode ? '#9ca3af' : '#6b7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{
+              padding: '1rem',
+              background: darkMode ? '#374151' : '#f9fafb',
+              borderRadius: '8px',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: '2rem',
+                fontWeight: '700',
+                color: '#f59e0b',
+                marginBottom: '0.25rem'
+              }}>
+                {salesStats.pendingLeads}
+              </div>
+              <div style={{
+                fontSize: '0.875rem',
+                color: darkMode ? '#9ca3af' : '#6b7280'
+              }}>
+                Pending Group Leads
+              </div>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: '1rem'
+            }}>
+              {salesStats.stats.map((stat) => (
+                <div key={stat.userId} style={{
+                  padding: '1.5rem',
+                  background: darkMode ? '#374151' : '#f9fafb',
+                  borderRadius: '12px',
+                  border: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`,
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)';
+                  e.currentTarget.style.boxShadow = darkMode ? '0 8px 16px rgba(0, 0, 0, 0.3)' : '0 8px 16px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: '700',
+                      fontSize: '1.25rem'
+                    }}>
+                      {stat.name.charAt(0)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        color: darkMode ? 'white' : '#111827'
+                      }}>
+                        {stat.name}
+                      </div>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: darkMode ? '#9ca3af' : '#6b7280'
+                      }}>
+                        {stat.email}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '1rem',
+                    background: darkMode ? '#4b5563' : 'white',
+                    borderRadius: '8px'
+                  }}>
+                    <div>
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: darkMode ? '#9ca3af' : '#6b7280',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Accepted Leads
+                      </div>
+                      <div style={{
+                        fontSize: '2rem',
+                        fontWeight: '700',
+                        color: '#22c55e'
+                      }}>
+                        {stat.acceptedLeads}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '0.75rem',
+                      background: 'rgba(34, 197, 94, 0.1)',
+                      borderRadius: '8px'
+                    }}>
+                      <UserCheck size={24} style={{ color: '#22c55e' }} />
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.5rem',
+                    background: darkMode ? '#1f2937' : '#f3f4f6',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    textAlign: 'center'
+                  }}>
+                    {stat.role.toUpperCase()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Employee Management Section */}
       <EmployeeManagement darkMode={darkMode} currentUser={currentUser} />
