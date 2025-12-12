@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, User, Eye, EyeOff, Phone, ArrowLeft, Shield, Sparkles, TrendingUp, Users, Star, CheckCircle } from 'lucide-react';
 import { oauthService } from '../services/oauthService';
-//import LogRocket from 'logrocket';
+import LogRocket from 'logrocket';
 
 const GreenCallLogin = ({ onLogin, onBack }) => {
   const [credentials, setCredentials] = useState({ email: '', password: '' });
@@ -18,13 +18,13 @@ const GreenCallLogin = ({ onLogin, onBack }) => {
       const result = await onLogin(credentials);
       
       // Identify user in LogRocket after successful login
-      //if (result && result.user) {
-     //LogRocket.identify(result.user.id || result.user._id, {
-     //     name: result.user.name,
-       //   email: result.user.email,
-         // role: result.user.role,
-       // });
-     // }
+      if (result && result.user) {
+        LogRocket.identify(result.user.id || result.user._id, {
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role,
+        });
+      }
     } catch (error) {
       alert('Invalid credentials. Please use navneet@greencallcrm.com / navneet');
     } finally {
@@ -57,11 +57,11 @@ const GreenCallLogin = ({ onLogin, onBack }) => {
         oauthService.getUserFromToken(token)
           .then(user => {
             // Identify user in LogRocket for OAuth login
-       //     LogRocket.identify(user.id || user._id, {
-         //     name: user.name,
-           //   email: user.email,
-             // role: user.role,
-           // });
+            LogRocket.identify(user.id || user._id, {
+              name: user.name,
+              email: user.email,
+              role: user.role,
+            });
             onLogin({ user, token });
           })
           .catch(error => {
