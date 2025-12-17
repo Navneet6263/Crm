@@ -27,7 +27,7 @@ const startLeadReminderCron = () => {
           { $expr: { $lt: ['$lastViewedAt', '$assignedAt'] } }
         ]
       })
-      .populate('assignedTo', 'name email managerName managerEmail')
+      .populate('assignedTo', 'name email managerName managerEmail role')
       .populate('assignedBy', 'name email')
       .populate('notes.createdBy', 'name');
       
@@ -53,9 +53,23 @@ const startLeadReminderCron = () => {
         
         const daysPending = Math.floor((new Date() - new Date(lead.assignedAt)) / (1000 * 60 * 60 * 24));
         
-        // Send email to manager if available, otherwise to assigner
-        const recipientEmail = lead.assignedTo.managerEmail || lead.assignedBy.email;
-        const recipientName = lead.assignedTo.managerName || lead.assignedBy.name;
+        // Get manager details from assignedTo user
+        let recipientEmail = lead.assignedBy?.email;
+        let recipientName = lead.assignedBy?.name;
+        
+        // If assignedTo has manager details, use those
+        if (lead.assignedTo?.managerEmail) {
+          recipientEmail = lead.assignedTo.managerEmail;
+          recipientName = lead.assignedTo.managerName || 'Manager';
+          console.log(`📧 Using manager email: ${recipientEmail} for ${lead.assignedTo.name}`);
+        } else {
+          console.log(`⚠️ No manager email found for ${lead.assignedTo.name}, using assigner: ${recipientEmail}`);
+        }
+        
+        if (!recipientEmail) {
+          console.log(`⚠️ Skipping lead ${lead._id} - no recipient email available`);
+          continue;
+        }
         
         try {
           await emailService.sendLeadReminderEmail(
@@ -73,7 +87,7 @@ const startLeadReminderCron = () => {
           
           console.log(`✅ Reminder sent for lead ${lead._id} to ${recipientEmail} (${lead.assignedTo.managerEmail ? 'Manager' : 'Assigner'})`);
         } catch (emailError) {
-          console.error(`❌ Failed to send reminder for lead ${lead._id}:`, emailError);
+          console.error(`❌ Failed to send reminder for lead ${lead._id}:`, emailError.message);
         }
       }
       

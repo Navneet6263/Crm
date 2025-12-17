@@ -171,6 +171,26 @@ const createCompany = async (req, res) => {
       limits: selectedPlan
     });
 
+    // Send beautiful welcome email
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendCompanyWelcomeEmail({
+        companyName: company.name,
+        companyId: company._id,
+        adminEmail: adminEmail,
+        tempPassword: tempPassword,
+        planName: planName,
+        usersLimit: selectedPlan.usersLimit,
+        leadsLimit: selectedPlan.leadsLimit,
+        customersLimit: selectedPlan.customersLimit,
+        storageLimit: selectedPlan.storageLimit
+      });
+      console.log('📧 Company welcome email sent to:', adminEmail);
+    } catch (emailError) {
+      console.error('❌ Failed to send company welcome email:', emailError);
+      // Don't fail company creation if email fails
+    }
+
     // Return success response
     res.status(201).json({
       success: true,
@@ -1018,7 +1038,7 @@ const getTeamMembers = async (req, res) => {
 // Create team member for current user's company
 const createTeamMember = async (req, res) => {
   try {
-    const { name, email, role, department } = req.body;
+    const { name, email, role, department, password } = req.body;
     
     console.log('👤 Creating team member - User:', req.user.email, 'Role:', req.user.role);
     
@@ -1137,19 +1157,25 @@ const createTeamMember = async (req, res) => {
       });
     }
 
-    // Generate temporary password
-    const tempPassword = generateStrongPassword(10);
+    // Use provided password or generate one
+    const userPassword = password && password.trim() ? password.trim() : generateStrongPassword(10);
+    
+    // Set password expiry to 1 hour from now
+    const passwordExpiry = new Date();
+    passwordExpiry.setHours(passwordExpiry.getHours() + 1);
 
     // Create user
     const newUser = await User.create({
       companyId: userCompanyId,
-      tenantId: userCompanyId, // For consistency
+      tenantId: userCompanyId,
       name: name.trim(),
       email: email.trim().toLowerCase(),
-      password: tempPassword,
+      password: userPassword,
       role: role || 'sales',
       department: department?.trim() || '',
       isActive: true,
+      isTemporaryPassword: true,
+      passwordExpiresAt: passwordExpiry,
       createdBy: req.user.id
     });
 
@@ -1160,6 +1186,23 @@ const createTeamMember = async (req, res) => {
       $inc: { 'usage.currentUsers': 1 }
     });
 
+    // Send welcome email with credentials
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendNewUserCredentials({
+        name: newUser.name,
+        email: newUser.email,
+        password: userPassword,
+        role: newUser.role,
+        companyName: company.name,
+        expiresAt: passwordExpiry
+      });
+      console.log('📧 Credentials email sent to:', newUser.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send credentials email:', emailError);
+      // Don't fail user creation if email fails
+    }
+
     res.status(201).json({
       success: true,
       user: {
@@ -1168,9 +1211,10 @@ const createTeamMember = async (req, res) => {
         email: newUser.email,
         role: newUser.role,
         department: newUser.department,
-        tempPassword
+        tempPassword: userPassword,
+        passwordExpiresAt: passwordExpiry
       },
-      message: 'Team member added successfully'
+      message: 'Team member added successfully. Password must be changed within 1 hour.'
     });
 
   } catch (error) {
@@ -1287,23 +1331,62 @@ const toggleTeamMemberStatus = async (req, res) => {
 
     // Toggle status
     const newStatus = !user.isActive;
-    await User.findByIdAndUpdate(userId, { 
-      isActive: newStatus,
-      deactivatedBy: newStatus ? null : req.user.id,
-      deactivatedAt: newStatus ? null : new Date()
-    });
+    const wasInactive = !user.isActive;
+    
+    // Generate new password if reactivating
+    let newPassword = null;
+    if (newStatus && wasInactive) {
+      newPassword = generateStrongPassword(10);
+      const passwordExpiry = new Date();
+      passwordExpiry.setHours(passwordExpiry.getHours() + 1);
+      
+      await User.findByIdAndUpdate(userId, { 
+        isActive: newStatus,
+        password: newPassword,
+        isTemporaryPassword: true,
+        passwordExpiresAt: passwordExpiry,
+        deactivatedBy: null,
+        deactivatedAt: null
+      });
+    } else {
+      await User.findByIdAndUpdate(userId, { 
+        isActive: newStatus,
+        deactivatedBy: newStatus ? null : req.user.id,
+        deactivatedAt: newStatus ? null : new Date()
+      });
+    }
 
     console.log(`✅ Team member ${newStatus ? 'activated' : 'deactivated'}:`, user.email);
 
     // Update company usage
     const increment = newStatus ? 1 : -1;
-    await Company.findByIdAndUpdate(userCompanyId, {
+    const company = await Company.findByIdAndUpdate(userCompanyId, {
       $inc: { 'usage.currentUsers': increment }
     });
 
+    // Send reactivation email if user was reactivated
+    if (newStatus && wasInactive) {
+      try {
+        const emailService = require('../services/emailService');
+        await emailService.sendUserReactivationEmail({
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          companyName: company.name,
+          sendNewPassword: true,
+          newPassword: newPassword
+        });
+        console.log('📧 Reactivation email sent to:', user.email);
+      } catch (emailError) {
+        console.error('❌ Failed to send reactivation email:', emailError);
+        // Don't fail the reactivation if email fails
+      }
+    }
+
     res.json({
       success: true,
-      message: `Team member ${newStatus ? 'activated' : 'deactivated'} successfully`
+      message: `Team member ${newStatus ? 'activated' : 'deactivated'} successfully`,
+      ...(newPassword && { tempPassword: newPassword })
     });
 
   } catch (error) {

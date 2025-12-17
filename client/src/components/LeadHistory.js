@@ -29,6 +29,8 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'timeline'
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   useEffect(() => {
     const allLeads = Array.isArray(crmData.leads) ? crmData.leads : (crmData.leads?.leads || []);
@@ -117,7 +119,14 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     });
 
     setFilteredLeads(filtered);
+    setCurrentPage(1); // Reset to page 1 when filters change
   }, [leads, searchTerm, statusFilter, dateFilter, sortBy, sortOrder]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
 
   const getStatusColor = (status) => {
     const colors = {
@@ -465,15 +474,15 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
           </div>
 
           {/* Table Body */}
-          <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-            {filteredLeads.map((lead, index) => {
+          <div>
+            {paginatedLeads.map((lead, index) => {
               const statusColor = getStatusColor(lead.status);
               const priorityColor = getPriorityColor(lead.priority);
               
               return (
                 <div key={lead._id || lead.id || index} style={{
                   padding: '1.5rem',
-                  borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                  borderBottom: index < paginatedLeads.length - 1 ? `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` : 'none',
                   transition: 'background-color 0.2s ease'
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.background = darkMode ? '#374151' : '#f9fafb'}
@@ -601,6 +610,92 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
               );
             })}
           </div>
+          
+          {/* Pagination */}
+          {filteredLeads.length > 0 && totalPages > 1 && (
+            <div style={{
+              padding: '1.5rem',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '0.5rem',
+              borderTop: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`
+            }}>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: currentPage === 1 ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                  color: currentPage === 1 ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                Previous
+              </button>
+              
+              {[...Array(totalPages)].map((_, i) => {
+                const pageNum = i + 1;
+                if (
+                  pageNum === 1 ||
+                  pageNum === totalPages ||
+                  (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+                ) {
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: currentPage === pageNum ? '#3b82f6' : (darkMode ? '#374151' : 'white'),
+                        color: currentPage === pageNum ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: currentPage === pageNum ? '600' : '400',
+                        minWidth: '40px'
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                } else if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
+                  return <span key={pageNum} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>...</span>;
+                }
+                return null;
+              })}
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: currentPage === totalPages ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                  color: currentPage === totalPages ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                Next
+              </button>
+              
+              <span style={{
+                marginLeft: '1rem',
+                color: darkMode ? '#d1d5db' : '#6b7280',
+                fontSize: '14px'
+              }}>
+                Page {currentPage} of {totalPages} ({filteredLeads.length} leads)
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         /* Timeline View */
@@ -615,7 +710,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             background: darkMode ? '#374151' : '#e5e7eb'
           }}></div>
           
-          {filteredLeads.map((lead, index) => {
+          {paginatedLeads.map((lead, index) => {
             const statusColor = getStatusColor(lead.status);
             
             return (

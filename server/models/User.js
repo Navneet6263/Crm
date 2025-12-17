@@ -149,6 +149,14 @@ const userSchema = new mongoose.Schema({
       return this.role === 'super-admin';
     }
   },
+  // Password expiry for temporary passwords
+  passwordExpiresAt: {
+    type: Date
+  },
+  isTemporaryPassword: {
+    type: Boolean,
+    default: false
+  },
   // User preferences
   notificationPreferences: {
     emailNotifications: { type: Boolean, default: true },

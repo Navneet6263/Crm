@@ -195,28 +195,30 @@ const emailService = {
     }
   },
 
-  sendLeadReminderEmail: async (assignerEmail, assignerName, leadData, assignedUserName, daysPending) => {
+  sendLeadReminderEmail: async (managerEmail, managerName, leadData, assignedUserName, daysPending) => {
     try {
+      console.log('📧 Sending reminder email to:', { managerEmail, managerName, assignedUserName, daysPending });
+      
       return await sendSMTPEmail({
-        to: assignerEmail,
+        to: managerEmail,
         subject: '⚠️ Lead Pending - No Activity Detected',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #dc2626;">⚠️ Lead Pending Reminder</h2>
-            <p>Hi ${assignerName},</p>
-            <p>The lead assigned to <strong>${assignedUserName}</strong> has not been actioned yet.</p>
-            <p>It has been <strong>${daysPending} days</strong> since assignment.</p>
+            <p>Hi ${managerName || 'Manager'},</p>
+            <p>The lead assigned to <strong>${assignedUserName || 'Sales Person'}</strong> has not been actioned yet.</p>
+            <p>It has been <strong>${daysPending || 0} days</strong> since assignment.</p>
             
             <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <h3 style="margin: 0 0 10px 0; color: #991b1b;">Pending Lead Details:</h3>
-              <p><strong>Contact Person:</strong> ${leadData.contactPerson}</p>
-              <p><strong>Company:</strong> ${leadData.companyName}</p>
-              <p><strong>Phone:</strong> ${leadData.phone}</p>
-              <p><strong>Assigned To:</strong> ${assignedUserName}</p>
-              <p><strong>Assigned On:</strong> ${new Date(leadData.assignedAt).toLocaleDateString('en-IN')}</p>
+              <p><strong>Contact Person:</strong> ${leadData.contactPerson || 'N/A'}</p>
+              <p><strong>Company:</strong> ${leadData.companyName || 'N/A'}</p>
+              <p><strong>Phone:</strong> ${leadData.phone || 'N/A'}</p>
+              <p><strong>Assigned To:</strong> ${assignedUserName || 'N/A'}</p>
+              <p><strong>Assigned On:</strong> ${leadData.assignedAt ? new Date(leadData.assignedAt).toLocaleDateString('en-IN') : 'N/A'}</p>
             </div>
             
-            <p>Please follow up with ${assignedUserName} to ensure timely action on this lead.</p>
+            <p>Please follow up with ${assignedUserName || 'the sales person'} to ensure timely action on this lead.</p>
             <p>Login to your CRM dashboard to reassign or take action.</p>
             
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
@@ -302,6 +304,239 @@ const emailService = {
       });
     } catch (error) {
       console.error('❌ Failed to send ticket resolved email:', error.message);
+      throw error;
+    }
+  },
+
+  sendNewUserCredentials: async (userData) => {
+    try {
+      const expiryTime = new Date(userData.expiresAt).toLocaleString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: 'numeric',
+        month: 'short'
+      });
+
+      return await sendSMTPEmail({
+        to: userData.email,
+        subject: `🎉 Welcome to ${userData.companyName} - Your CRM Account`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #22c55e, #4ade80); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px;">
+              <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to ${userData.companyName}!</h1>
+              <p style="color: white; margin: 10px 0 0 0;">Your CRM account has been created</p>
+            </div>
+            
+            <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+              <p style="font-size: 16px; color: #374151;">Hi ${userData.name},</p>
+              <p style="font-size: 16px; color: #374151;">Your account has been created successfully! Here are your login credentials:</p>
+              
+              <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #1f2937; margin: 0 0 15px 0;">🔑 Login Credentials:</h3>
+                <p style="margin: 8px 0;"><strong>Email:</strong> ${userData.email}</p>
+                <p style="margin: 8px 0;"><strong>Password:</strong> <code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${userData.password}</code></p>
+                <p style="margin: 8px 0;"><strong>Role:</strong> ${userData.role.toUpperCase()}</p>
+              </div>
+              
+              <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="margin: 0; color: #92400e; font-weight: 600;">⚠️ IMPORTANT: This password expires at ${expiryTime}</p>
+                <p style="margin: 5px 0 0 0; color: #92400e; font-size: 14px;">You must change your password within 1 hour of first login.</p>
+              </div>
+              
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" style="display: inline-block; background: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login to CRM</a>
+              </div>
+              
+              <p style="font-size: 14px; color: #6b7280;">If you have any questions, please contact your administrator.</p>
+              
+              <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 12px; text-align: center;">Green CRM - Automated Email</p>
+            </div>
+          </div>
+        `
+      });
+    } catch (error) {
+      console.error('❌ Failed to send new user credentials email:', error.message);
+      throw error;
+    }
+  },
+
+  sendCompanyWelcomeEmail: async (companyData) => {
+    try {
+      return await sendSMTPEmail({
+        to: companyData.adminEmail,
+        subject: `🎊 Welcome to Green CRM - ${companyData.companyName} Account Created!`,
+        html: `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #f8fafc;">
+            <!-- Header with gradient -->
+            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%); padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0;">
+              <div style="background: white; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
+                <span style="font-size: 48px;">🏢</span>
+              </div>
+              <h1 style="color: white; margin: 0; font-size: 32px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">Welcome to Green CRM!</h1>
+              <p style="color: #d1fae5; margin: 12px 0 0 0; font-size: 18px; font-weight: 500;">Your company account is ready</p>
+            </div>
+
+            <!-- Main content -->
+            <div style="background: white; padding: 40px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="color: #1f2937; margin: 0 0 10px 0; font-size: 24px;">🎉 Congratulations!</h2>
+                <p style="color: #6b7280; font-size: 16px; line-height: 1.6; margin: 0;">Your company <strong style="color: #10b981;">${companyData.companyName}</strong> has been successfully registered with Green CRM.</p>
+              </div>
+
+              <!-- Company Details Card -->
+              <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #10b981;">
+                <h3 style="color: #047857; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center;">
+                  <span style="font-size: 24px; margin-right: 10px;">🏢</span> Company Details
+                </h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #374151; font-weight: 600;">Company Name:</td>
+                    <td style="padding: 8px 0; color: #1f2937; font-weight: 700;">${companyData.companyName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #374151; font-weight: 600;">Company ID:</td>
+                    <td style="padding: 8px 0; color: #1f2937;"><code style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${companyData.companyId}</code></td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #374151; font-weight: 600;">Admin Email:</td>
+                    <td style="padding: 8px 0; color: #1f2937;">${companyData.adminEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #374151; font-weight: 600;">Plan:</td>
+                    <td style="padding: 8px 0;"><span style="background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">${companyData.planName.toUpperCase()}</span></td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Admin Credentials Card -->
+              <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #f59e0b;">
+                <h3 style="color: #92400e; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center;">
+                  <span style="font-size: 24px; margin-right: 10px;">🔐</span> Admin Login Credentials
+                </h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-weight: 600;">Email:</td>
+                    <td style="padding: 8px 0; color: #92400e; font-weight: 700;">${companyData.adminEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #78350f; font-weight: 600;">Password:</td>
+                    <td style="padding: 8px 0;"><code style="background: #fbbf24; color: #78350f; padding: 6px 12px; border-radius: 6px; font-family: monospace; font-size: 16px; font-weight: 700;">${companyData.tempPassword}</code></td>
+                  </tr>
+                </table>
+                <div style="background: #fef3c7; border: 2px dashed #f59e0b; padding: 12px; border-radius: 8px; margin-top: 15px;">
+                  <p style="margin: 0; color: #92400e; font-size: 13px; font-weight: 600;">⚠️ Please change this password after your first login for security.</p>
+                </div>
+              </div>
+
+              <!-- Plan Features -->
+              <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #3b82f6;">
+                <h3 style="color: #1e40af; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center;">
+                  <span style="font-size: 24px; margin-right: 10px;">✨</span> Your Plan Includes
+                </h3>
+                <ul style="margin: 0; padding-left: 20px; color: #1e3a8a;">
+                  <li style="margin: 8px 0; line-height: 1.6;">👥 <strong>${companyData.usersLimit === -1 ? 'Unlimited' : companyData.usersLimit}</strong> Team Members</li>
+                  <li style="margin: 8px 0; line-height: 1.6;">📊 <strong>${companyData.leadsLimit === -1 ? 'Unlimited' : companyData.leadsLimit}</strong> Leads</li>
+                  <li style="margin: 8px 0; line-height: 1.6;">👤 <strong>${companyData.customersLimit === -1 ? 'Unlimited' : companyData.customersLimit}</strong> Customers</li>
+                  <li style="margin: 8px 0; line-height: 1.6;">💾 <strong>${companyData.storageLimit === -1 ? 'Unlimited' : companyData.storageLimit + ' GB'}</strong> Storage</li>
+                </ul>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 16px 40px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transition: all 0.3s;">🚀 Login to Dashboard</a>
+              </div>
+
+              <!-- Support Section -->
+              <div style="background: #f9fafb; padding: 20px; border-radius: 10px; text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; margin: 0 0 10px 0; font-size: 14px;">Need help getting started?</p>
+                <p style="color: #374151; margin: 0; font-size: 14px;">📧 Contact us at <a href="mailto:support@greencrm.com" style="color: #10b981; text-decoration: none; font-weight: 600;">support@greencrm.com</a></p>
+              </div>
+
+              <!-- Footer -->
+              <hr style="margin: 30px 0; border: none; border-top: 2px solid #e5e7eb;">
+              <div style="text-align: center;">
+                <p style="color: #9ca3af; font-size: 12px; margin: 5px 0;">© 2024 Green CRM. All rights reserved.</p>
+                <p style="color: #9ca3af; font-size: 12px; margin: 5px 0;">This is an automated email. Please do not reply.</p>
+              </div>
+            </div>
+          </div>
+        `
+      });
+    } catch (error) {
+      console.error('❌ Failed to send company welcome email:', error.message);
+      throw error;
+    }
+  },
+
+  sendUserReactivationEmail: async (userData) => {
+    try {
+      return await sendSMTPEmail({
+        to: userData.email,
+        subject: `✅ Your Account Has Been Reactivated - ${userData.companyName}`,
+        html: `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc;">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%); padding: 35px 30px; text-align: center; border-radius: 16px 16px 0 0;">
+              <div style="background: white; width: 70px; height: 70px; border-radius: 50%; margin: 0 auto 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 12px rgba(0,0,0,0.15);">
+                <span style="font-size: 40px;">✅</span>
+              </div>
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">Account Reactivated!</h1>
+              <p style="color: #bfdbfe; margin: 10px 0 0 0; font-size: 16px;">Welcome back to ${userData.companyName}</p>
+            </div>
+
+            <!-- Main content -->
+            <div style="background: white; padding: 35px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
+              <p style="font-size: 16px; color: #374151; line-height: 1.6;">Hi <strong>${userData.name}</strong>,</p>
+              <p style="font-size: 16px; color: #374151; line-height: 1.6;">Great news! Your account has been <strong style="color: #3b82f6;">reactivated</strong> and you now have full access to the CRM system.</p>
+
+              <!-- Account Info Card -->
+              <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 20px; border-radius: 10px; margin: 25px 0; border-left: 4px solid #3b82f6;">
+                <h3 style="color: #1e40af; margin: 0 0 12px 0; font-size: 16px;">👤 Account Information</h3>
+                <p style="margin: 6px 0; color: #1e3a8a;"><strong>Email:</strong> ${userData.email}</p>
+                <p style="margin: 6px 0; color: #1e3a8a;"><strong>Role:</strong> <span style="background: #3b82f6; color: white; padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: 600;">${userData.role.toUpperCase()}</span></p>
+                <p style="margin: 6px 0; color: #1e3a8a;"><strong>Status:</strong> <span style="color: #10b981; font-weight: 700;">● Active</span></p>
+              </div>
+
+              ${userData.sendNewPassword ? `
+              <!-- New Password Card -->
+              <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 20px; border-radius: 10px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                <h3 style="color: #92400e; margin: 0 0 12px 0; font-size: 16px;">🔑 New Login Credentials</h3>
+                <p style="margin: 6px 0; color: #78350f;"><strong>Email:</strong> ${userData.email}</p>
+                <p style="margin: 6px 0; color: #78350f;"><strong>New Password:</strong> <code style="background: #fbbf24; color: #78350f; padding: 5px 10px; border-radius: 5px; font-family: monospace; font-size: 15px; font-weight: 700;">${userData.newPassword}</code></p>
+                <div style="background: #fef3c7; border: 2px dashed #f59e0b; padding: 10px; border-radius: 6px; margin-top: 12px;">
+                  <p style="margin: 0; color: #92400e; font-size: 12px; font-weight: 600;">⚠️ Password expires in 1 hour. Please change it after login.</p>
+                </div>
+              </div>
+              ` : ''}
+
+              <!-- What's Next -->
+              <div style="background: #f9fafb; padding: 20px; border-radius: 10px; margin: 25px 0;">
+                <h3 style="color: #374151; margin: 0 0 12px 0; font-size: 16px;">🎯 What's Next?</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #6b7280; line-height: 1.8;">
+                  <li>Login to your dashboard using your credentials</li>
+                  ${userData.sendNewPassword ? '<li>Change your temporary password immediately</li>' : ''}
+                  <li>Access all CRM features and tools</li>
+                  <li>Continue managing your leads and customers</li>
+                </ul>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" style="display: inline-block; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">🚀 Login Now</a>
+              </div>
+
+              <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 25px;">If you have any questions, please contact your administrator.</p>
+
+              <!-- Footer -->
+              <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
+              <p style="color: #9ca3af; font-size: 11px; text-align: center; margin: 0;">Green CRM - Automated Email | Do not reply to this email</p>
+            </div>
+          </div>
+        `
+      });
+    } catch (error) {
+      console.error('❌ Failed to send user reactivation email:', error.message);
       throw error;
     }
   },

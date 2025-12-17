@@ -12,6 +12,9 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
   const [loading, setLoading] = useState(true);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [limits, setLimits] = useState({ current: 0, max: 5, canAdd: false });
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [newUserCredentials, setNewUserCredentials] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Load team members from backend with cleanup
   useEffect(() => {
@@ -126,15 +129,20 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
       const response = await apiService.createTeamMember(userData);
 
       if (response && response.success) {
-        const roleDisplay = roles.find(r => r.value === response.user.role)?.label || response.user.role;
-        const tempPasswordMsg = response.user.tempPassword ? 
-          `\n\n🔑 Temporary Password: ${response.user.tempPassword}\n\nPlease share this with the new team member securely.` : '';
+        // Store credentials and show modal
+        setNewUserCredentials({
+          name: response.user.name,
+          email: response.user.email,
+          password: response.user.tempPassword,
+          role: roles.find(r => r.value === response.user.role)?.label || response.user.role
+        });
         
-        showSuccess(`✅ Team member added successfully!\n👤 Name: ${response.user.name}\n📧 Email: ${response.user.email}\n🎭 Role: ${roleDisplay}${tempPasswordMsg}`);
-        
-        // Reset form
+        // Reset form and close add modal
         setNewUser({ name: '', email: '', role: 'sales', department: '', password: '', managerName: '', managerEmail: '' });
         setShowAddModal(false);
+        
+        // Show credentials modal
+        setShowCredentialsModal(true);
         
         // Reload the list
         await loadTeamMembers();
@@ -791,6 +799,149 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Credentials Modal */}
+      {showCredentialsModal && newUserCredentials && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100
+        }}>
+          <div style={{
+            background: darkMode ? '#1f2937' : 'white',
+            padding: '2rem',
+            borderRadius: '12px',
+            width: '450px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>✅</div>
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: darkMode ? 'white' : '#1f2937',
+                marginBottom: '0.5rem'
+              }}>User Created Successfully!</h3>
+              <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>
+                Save these credentials - they will be emailed to the user
+              </p>
+            </div>
+
+            <div style={{
+              background: darkMode ? '#374151' : '#f9fafb',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', display: 'block', marginBottom: '0.25rem' }}>NAME</label>
+                <div style={{ color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>{newUserCredentials.name}</div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', display: 'block', marginBottom: '0.25rem' }}>EMAIL</label>
+                <div style={{ color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>{newUserCredentials.email}</div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', display: 'block', marginBottom: '0.25rem' }}>ROLE</label>
+                <div style={{ color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>{newUserCredentials.role}</div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280', display: 'block', marginBottom: '0.25rem' }}>TEMPORARY PASSWORD</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={newUserCredentials.password}
+                    readOnly
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      background: darkMode ? '#1f2937' : 'white',
+                      border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
+                      borderRadius: '6px',
+                      color: darkMode ? 'white' : '#1f2937',
+                      fontFamily: 'monospace',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      padding: '0.5rem',
+                      background: darkMode ? '#4b5563' : '#e5e7eb',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      color: darkMode ? 'white' : '#1f2937'
+                    }}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(newUserCredentials.password);
+                      showSuccess('Password copied to clipboard!');
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              background: darkMode ? '#065f46' : '#dcfce7',
+              color: darkMode ? '#34d399' : '#166534',
+              padding: '0.75rem',
+              borderRadius: '8px',
+              fontSize: '0.75rem',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              ⚠️ Password expires in 1 hour. User must change it on first login.
+            </div>
+
+            <button
+              onClick={() => {
+                setShowCredentialsModal(false);
+                setNewUserCredentials(null);
+                setShowPassword(false);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#10b981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+            >
+              Done
+            </button>
           </div>
         </div>
       )}

@@ -33,6 +33,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     requirements: ''
   });
   const [newNote, setNewNote] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   // Get current user from localStorage
   useEffect(() => {
@@ -101,7 +103,19 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     };
     
     fetchData();
-  }, [productFilter]); // Removed crmData.leads dependency to prevent conflicts
+    
+    // Listen for global lead updates
+    const handleLeadsUpdate = () => {
+      console.log('AllLeads: Received leadsUpdated event');
+      fetchData();
+    };
+    
+    window.addEventListener('leadsUpdated', handleLeadsUpdate);
+    
+    return () => {
+      window.removeEventListener('leadsUpdated', handleLeadsUpdate);
+    };
+  }, [productFilter]);
 
   // Filter leads based on search term, status filter, and product filter
   const filteredLeads = leads.filter(lead => {
@@ -140,6 +154,12 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     
     return matchesSearch && matchesStatus && matchesProduct;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
   
   // Debug filter counts
   console.log('📊 Filter Debug:', {
@@ -960,7 +980,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
               <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>Loading leads...</h3>
             </div>
           ) : (
-            filteredLeads.length === 0 ? (
+            paginatedLeads.length === 0 ? (
             <div style={{
               padding: '40px',
               textAlign: 'center',
@@ -972,7 +992,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                 {searchTerm ? `No results for "${searchTerm}"` : 'No leads available'}
               </p>
             </div>
-          ) : filteredLeads.map((lead, index) => {
+          ) : paginatedLeads.map((lead, index) => {
             const leadId = lead._id || lead.id;
             return (
             <div 
@@ -981,7 +1001,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                 display: 'flex',
                 alignItems: 'center',
                 padding: '20px',
-                borderBottom: index < filteredLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
+                borderBottom: index < paginatedLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
                 transition: 'all 0.2s',
                 backgroundColor: selectedLeadId === leadId 
                   ? (darkMode ? '#4b5563' : '#f0f9ff') 
@@ -1341,6 +1361,92 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
             </div>
           );
         }))}
+        
+        {/* Pagination */}
+        {filteredLeads.length > 0 && totalPages > 1 && (
+          <div style={{
+            padding: '1.5rem',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '0.5rem',
+            borderTop: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
+          }}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentPage === 1 ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                color: currentPage === 1 ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Previous
+            </button>
+            
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1;
+              if (
+                pageNum === 1 ||
+                pageNum === totalPages ||
+                (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: currentPage === pageNum ? '#3b82f6' : (darkMode ? '#374151' : 'white'),
+                      color: currentPage === pageNum ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: currentPage === pageNum ? '600' : '400',
+                      minWidth: '40px'
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              } else if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
+                return <span key={pageNum} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>...</span>;
+              }
+              return null;
+            })}
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentPage === totalPages ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                color: currentPage === totalPages ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Next
+            </button>
+            
+            <span style={{
+              marginLeft: '1rem',
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              fontSize: '14px'
+            }}>
+              Page {currentPage} of {totalPages} ({filteredLeads.length} leads)
+            </span>
+          </div>
+        )}
         </div>
         
         {/* Lead Details Modal */}

@@ -108,8 +108,10 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
       if (response.ok) {
         const data = await response.json();
         const employeesList = data.users || data || [];
-        console.log('📊 Fetched employees:', employeesList.length, 'users');
-        setEmployees(employeesList);
+        // Filter out admin role users
+        const filteredEmployees = employeesList.filter(emp => emp.role !== 'admin');
+        console.log('📊 Fetched employees:', filteredEmployees.length, 'users (admin hidden)');
+        setEmployees(filteredEmployees);
       } else {
         console.error('Failed to fetch employees:', response.status);
         setEmployees([]);
@@ -2572,8 +2574,10 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
         </div>
       )}
 
-      {/* Employee Management Section */}
-      <EmployeeManagement darkMode={darkMode} currentUser={currentUser} />
+      {/* Employee Management Section - Only for SuperAdmin */}
+      {currentUser?.role === 'super-admin' && (
+        <EmployeeManagement darkMode={darkMode} currentUser={currentUser} />
+      )}
 
       {/* User Management Section */}
       <div style={{

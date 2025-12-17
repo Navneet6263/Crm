@@ -25,11 +25,14 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
     requirements: ''
   });
   const [newNote, setNewNote] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   const handleAcceptLead = async (leadId) => {
     try {
       await apiService.acceptGroupLead(leadId);
       
+      // Update the accepted lead in local state
       setLeads(prevLeads => 
         prevLeads.map(lead => 
           (lead._id || lead.id) === leadId 
@@ -37,6 +40,9 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
             : lead
         )
       );
+      
+      // Trigger global refresh event
+      window.dispatchEvent(new CustomEvent('leadsUpdated'));
       
       if (window.showToast) {
         window.showToast('success', '✅ Lead accepted successfully!');
@@ -59,6 +65,9 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
       setLeads(prevLeads => 
         prevLeads.filter(lead => (lead._id || lead.id) !== leadId)
       );
+      
+      // Trigger global refresh event
+      window.dispatchEvent(new CustomEvent('leadsUpdated'));
       
       if (window.showToast) {
         window.showToast('info', '📝 Lead declined and returned to pool');
@@ -97,7 +106,11 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
             });
             const groupData = await groupLeadsResponse.json();
             const groupLeads = Array.isArray(groupData) ? groupData : (groupData.leads || []);
-            leadsData = [...leadsData, ...groupLeads];
+            
+            // Merge group leads with my leads, avoiding duplicates
+            const existingLeadIds = new Set(leadsData.map(l => l._id || l.id));
+            const uniqueGroupLeads = groupLeads.filter(gl => !existingLeadIds.has(gl._id || gl.id));
+            leadsData = [...leadsData, ...uniqueGroupLeads];
           }
           
           // If backend doesn't return leads, try getAllLeads and filter
@@ -184,6 +197,18 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
     };
 
     fetchMyLeads();
+    
+    // Listen for global lead updates
+    const handleLeadsUpdate = () => {
+      console.log('MyLeads: Received leadsUpdated event');
+      fetchMyLeads();
+    };
+    
+    window.addEventListener('leadsUpdated', handleLeadsUpdate);
+    
+    return () => {
+      window.removeEventListener('leadsUpdated', handleLeadsUpdate);
+    };
   }, [crmData, user]);
 
   // Enhanced filtering with priority
@@ -198,37 +223,50 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
+
   const updateLeadStatus = async (leadId, newStatus) => {
+    const lead = leads.find(l => (l._id || l.id) === leadId);
+    const oldStatus = lead?.status;
+    
     try {
-      const lead = leads.find(l => (l._id || l.id) === leadId);
-      const oldStatus = lead?.status;
-      
-      await apiService.updateLead(leadId, { status: newStatus });
-      
-      // Refresh global data
-      if (updateCrmData) {
-        const allLeads = await apiService.getAllLeads();
-        updateCrmData({ leads: allLeads });
-      }
-      
+      // Update immediately in local state (optimistic update)
       setLeads(prevLeads => 
         prevLeads.map(lead => 
           (lead._id || lead.id) === leadId ? { ...lead, status: newStatus } : lead
         )
       );
       
-      // Add history note for status change
+      // Update in backend
+      await apiService.updateLead(leadId, { status: newStatus });
+      
+      // Add history note for status change (in background)
       if (oldStatus !== newStatus) {
         const statusNote = `Status changed from "${oldStatus}" to "${newStatus}" by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}`;
-        try {
-          await apiService.addLeadNote(leadId, statusNote);
-        } catch (noteError) {
-          console.error('Error adding status change note:', noteError);
-        }
+        apiService.addLeadNote(leadId, statusNote).catch(err => 
+          console.error('Error adding status change note:', err)
+        );
+      }
+      
+      // Show success toast
+      if (window.showToast) {
+        window.showToast('success', `✅ Status updated to ${newStatus}`);
       }
     } catch (error) {
       console.error('Error updating lead status:', error);
-      alert(`Failed to update lead status: ${error.message}`);
+      // Revert on error
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          (lead._id || lead.id) === leadId ? { ...lead, status: oldStatus } : lead
+        )
+      );
+      if (window.showToast) {
+        window.showToast('error', `❌ Failed to update status`);
+      }
     }
   };
 
@@ -710,7 +748,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
               </p>
             </div>
           ) : (
-            filteredLeads.map((lead, index) => {
+            paginatedLeads.map((lead, index) => {
               const statusInfo = getStatusColor(lead.status);
               const priorityInfo = getPriorityColor(lead.priority);
               const StatusIcon = statusInfo.icon;
@@ -1007,7 +1045,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
                       display: 'flex',
                       alignItems: 'center',
                       padding: '20px',
-                      borderBottom: index < filteredLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
+                      borderBottom: index < paginatedLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
                       transition: 'all 0.2s',
                       position: 'relative'
                     }}
@@ -1224,6 +1262,92 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
             })
           )}
         </div>
+        
+        {/* Pagination */}
+        {filteredLeads.length > 0 && totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginTop: '2rem',
+            padding: '1rem'
+          }}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentPage === 1 ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                color: currentPage === 1 ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Previous
+            </button>
+            
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1;
+              if (
+                pageNum === 1 ||
+                pageNum === totalPages ||
+                (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: currentPage === pageNum ? '#3b82f6' : (darkMode ? '#374151' : 'white'),
+                      color: currentPage === pageNum ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: currentPage === pageNum ? '600' : '400',
+                      minWidth: '40px'
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              } else if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
+                return <span key={pageNum} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>...</span>;
+              }
+              return null;
+            })}
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentPage === totalPages ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                color: currentPage === totalPages ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Next
+            </button>
+            
+            <span style={{
+              marginLeft: '1rem',
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              fontSize: '14px'
+            }}>
+              Page {currentPage} of {totalPages} ({filteredLeads.length} leads)
+            </span>
+          </div>
+        )}
         
         {/* Lead Details Modal */}
         {showLeadDetails && selectedLead && (

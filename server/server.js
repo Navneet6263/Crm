@@ -242,6 +242,17 @@ app.post('/api/auth/login', loginLimiter, auditLogger('LOGIN'), async (req, res)
       return res.status(401).json({ message: 'Incorrect password' });
     }
     
+    // Check if password has expired
+    if (user.isTemporaryPassword && user.passwordExpiresAt) {
+      if (new Date() > user.passwordExpiresAt) {
+        console.log('❌ Temporary password expired');
+        return res.status(401).json({ 
+          message: 'Temporary password expired. Please contact your administrator for a new password.',
+          passwordExpired: true
+        });
+      }
+    }
+    
     // Generate JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
@@ -350,8 +361,23 @@ app.put('/api/auth/change-password', authenticateToken, auditLogger('PASSWORD_CH
 // Get users for assignment
 app.get('/api/auth/users', authenticateToken, async (req, res) => {
   try {
-    const users = await User.find({ role: { $in: ['sales', 'support', 'manager'] } })
-      .select('name email role')
+    // Build query with company filter
+    let query = { role: { $in: ['sales', 'support', 'manager', 'admin', 'senior-manager', 'sales-rep', 'sales-manager', 'marketing'] } };
+    
+    // Add company filter for non-superadmin users
+    if (req.user.role !== 'super-admin') {
+      const userCompanyId = req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
+      
+      if (userCompanyId) {
+        query.$or = [
+          { companyId: userCompanyId },
+          { tenantId: userCompanyId }
+        ];
+      }
+    }
+    
+    const users = await User.find(query)
+      .select('name email role isActive companyId tenantId')
       .sort({ name: 1 });
     
     res.json(users);

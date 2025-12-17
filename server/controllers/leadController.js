@@ -293,7 +293,7 @@ const getLeads = async (req, res) => {
       role: req.user.role
     });
     
-    const { status, priority, assignedTo, search, page = 1, limit = 10000, product } = req.query;
+    const { status, priority, assignedTo, search, page = 1, limit = 50, product } = req.query;
     
     let query = { isActive: true };
     
@@ -349,11 +349,13 @@ const getLeads = async (req, res) => {
     console.log('🔍 Final Query:', JSON.stringify(query, null, 2));
 
     const leads = await Lead.find(query)
+      .select('-notes -activities')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
 
     const total = await Lead.countDocuments(query);
     
@@ -588,7 +590,7 @@ const getMyLeads = async (req, res) => {
     console.log('👤 User Email:', req.user.email);
     console.log('👤 User Role:', req.user.role);
     
-    const { status, priority, search, page = 1, limit = 10000 } = req.query;
+    const { status, priority, search, page = 1, limit = 50 } = req.query;
     
     let query = { isActive: true };
     
@@ -642,11 +644,13 @@ const getMyLeads = async (req, res) => {
     }
 
     const leads = await Lead.find(query)
+      .select('-notes -activities')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
 
     const total = await Lead.countDocuments(query);
     
@@ -677,7 +681,7 @@ const getMyLeads = async (req, res) => {
 const getLeadsByProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { page = 1, limit = 10000 } = req.query;
+    const { page = 1, limit = 50 } = req.query;
     
     let query = { isActive: true, product: productId };
     
@@ -695,18 +699,20 @@ const getLeadsByProduct = async (req, res) => {
     }
     
     const leads = await Lead.find(query)
+      .select('-notes -activities')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .lean();
 
     const total = await Lead.countDocuments(query);
     
     res.json({
       leads,
       totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      currentPage: parseInt(page),
       total
     });
   } catch (error) {
@@ -901,19 +907,47 @@ const getPendingGroupLeads = async (req, res) => {
 
 const getSalesTeamStats = async (req, res) => {
   try {
-    // Get all sales users
-    const salesUsers = await User.find({
+    // Get company ID from user
+    let userCompanyId;
+    if (req.user.role === 'super-admin') {
+      // SuperAdmin can see all companies or specific company if provided
+      userCompanyId = req.query.companyId || null;
+    } else {
+      // Other users only see their own company
+      userCompanyId = req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
+    }
+    
+    // Build user query with company filter
+    const userQuery = {
       role: { $in: ['sales', 'sales-rep', 'sales-manager', 'senior-manager'] },
       isActive: true
-    }).select('name email role');
+    };
+    
+    // Add company filter for non-superadmin or when superadmin selects a company
+    if (userCompanyId) {
+      userQuery.$or = [
+        { companyId: userCompanyId },
+        { tenantId: userCompanyId }
+      ];
+    }
+    
+    // Get sales users from current company only
+    const salesUsers = await User.find(userQuery).select('name email role companyId tenantId');
     
     // Get stats for each user
     const stats = await Promise.all(salesUsers.map(async (user) => {
-      // Count accepted leads (assigned to this user)
-      const acceptedCount = await Lead.countDocuments({
+      // Count accepted leads (assigned to this user) from same company
+      const leadQuery = {
         assignedTo: user._id,
         isActive: true
-      });
+      };
+      
+      // Add company filter to leads as well
+      if (userCompanyId) {
+        leadQuery.companyId = userCompanyId;
+      }
+      
+      const acceptedCount = await Lead.countDocuments(leadQuery);
       
       return {
         userId: user._id,
@@ -924,12 +958,18 @@ const getSalesTeamStats = async (req, res) => {
       };
     }));
     
-    // Get pending group leads count
-    const pendingCount = await Lead.countDocuments({
+    // Get pending group leads count for current company
+    const pendingQuery = {
       status: 'pending-acceptance',
       assignedToGroup: 'sales',
       isActive: true
-    });
+    };
+    
+    if (userCompanyId) {
+      pendingQuery.companyId = userCompanyId;
+    }
+    
+    const pendingCount = await Lead.countDocuments(pendingQuery);
     
     res.json({ stats, pendingLeads: pendingCount });
   } catch (error) {
