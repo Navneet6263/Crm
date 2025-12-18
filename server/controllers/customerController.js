@@ -82,10 +82,12 @@ const getCustomers = async (req, res) => {
     }
 
     const customers = await Customer.find(query)
+      .select('name email phone companyName status customerType industry createdBy assignedTo createdAt updatedAt')
       .populate('createdBy assignedTo', 'name email')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
 
     const total = await Customer.countDocuments(query);
 
@@ -103,6 +105,7 @@ const getCustomers = async (req, res) => {
 const getCustomerById = async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.id)
+      .select('name email phone companyName status customerType industry createdBy assignedTo createdAt updatedAt noteHistory')
       .populate('createdBy assignedTo', 'name email')
       .populate('noteHistory.createdBy', 'name');
     
@@ -122,7 +125,9 @@ const updateCustomer = async (req, res) => {
       req.params.id,
       req.body,
       { new: true, runValidators: true }
-    ).populate('createdBy assignedTo', 'name email');
+    )
+    .select('name email phone companyName status customerType industry createdBy assignedTo createdAt updatedAt')
+    .populate('createdBy assignedTo', 'name email');
     
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });

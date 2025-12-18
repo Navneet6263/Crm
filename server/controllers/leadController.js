@@ -349,7 +349,7 @@ const getLeads = async (req, res) => {
     console.log('🔍 Final Query:', JSON.stringify(query, null, 2));
 
     const leads = await Lead.find(query)
-      .select('-notes -activities')
+      .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
@@ -383,7 +383,8 @@ const getLeads = async (req, res) => {
 const getLeadById = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id)
-      .populate('createdBy assignedTo', 'name email')
+      .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue notes activities lastViewedAt')
+      .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .populate('notes.createdBy activities.createdBy', 'name');
     
@@ -426,7 +427,9 @@ const updateLead = async (req, res) => {
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('createdBy assignedTo', 'name email role');
+    )
+    .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue activities')
+    .populate('createdBy assignedTo', 'name email role');
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
@@ -524,12 +527,14 @@ const assignLead = async (req, res) => {
       leadId,
       { 
         assignedTo,
-        status: 'assigned', // Update status to assigned
+        status: 'assigned',
         assignedAt: new Date(),
         assignedBy: req.user._id || req.user.id
       },
       { new: true, runValidators: true }
-    ).populate('createdBy assignedTo assignedBy', 'name email role');
+    )
+    .select('contactPerson companyName email phone status priority source product createdBy assignedTo assignedBy createdAt updatedAt estimatedValue activities')
+    .populate('createdBy assignedTo assignedBy', 'name email role');
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
@@ -644,7 +649,7 @@ const getMyLeads = async (req, res) => {
     }
 
     const leads = await Lead.find(query)
-      .select('-notes -activities')
+      .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
@@ -699,7 +704,7 @@ const getLeadsByProduct = async (req, res) => {
     }
     
     const leads = await Lead.find(query)
-      .select('-notes -activities')
+      .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
@@ -848,6 +853,7 @@ const acceptGroupLead = async (req, res) => {
     
     await lead.save();
     await lead.populate('assignedTo', 'name email role');
+    await lead.populate('product', 'name color icon');
     
     res.json({ success: true, message: 'Lead accepted successfully', lead });
   } catch (error) {
@@ -894,6 +900,7 @@ const getPendingGroupLeads = async (req, res) => {
     };
     
     const leads = await Lead.find(query)
+      .select('contactPerson companyName email phone status priority source product createdBy createdAt')
       .populate('createdBy', 'name email')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 });

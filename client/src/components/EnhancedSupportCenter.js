@@ -186,26 +186,66 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
       <div className="stats-section">
         <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
-            <h3>{stats.total}</h3>
-            <p>Total Tickets</p>
+            <h3 style={{ 
+              color: darkMode ? '#ffffff' : '#1f2937',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>{stats.total}</h3>
+            <p style={{ 
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>Total Tickets</p>
           </div>
         </div>
         <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
-            <h3>{stats.open}</h3>
-            <p>Open Tickets</p>
+            <h3 style={{ 
+              color: darkMode ? '#ffffff' : '#1f2937',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>{stats.open}</h3>
+            <p style={{ 
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>Open Tickets</p>
           </div>
         </div>
         <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
-            <h3>{stats.inProgress}</h3>
-            <p>In Progress</p>
+            <h3 style={{ 
+              color: darkMode ? '#ffffff' : '#1f2937',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>{stats.inProgress}</h3>
+            <p style={{ 
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>In Progress</p>
           </div>
         </div>
         <div className={`stat-card ${darkMode ? 'dark' : ''}`}>
           <div className="stat-info">
-            <h3>{stats.resolved}</h3>
-            <p>Resolved</p>
+            <h3 style={{ 
+              color: darkMode ? '#ffffff' : '#1f2937',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>{stats.resolved}</h3>
+            <p style={{ 
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              textShadow: 'none',
+              background: 'none',
+              WebkitTextFillColor: 'initial'
+            }}>Resolved</p>
           </div>
         </div>
       </div>
@@ -214,7 +254,12 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
         backgroundColor: darkMode ? '#374151' : 'white',
         color: darkMode ? '#ffffff' : '#1f2937'
       }}>
-        <h2 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Support Center</h2>
+        <h2 style={{ 
+          color: darkMode ? '#ffffff' : '#1f2937',
+          textShadow: 'none',
+          background: 'none',
+          WebkitTextFillColor: 'initial'
+        }}>Support Center</h2>
         <div className="header-actions">
           <button 
             className={`btn-primary ${darkMode ? 'dark' : ''}`}
@@ -301,7 +346,12 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
           backgroundColor: darkMode ? '#374151' : 'white',
           color: darkMode ? '#ffffff' : '#000000'
         }}>
-          <h3 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Support Tickets</h3>
+          <h3 style={{ 
+            color: darkMode ? '#ffffff' : '#1f2937',
+            textShadow: 'none',
+            background: 'none',
+            WebkitTextFillColor: 'initial'
+          }}>Support Tickets</h3>
           {loading ? (
             <div className="loading">Loading tickets...</div>
           ) : (
@@ -333,7 +383,12 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                         {ticket.priority}
                       </span>
                     </div>
-                    <h4 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>{ticket.title}</h4>
+                    <h4 style={{ 
+                      color: darkMode ? '#ffffff' : '#1f2937',
+                      textShadow: 'none',
+                      background: 'none',
+                      WebkitTextFillColor: 'initial'
+                    }}>{ticket.title}</h4>
                     <div className="ticket-meta">
                       <span 
                         className="status-badge"
@@ -360,7 +415,12 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
             <div className="ticket-details-header" style={{
               borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
             }}>
-              <h3 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>#{selectedTicket.ticketId} - {selectedTicket.title}</h3>
+              <h3 style={{ 
+                color: darkMode ? '#ffffff' : '#1f2937',
+                textShadow: 'none',
+                background: 'none',
+                WebkitTextFillColor: 'initial'
+              }}>#{selectedTicket.ticketId} - {selectedTicket.title}</h3>
               <div className="ticket-actions">
                 {currentUser && ['admin', 'super-admin'].includes(currentUser.role) && (
                   <select 
@@ -417,12 +477,22 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
             </div>
 
             <div className="ticket-description">
-              <h4 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Description</h4>
+              <h4 style={{ 
+                color: darkMode ? '#ffffff' : '#1f2937',
+                textShadow: 'none',
+                background: 'none',
+                WebkitTextFillColor: 'initial'
+              }}>Description</h4>
               <p style={{ color: darkMode ? '#ffffff' : '#000000' }}>{selectedTicket.description}</p>
             </div>
 
             <div className="ticket-replies">
-              <h4 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Conversation</h4>
+              <h4 style={{ 
+                color: darkMode ? '#ffffff' : '#1f2937',
+                textShadow: 'none',
+                background: 'none',
+                WebkitTextFillColor: 'initial'
+              }}>Conversation</h4>
               <div className="replies-list">
                 {selectedTicket.replies?.map((reply, index) => (
                   <div key={index} className={`reply ${reply.isStaff ? 'staff-reply' : 'customer-reply'}`} style={{
@@ -478,7 +548,12 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
             <div className="modal-header" style={{
               borderBottom: `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}`
             }}>
-              <h3 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Create New Ticket</h3>
+              <h3 style={{ 
+                color: darkMode ? '#ffffff' : '#1f2937',
+                textShadow: 'none',
+                background: 'none',
+                WebkitTextFillColor: 'initial'
+              }}>Create New Ticket</h3>
               <button 
                 className="close-btn"
                 onClick={() => setShowCreateForm(false)}

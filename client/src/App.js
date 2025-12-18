@@ -27,6 +27,8 @@ import CompanySetup from './components/CompanySetup';
 import AccessDenied from './components/AccessDenied';
 import SimpleAddLead from './components/AddLead';
 import AIChatWidget from './components/AIChatWidget';
+import WelcomeScreen from './components/WelcomeScreen';
+import NavigationHub from './components/NavigationHub';
 
 
 // Import components directly to avoid chunk loading issues
@@ -100,6 +102,8 @@ const AppContent = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [showAddLead, setShowAddLead] = useState(false);
   const [showCompanySetup, setShowCompanySetup] = useState(false);
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(false);
+  const [showNavigationHub, setShowNavigationHub] = useState(false);
 
   // Browser history management
   useEffect(() => {
@@ -289,8 +293,7 @@ const AppContent = () => {
           };
           setCurrentUser(user);
           setIsLoggedIn(true);
-          setActiveView('dashboard');
-          showToast('success', `Welcome ${user.name}!`);
+          setShowWelcomeScreen(true);
           window.history.replaceState({}, document.title, window.location.pathname);
           return;
         } catch (err) {
@@ -306,8 +309,7 @@ const AppContent = () => {
               const userData = await response.json();
               setCurrentUser(userData.user);
               setIsLoggedIn(true);
-              setActiveView('dashboard');
-              showToast('success', `Welcome ${userData.user.name}!`);
+              setShowWelcomeScreen(true);
               window.history.replaceState({}, document.title, window.location.pathname);
               return;
             }
@@ -340,8 +342,7 @@ const AppContent = () => {
           console.log('✅ Auto-login successful:', authData.user.name);
           setCurrentUser(authData.user);
           setIsLoggedIn(true);
-          setActiveView('dashboard');
-          showToast('success', `Welcome back, ${authData.user.name}!`);
+          setShowWelcomeScreen(true);
         } else {
           // Invalid session, clear token
           localStorage.removeItem('authToken');
@@ -385,12 +386,11 @@ const AppContent = () => {
       localStorage.setItem('authToken', token);
       setCurrentUser(user);
       setIsLoggedIn(true);
-      setActiveView('dashboard');
+      setShowWelcomeScreen(true);
       
       // Track login event
       trackUserLogin(user.role);
       
-      showToast('success', `Welcome back, ${user.name}!`);
       return true;
     } catch (error) {
       console.error('Login error:', error);
@@ -413,9 +413,8 @@ const AppContent = () => {
       localStorage.setItem('authToken', token);
       setCurrentUser(user);
       setIsLoggedIn(true);
-      setActiveView('dashboard');
+      setShowWelcomeScreen(true);
       
-      showToast('success', `Welcome ${user.name}!`);
       return true;
     } catch (error) {
       console.error('Customer login error:', error);
@@ -447,6 +446,19 @@ const AppContent = () => {
     } catch (error) {
       console.error('Signup error:', error);
       throw error;
+    }
+  };
+
+  const handleWelcomeComplete = () => {
+    setShowWelcomeScreen(false);
+    setShowNavigationHub(true);
+  };
+
+  const handleNavigationHubNavigate = (viewId) => {
+    setShowNavigationHub(false);
+    setActiveView(viewId === 'add-lead' ? 'add-enquiry' : viewId);
+    if (viewId !== 'add-lead') {
+      showToast('success', `Welcome back, ${currentUser.name}!`);
     }
   };
 
@@ -601,7 +613,7 @@ const AppContent = () => {
 
       case 'analytics': return <AnalyticsDashboard darkMode={darkMode} />;
       case 'tasks': return <TaskKanban darkMode={darkMode} />;
-      case 'communication': return <CommunicationHub darkMode={darkMode} lead={null} onClose={() => changeView('dashboard')} />;
+      case 'communication': return <CommunicationHub darkMode={darkMode} lead={null} onClose={() => changeView('dashboard')} currentUser={currentUser} />;
       case 'location': return <LocationTracker darkMode={darkMode} currentUser={currentUser} />;
       case 'documents': return <DocumentManager darkMode={darkMode} currentUser={currentUser} />;
       case 'calendar': return <CalendarSync darkMode={darkMode} currentUser={currentUser} />;
@@ -684,6 +696,36 @@ const AppContent = () => {
           />
         )}
       </div>
+    );
+  }
+
+  // Show welcome screen first after login
+  if (showWelcomeScreen) {
+    return (
+      <WelcomeScreen
+        userName={currentUser?.name || 'User'}
+        onComplete={handleWelcomeComplete}
+        darkMode={darkMode}
+      />
+    );
+  }
+
+  // Show navigation hub after welcome screen
+  if (showNavigationHub) {
+    return (
+      <NavigationHub
+        userName={currentUser?.name || 'User'}
+        userRole={currentUser?.role}
+        onNavigate={handleNavigationHubNavigate}
+        darkMode={darkMode}
+        recentActivity={{
+          lastView: 'dashboard',
+          lastViewName: 'Dashboard',
+          myLeadsCount: crmData.leads?.filter(lead => lead.assignedTo === currentUser?.id)?.length || 0,
+          totalLeads: crmData.leads?.length || 0,
+          recentCount: 3
+        }}
+      />
     );
   }
 

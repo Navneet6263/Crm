@@ -487,7 +487,9 @@ const CRMAnalytics = ({ darkMode }) => {
                 marginBottom: '0.5rem' 
               }}>
                 <span style={{ color: darkMode ? '#d1d5db' : '#374151', fontWeight: '600' }}>Leads Module</span>
-                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>85% Usage</span>
+                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                  {analytics?.userActivity?.filter(u => u.leadsAdded > 0).length || 0} users active
+                </span>
               </div>
               <div style={{
                 width: '100%',
@@ -497,7 +499,7 @@ const CRMAnalytics = ({ darkMode }) => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: '85%',
+                  width: `${Math.round((analytics?.userActivity?.filter(u => u.leadsAdded > 0).length / Math.max(analytics?.totalUsers, 1)) * 100)}%`,
                   height: '100%',
                   background: 'linear-gradient(90deg, #22c55e, #4ade80)',
                   borderRadius: '4px'
@@ -512,7 +514,9 @@ const CRMAnalytics = ({ darkMode }) => {
                 marginBottom: '0.5rem' 
               }}>
                 <span style={{ color: darkMode ? '#d1d5db' : '#374151', fontWeight: '600' }}>Customer Management</span>
-                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>72% Usage</span>
+                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                  {analytics?.userActivity?.filter(u => u.customersAdded > 0).length || 0} users active
+                </span>
               </div>
               <div style={{
                 width: '100%',
@@ -522,7 +526,7 @@ const CRMAnalytics = ({ darkMode }) => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: '72%',
+                  width: `${Math.round((analytics?.userActivity?.filter(u => u.customersAdded > 0).length / Math.max(analytics?.totalUsers, 1)) * 100)}%`,
                   height: '100%',
                   background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
                   borderRadius: '4px'
@@ -536,8 +540,10 @@ const CRMAnalytics = ({ darkMode }) => {
                 justifyContent: 'space-between', 
                 marginBottom: '0.5rem' 
               }}>
-                <span style={{ color: darkMode ? '#d1d5db' : '#374151', fontWeight: '600' }}>Reports & Analytics</span>
-                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>45% Usage</span>
+                <span style={{ color: darkMode ? '#d1d5db' : '#374151', fontWeight: '600' }}>Active Sessions</span>
+                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                  {analytics?.userActivity?.filter(u => u.sessions > 0).length || 0} users active
+                </span>
               </div>
               <div style={{
                 width: '100%',
@@ -547,7 +553,7 @@ const CRMAnalytics = ({ darkMode }) => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: '45%',
+                  width: `${Math.round((analytics?.userActivity?.filter(u => u.sessions > 0).length / Math.max(analytics?.totalUsers, 1)) * 100)}%`,
                   height: '100%',
                   background: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
                   borderRadius: '4px'
@@ -561,8 +567,10 @@ const CRMAnalytics = ({ darkMode }) => {
                 justifyContent: 'space-between', 
                 marginBottom: '0.5rem' 
               }}>
-                <span style={{ color: darkMode ? '#d1d5db' : '#374151', fontWeight: '600' }}>Settings & Admin</span>
-                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>28% Usage</span>
+                <span style={{ color: darkMode ? '#d1d5db' : '#374151', fontWeight: '600' }}>Overall Activity</span>
+                <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                  {analytics?.activeUsers || 0} / {analytics?.totalUsers || 0} users
+                </span>
               </div>
               <div style={{
                 width: '100%',
@@ -572,7 +580,7 @@ const CRMAnalytics = ({ darkMode }) => {
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  width: '28%',
+                  width: `${analytics?.adoptionRate || 0}%`,
                   height: '100%',
                   background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)',
                   borderRadius: '4px'

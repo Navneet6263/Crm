@@ -10,6 +10,74 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' });
 
   useEffect(() => {
+    // SEO Meta Tags
+    document.title = 'GreenCall CRM - AI-Powered Customer Management for Indian Businesses';
+    
+    // Create or update meta tags
+    const updateMetaTag = (name, content) => {
+      let meta = document.querySelector(`meta[name="${name}"]`) || document.querySelector(`meta[property="${name}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        if (name.startsWith('og:') || name.startsWith('twitter:')) {
+          meta.setAttribute('property', name);
+        } else {
+          meta.setAttribute('name', name);
+        }
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
+
+    // Basic SEO
+    updateMetaTag('description', 'Transform your business with GreenCall CRM - AI-powered customer management platform built for Indian businesses. WhatsApp integration, advanced analytics, 14-day free trial.');
+    updateMetaTag('keywords', 'CRM software India, customer management, WhatsApp CRM, sales automation, lead management, Indian business CRM, AI CRM');
+    updateMetaTag('author', 'GreenCall Technologies');
+    
+    // Open Graph
+    updateMetaTag('og:title', 'GreenCall CRM - AI-Powered Customer Management');
+    updateMetaTag('og:description', 'Transform your business with our intelligent CRM platform. Built for Indian businesses with WhatsApp integration and advanced analytics.');
+    updateMetaTag('og:type', 'website');
+    updateMetaTag('og:url', window.location.href);
+    updateMetaTag('og:image', 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80');
+    
+    // Twitter Cards
+    updateMetaTag('twitter:card', 'summary_large_image');
+    updateMetaTag('twitter:title', 'GreenCall CRM - AI-Powered Customer Management');
+    updateMetaTag('twitter:description', 'Transform your business with our intelligent CRM platform built for Indian businesses.');
+    updateMetaTag('twitter:image', 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80');
+
+    // Structured Data
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "GreenCall CRM",
+      "description": "AI-powered customer relationship management platform for Indian businesses",
+      "url": window.location.href,
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "999",
+        "priceCurrency": "INR",
+        "priceValidUntil": "2024-12-31"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.9",
+        "ratingCount": "150"
+      }
+    };
+
+    let structuredDataScript = document.querySelector('#structured-data');
+    if (!structuredDataScript) {
+      structuredDataScript = document.createElement('script');
+      structuredDataScript.id = 'structured-data';
+      structuredDataScript.type = 'application/ld+json';
+      document.head.appendChild(structuredDataScript);
+    }
+    structuredDataScript.textContent = JSON.stringify(structuredData);
+
+    // CSS Animations
     const styleSheet = document.createElement('style');
     styleSheet.textContent = `
       @keyframes fadeInUp {
@@ -22,7 +90,10 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
       }
     `;
     document.head.appendChild(styleSheet);
-    return () => document.head.removeChild(styleSheet);
+    return () => {
+      document.head.removeChild(styleSheet);
+      if (structuredDataScript) document.head.removeChild(structuredDataScript);
+    };
   }, []);
 
   return (
@@ -58,6 +129,44 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
           onBookDemo={() => setIsDemoModalOpen(true)}
         />
         
+        {/* Lead Capture Magnet */}
+        <section style={{
+          padding: '1rem 2rem',
+          background: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.05)',
+          textAlign: 'center',
+          borderBottom: `1px solid ${darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.15)'}`
+        }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '50px',
+              border: `1px solid ${darkMode ? 'rgba(34, 197, 94, 0.3)' : 'rgba(34, 197, 94, 0.2)'}`,
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              color: darkMode ? '#4ade80' : '#16a34a',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(34, 197, 94, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+            >
+              <span>📝</span>
+              <span>FREE: Download 7-Step Sales Funnel PDF Guide</span>
+              <ArrowRight size={16} />
+            </div>
+          </div>
+        </section>
+
         <section id="hero" style={{
           background: 'transparent',
           padding: window.innerWidth <= 768 ? '6rem 1rem 4rem' : '8rem 2rem 6rem',
@@ -367,6 +476,424 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
           </div>
         </section>
 
+        {/* Features Section */}
+        <section id="features" style={{
+          padding: '8rem 2rem',
+          background: darkMode 
+            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
+            : 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdf4 100%)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: '20%',
+            left: '10%',
+            width: '400px',
+            height: '400px',
+            background: 'linear-gradient(45deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1))',
+            borderRadius: '50%',
+            filter: 'blur(80px)',
+            animation: 'float 8s ease-in-out infinite'
+          }} />
+          <div style={{
+            position: 'absolute',
+            bottom: '10%',
+            right: '15%',
+            width: '300px',
+            height: '300px',
+            background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.12), rgba(147, 51, 234, 0.08))',
+            borderRadius: '50%',
+            filter: 'blur(60px)',
+            animation: 'float 10s ease-in-out infinite reverse'
+          }} />
+
+          <div style={{
+            maxWidth: '1400px',
+            margin: '0 auto',
+            textAlign: 'center',
+            position: 'relative',
+            zIndex: 1
+          }}>
+            <div style={{
+              marginBottom: '5rem',
+              animation: 'fadeInUp 0.8s ease-out'
+            }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: darkMode 
+                  ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.1))'
+                  : 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1))',
+                padding: '0.75rem 2rem',
+                borderRadius: '50px',
+                border: `2px solid ${darkMode ? 'rgba(34, 197, 94, 0.3)' : 'rgba(34, 197, 94, 0.25)'}`,
+                marginBottom: '2rem',
+                fontSize: '0.9rem',
+                fontWeight: '700',
+                color: darkMode ? '#4ade80' : '#16a34a',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                boxShadow: darkMode 
+                  ? '0 10px 30px rgba(34, 197, 94, 0.2)'
+                  : '0 10px 30px rgba(34, 197, 94, 0.15)'
+              }}>
+                <Sparkles size={18} />
+                <span>Premium Features</span>
+              </div>
+
+              <h2 style={{
+                fontSize: '3.5rem',
+                fontWeight: '900',
+                color: darkMode ? '#f9fafb' : '#1f2937',
+                marginBottom: '1.5rem',
+                letterSpacing: '-0.02em',
+                lineHeight: '1.1',
+                textShadow: darkMode 
+                  ? '0 0 20px rgba(74, 222, 128, 0.3)'
+                  : '0 0 20px rgba(22, 163, 74, 0.2)'
+              }}>
+                Powerful Features Built for Growth
+              </h2>
+              
+              <p style={{
+                fontSize: '1.4rem',
+                color: darkMode ? '#d1fae5' : '#166534',
+                marginBottom: '1rem',
+                opacity: '0.9',
+                lineHeight: '1.6',
+                maxWidth: '700px',
+                margin: '0 auto'
+              }}>
+                Everything you need to manage and grow your business with cutting-edge technology
+              </p>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '2.5rem',
+              marginBottom: '4rem'
+            }}>
+              {[
+                { 
+                  icon: '🚀', 
+                  title: 'Fast Lead Management', 
+                  desc: 'Capture and manage leads instantly with AI-powered automation',
+                  gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  color: '#3b82f6'
+                },
+                { 
+                  icon: '🔒', 
+                  title: 'Secure Access', 
+                  desc: 'Bank-level security with end-to-end encryption for your data',
+                  gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#ef4444'
+                },
+                { 
+                  icon: '📊', 
+                  title: 'Sales Dashboard', 
+                  desc: 'Real-time insights and analytics with beautiful visualizations',
+                  gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  color: '#8b5cf6'
+                },
+                { 
+                  icon: '📨', 
+                  title: 'Email & WhatsApp Automation', 
+                  desc: 'Multi-channel communication with smart automation workflows',
+                  gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#f59e0b'
+                },
+                { 
+                  icon: '👥', 
+                  title: 'Team Collaboration', 
+                  desc: 'Work together seamlessly with real-time collaboration tools',
+                  gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#10b981'
+                },
+                { 
+                  icon: '📈', 
+                  title: 'Advanced Analytics', 
+                  desc: 'Data-driven decision making with predictive insights',
+                  gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                  color: '#ec4899'
+                }
+              ].map((feature, index) => (
+                <div key={index} style={{
+                  background: darkMode 
+                    ? 'linear-gradient(135deg, rgba(31, 41, 55, 0.95) 0%, rgba(55, 65, 81, 0.9) 100%)'
+                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%)',
+                  backdropFilter: 'blur(20px)',
+                  padding: '3rem 2.5rem',
+                  borderRadius: '28px',
+                  border: `2px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+                  boxShadow: darkMode 
+                    ? '0 25px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                    : '0 25px 60px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                  animation: `fadeInUp 0.8s ease-out ${index * 0.15}s both`,
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-12px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = darkMode 
+                    ? `0 35px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px ${feature.color}40`
+                    : `0 35px 80px rgba(0, 0, 0, 0.18), 0 0 0 1px ${feature.color}30`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = darkMode 
+                    ? '0 25px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+                    : '0 25px 60px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8)';
+                }}
+                >
+                  <div style={{
+                    width: '90px',
+                    height: '90px',
+                    borderRadius: '24px',
+                    background: feature.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '2rem',
+                    boxShadow: `0 15px 40px ${feature.color}40`,
+                    position: 'relative',
+                    zIndex: 1
+                  }}>
+                    <div style={{ fontSize: '2.5rem' }}>{feature.icon}</div>
+                  </div>
+
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <h3 style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '700',
+                      color: darkMode ? '#f9fafb' : '#1f2937',
+                      marginBottom: '1rem',
+                      letterSpacing: '-0.01em'
+                    }}>{feature.title}</h3>
+                    
+                    <p style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                      fontSize: '1rem',
+                      lineHeight: '1.6',
+                      marginBottom: '1.5rem'
+                    }}>{feature.desc}</p>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      color: feature.color,
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      transition: 'all 0.3s ease'
+                    }}>
+                      <span>Learn More</span>
+                      <ArrowRight size={16} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Why Choose Us Section */}
+        <section style={{
+          padding: '4rem 2rem',
+          background: darkMode ? 'rgba(31, 41, 55, 0.5)' : 'rgba(255, 255, 255, 0.8)',
+          textAlign: 'center'
+        }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            <h3 style={{
+              fontSize: '2rem',
+              fontWeight: '700',
+              color: darkMode ? '#f9fafb' : '#1f2937',
+              marginBottom: '3rem'
+            }}>Why Choose GreenCall CRM?</h3>
+            
+            <div style={{
+              background: darkMode ? 'rgba(31, 41, 55, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+              padding: '2rem',
+              borderRadius: '16px',
+              border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`,
+              boxShadow: darkMode ? '0 20px 50px rgba(0, 0, 0, 0.4)' : '0 20px 50px rgba(0, 0, 0, 0.1)',
+              overflow: 'auto'
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '1rem', fontWeight: '600', color: darkMode ? '#d1d5db' : '#374151', textAlign: 'left' }}>Feature</th>
+                    <th style={{ padding: '1rem', fontWeight: '600', color: darkMode ? '#ef4444' : '#dc2626', textAlign: 'center' }}>Others</th>
+                    <th style={{ padding: '1rem', fontWeight: '600', color: darkMode ? '#4ade80' : '#16a34a', textAlign: 'center' }}>GreenCall CRM</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { feature: 'Speed', others: 'Slow', ours: '⚡ Lightning Fast' },
+                    { feature: 'Setup', others: 'Complex', ours: '2 min Setup' },
+                    { feature: 'Support', others: 'Limited', ours: '24/7 Support' },
+                    { feature: 'Cost', others: 'High', ours: 'Affordable' }
+                  ].map((row, index) => (
+                    <tr key={index} style={{ borderTop: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` }}>
+                      <td style={{ padding: '1rem', color: darkMode ? '#d1d5db' : '#6b7280', textAlign: 'left' }}>{row.feature}</td>
+                      <td style={{ padding: '1rem', color: darkMode ? '#ef4444' : '#dc2626', textAlign: 'center' }}>{row.others}</td>
+                      <td style={{ padding: '1rem', color: darkMode ? '#4ade80' : '#16a34a', fontWeight: '600', textAlign: 'center' }}>{row.ours}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        {/* Trust & Security Section */}
+        <section style={{
+          padding: '4rem 2rem',
+          background: darkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(255, 255, 255, 0.8)',
+          textAlign: 'center'
+        }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f9fafb' : '#1f2937',
+              marginBottom: '2rem'
+            }}>Trusted & Secure Platform</h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '2rem'
+            }}>
+              {[
+                { icon: '🔐', title: 'SSL Security', desc: 'End-to-end encryption' },
+                { icon: '☁️', title: 'Secure Cloud', desc: 'AWS hosting' },
+                { icon: '🛡️', title: 'GDPR Ready', desc: 'Privacy compliant' },
+                { icon: '⚡', title: '99.9% Uptime', desc: 'Always available' }
+              ].map((item, index) => (
+                <div key={index} style={{
+                  padding: '1.5rem',
+                  background: darkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  borderRadius: '12px',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{item.icon}</div>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f9fafb' : '#1f2937',
+                    marginBottom: '0.25rem'
+                  }}>{item.title}</h4>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: darkMode ? '#d1d5db' : '#6b7280'
+                  }}>{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Social Proof Counters */}
+        <section style={{
+          padding: '3rem 2rem',
+          background: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.05)',
+          textAlign: 'center'
+        }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '2rem'
+            }}>
+              {[
+                { number: '18+', label: 'Active Daily Users', icon: '👥' },
+                { number: '2.4k+', label: 'Events Tracked (7 days)', icon: '📈' },
+                { number: '70+', label: 'Leads Processed', icon: '🔥' },
+                { number: '99.5%', label: 'Uptime', icon: '🚀' }
+              ].map((stat, index) => (
+                <div key={index} style={{
+                  padding: '2rem 1rem',
+                  animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{stat.icon}</div>
+                  <div style={{
+                    fontSize: '2.5rem',
+                    fontWeight: '700',
+                    color: darkMode ? '#4ade80' : '#16a34a',
+                    marginBottom: '0.5rem'
+                  }}>{stat.number}</div>
+                  <div style={{
+                    fontSize: '1rem',
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                    fontWeight: '500'
+                  }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Customer Logos Section */}
+        <section style={{
+          padding: '4rem 2rem',
+          background: darkMode ? 'rgba(31, 41, 55, 0.3)' : 'rgba(255, 255, 255, 0.8)',
+          textAlign: 'center'
+        }}>
+          <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+            <h3 style={{
+              fontSize: '1.5rem',
+              fontWeight: '600',
+              color: darkMode ? '#f9fafb' : '#1f2937',
+              marginBottom: '2rem'
+            }}>Trusted by Leading Companies</h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '2rem',
+              alignItems: 'center'
+            }}>
+              {[
+                { name: 'JustJob', desc: 'Recruitment Platform' },
+                { name: 'Talent Foundation', desc: 'HR Consulting' },
+                { name: 'Vision India', desc: 'Training Institute' },
+                { name: 'Live Skills', desc: 'EdTech Platform' }
+              ].map((company, index) => (
+                <div key={index} style={{
+                  padding: '1.5rem',
+                  background: darkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  borderRadius: '12px',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`,
+                  transition: 'transform 0.3s ease',
+                  cursor: 'pointer',
+                  animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                >
+                  <div style={{
+                    fontSize: '1.25rem',
+                    fontWeight: '700',
+                    color: darkMode ? '#4ade80' : '#16a34a',
+                    marginBottom: '0.5rem'
+                  }}>{company.name}</div>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: darkMode ? '#d1d5db' : '#6b7280'
+                  }}>{company.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Company Story Section */}
         <section id="company-story" style={{
           padding: '6rem 2rem',
@@ -505,7 +1032,7 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
               </button>
             </div>
 
-            {/* Company Story Image */}
+            {/* Product Demo */}
             <div style={{
               animation: 'fadeInUp 0.8s ease-out 0.2s',
               position: 'relative',
@@ -518,30 +1045,70 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
                 boxShadow: darkMode ?
                   '0 32px 64px rgba(0, 0, 0, 0.3)' :
                   '0 32px 64px rgba(0, 0, 0, 0.12)',
-                border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`
+                border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`,
+                position: 'relative',
+                overflow: 'hidden'
               }}>
-                <img
-                  src="https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
-                  alt="Team working together"
-                  style={{
-                    width: '100%',
-                    height: '400px',
-                    borderRadius: '16px',
-                    objectFit: 'cover',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
-                    transition: 'transform 0.3s ease',
-                    transform: 'translateZ(0)',
-                    willChange: 'transform'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateZ(0) scale(1.02)';
-                    e.target.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateZ(0) scale(1)';
-                    e.target.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.1)';
-                  }}
-                />
+                {/* Demo Video Placeholder */}
+                <div style={{
+                  width: '100%',
+                  height: '400px',
+                  borderRadius: '16px',
+                  background: darkMode 
+                    ? 'linear-gradient(135deg, #1f2937 0%, #374151 100%)'
+                    : 'linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: `2px dashed ${darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(34, 197, 94, 0.3)'}`,
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                  e.currentTarget.style.borderColor = darkMode ? '#4ade80' : '#16a34a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.borderColor = darkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(34, 197, 94, 0.3)';
+                }}
+                >
+                  <div style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '1rem',
+                    boxShadow: '0 10px 30px rgba(34, 197, 94, 0.3)',
+                    animation: 'float 3s ease-in-out infinite'
+                  }}>
+                    <div style={{ fontSize: '2rem', color: 'white' }}>▶️</div>
+                  </div>
+                  <h3 style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f9fafb' : '#1f2937',
+                    marginBottom: '0.5rem'
+                  }}>Watch CRM in Action</h3>
+                  <p style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                    textAlign: 'center',
+                    fontSize: '1rem'
+                  }}>See how GreenCall CRM transforms<br/>your business operations</p>
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '0.5rem 1rem',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    borderRadius: '20px',
+                    fontSize: '0.875rem',
+                    color: darkMode ? '#4ade80' : '#16a34a',
+                    fontWeight: '600'
+                  }}>3 min demo video</div>
+                </div>
               </div>
             </div>
           </div>
@@ -604,6 +1171,42 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
               marginBottom: '4rem',
               animation: 'fadeInUp 0.8s ease-out'
             }}>
+              {/* Pricing Toggle */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                marginBottom: '2rem'
+              }}>
+                <div style={{
+                  background: darkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  padding: '0.5rem',
+                  borderRadius: '12px',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+                  display: 'flex',
+                  gap: '0.5rem'
+                }}>
+                  <button style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}>Monthly</button>
+                  <button style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'transparent',
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}>Yearly <span style={{ color: '#22c55e', fontSize: '0.8rem' }}>(Save 20%)</span></button>
+                </div>
+              </div>
 
               
               <h2 style={{
@@ -1032,6 +1635,67 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
                       {testimonial.company}
                     </span>
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section style={{
+          padding: '6rem 2rem',
+          background: darkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.8)',
+          textAlign: 'center'
+        }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <h2 style={{
+              fontSize: '2.5rem',
+              fontWeight: '700',
+              color: darkMode ? '#f9fafb' : '#1f2937',
+              marginBottom: '3rem'
+            }}>Frequently Asked Questions</h2>
+            
+            <div style={{ textAlign: 'left' }}>
+              {[
+                {
+                  q: 'How quickly can I set up GreenCall CRM?',
+                  a: 'You can set up your account and start using GreenCall CRM in under 2 minutes. Our intuitive setup wizard guides you through the process.'
+                },
+                {
+                  q: 'Is my data secure with GreenCall CRM?',
+                  a: 'Yes, we use bank-level SSL encryption, secure AWS cloud hosting, and are GDPR compliant. Your data is protected with the highest security standards.'
+                },
+                {
+                  q: 'Can I integrate WhatsApp with the CRM?',
+                  a: 'Absolutely! GreenCall CRM offers seamless WhatsApp integration along with email and other communication channels for unified customer engagement.'
+                },
+                {
+                  q: 'What kind of support do you provide?',
+                  a: 'We provide 24/7 customer support via email, chat, and phone. Our dedicated support team is always ready to help you succeed.'
+                },
+                {
+                  q: 'Can I cancel my subscription anytime?',
+                  a: 'Yes, you can cancel your subscription at any time. No long-term contracts or hidden fees. We believe in earning your business every month.'
+                }
+              ].map((faq, index) => (
+                <div key={index} style={{
+                  background: darkMode ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(34, 197, 94, 0.2)'}`,
+                  marginBottom: '1rem',
+                  animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`
+                }}>
+                  <h3 style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f9fafb' : '#1f2937',
+                    marginBottom: '1rem'
+                  }}>{faq.q}</h3>
+                  <p style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                    lineHeight: '1.6'
+                  }}>{faq.a}</p>
                 </div>
               ))}
             </div>

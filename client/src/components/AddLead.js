@@ -175,8 +175,13 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
         priority: leadData.priority,
         industry: leadData.industry
       });
+      
+      // Success - close modal (App.js will show success message)
+      setIsSubmitting(false);
+      onCancel(); // Close the modal
     } catch (error) {
       console.error('Error saving lead:', error);
+      showToast('error', '❌ Failed to create lead. Please try again.');
       setIsSubmitting(false);
     }
   };

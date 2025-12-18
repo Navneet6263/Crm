@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { showToast } from './ToastNotification';
 
-const CommunicationHub = ({ darkMode, lead, onClose }) => {
+const CommunicationHub = ({ darkMode, lead, onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState('email');
   const [emailTemplate, setEmailTemplate] = useState('');
   const [customMessage, setCustomMessage] = useState('');
@@ -36,6 +36,12 @@ const CommunicationHub = ({ darkMode, lead, onClose }) => {
   const [emailBody, setEmailBody] = useState('');
   const [recipientEmail, setRecipientEmail] = useState(lead?.email || '');
   const [sending, setSending] = useState(false);
+
+  // Check if user has company or is admin/super-admin (allow them full access)
+  // Only restrict random users who signed up without company
+  const hasCompanyAccess = currentUser?.companyId || currentUser?.tenantId || 
+                           ['super-admin', 'admin', 'manager', 'senior-manager', 'sales', 'marketing'].includes(currentUser?.role);
+  const hasPaidPlan = hasCompanyAccess;
 
   // Load custom templates from localStorage
   useEffect(() => {
@@ -164,6 +170,10 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
   const allTemplates = [...defaultTemplates, ...customTemplates];
 
   const handleCall = async () => {
+    if (!hasPaidPlan) {
+      showToast('error', '🔒 This feature is only available for paid plans');
+      return;
+    }
     if (lead?.phone) {
       try {
         // Log call activity
@@ -198,6 +208,10 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
   };
 
   const handleWhatsApp = async () => {
+    if (!hasPaidPlan) {
+      showToast('error', '🔒 This feature is only available for paid plans');
+      return;
+    }
     if (lead?.phone) {
       try {
         const message = customMessage || `Hi ${lead.contactPerson}, this is regarding your inquiry about our CRM solutions. I'd love to discuss how we can help ${lead.companyName} grow!`;
@@ -239,6 +253,10 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
   };
 
   const handleEmail = async () => {
+    if (!hasPaidPlan) {
+      showToast('error', '🔒 This feature is only available for paid plans');
+      return;
+    }
     if (!recipientEmail || !emailSubject || !emailBody) {
       showToast('error', '❌ Please fill all required fields');
       return;
@@ -341,6 +359,10 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
   };
 
   const generateMeetingLink = async () => {
+    if (!hasPaidPlan) {
+      showToast('error', '🔒 This feature is only available for paid plans');
+      return;
+    }
     try {
       // Generate meeting link
       const meetingId = Math.random().toString(36).substring(2, 15);
@@ -656,6 +678,41 @@ P.S. Spots are limited, so please book soon to avoid disappointment.`
 
         {/* Tab Content */}
         <div style={{ padding: '2rem' }}>
+          {!hasPaidPlan && (
+            <div style={{
+              background: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
+              color: 'white',
+              padding: '1.5rem',
+              borderRadius: '12px',
+              marginBottom: '1.5rem',
+              textAlign: 'center',
+              boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)'
+            }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔒</div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>Only for Paid Plan</h3>
+              <p style={{ fontSize: '0.95rem', opacity: 0.95, marginBottom: '1rem' }}>
+                Communication Hub is available only for company users with paid plans. Please contact your administrator or purchase a plan to unlock this feature.
+              </p>
+              <button
+                onClick={() => {
+                  showToast('info', '💎 Please contact admin or purchase a plan to access this feature');
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'white',
+                  color: '#f59e0b',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                }}
+              >
+                Contact Admin
+              </button>
+            </div>
+          )}
           {activeTab === 'call' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{

@@ -119,6 +119,7 @@ const login = async (req, res) => {
     // Only legitimate superadmin (navneet@greencall.com) should exist
 
     const user = await User.findOne({ email })
+      .select('name email password role companyId tenantId isActive lastLogin')
       .populate('companyId', 'name plan usage status')
       .populate('tenantId', 'name plan usage status');
     
@@ -230,7 +231,7 @@ const checkAuth = async (req, res) => {
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id)
-      .select('-password')
+      .select('name email role companyId tenantId isActive lastLogin')
       .populate('companyId', 'name plan usage status')
       .populate('tenantId', 'name plan usage status');
     
@@ -323,7 +324,7 @@ const getAllUsers = async (req, res) => {
     }
     
     const users = await User.find(query)
-      .select('-password')
+      .select('name email role phone isActive companyId tenantId createdAt managerName managerEmail')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);

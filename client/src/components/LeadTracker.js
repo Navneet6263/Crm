@@ -25,6 +25,8 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list' for mobile
   const [wsConnection, setWsConnection] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   const leads = Array.isArray(crmData.leads) ? crmData.leads : (crmData.leads?.leads || []);
   const myLeads = leads; // Show all leads for now
@@ -86,6 +88,12 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
     
     return filtered;
   }, [myLeads, searchTerm, statusFilter, productFilter, fuzzyMatch]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
 
   // Mobile detection
   useEffect(() => {
@@ -753,7 +761,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
               </p>
             </div>
           ) : (
-            filteredLeads.map((lead, index) => {
+            paginatedLeads.map((lead, index) => {
               const leadId = lead._id || lead.id;
               const statusColor = getStatusColor(lead.status);
               
@@ -1059,7 +1067,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                       display: 'flex',
                       alignItems: 'center',
                       padding: '20px',
-                      borderBottom: index < filteredLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
+                      borderBottom: index < paginatedLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
                       transition: 'all 0.2s',
                       position: 'relative'
                     }}
@@ -1239,6 +1247,92 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
             })
           )}
         </div>
+
+        {/* Pagination */}
+        {filteredLeads.length > 0 && totalPages > 1 && (
+          <div style={{
+            padding: '1.5rem',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginTop: '1rem'
+          }}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentPage === 1 ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                color: currentPage === 1 ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Previous
+            </button>
+            
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1;
+              if (
+                pageNum === 1 ||
+                pageNum === totalPages ||
+                (pageNum >= currentPage - 2 && pageNum <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: currentPage === pageNum ? '#3b82f6' : (darkMode ? '#374151' : 'white'),
+                      color: currentPage === pageNum ? 'white' : (darkMode ? '#d1d5db' : '#374151'),
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: currentPage === pageNum ? '600' : '400',
+                      minWidth: '40px'
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              } else if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
+                return <span key={pageNum} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>...</span>;
+              }
+              return null;
+            })}
+            
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentPage === totalPages ? (darkMode ? '#4b5563' : '#e5e7eb') : '#3b82f6',
+                color: currentPage === totalPages ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              Next
+            </button>
+            
+            <span style={{
+              marginLeft: '1rem',
+              color: darkMode ? '#d1d5db' : '#6b7280',
+              fontSize: '14px'
+            }}>
+              Page {currentPage} of {totalPages} ({filteredLeads.length} leads)
+            </span>
+          </div>
+        )}
 
       {filteredLeads.length === 0 && myLeads.length > 0 && (
         <div style={{
