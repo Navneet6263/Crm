@@ -241,28 +241,31 @@ const createLead = async (req, res) => {
     
     const lead = await Lead.create(leadData);
     
-    // Populate the lead with user and product details
-    await lead.populate('createdBy assignedTo', 'name email');
-    await lead.populate('product', 'name color icon');
-    
     console.log('✅ Lead created successfully:', {
       leadId: lead._id,
-      contactPerson: lead.contactPerson,
-      createdBy: lead.createdBy,
-      assignedTo: lead.assignedTo,
-      product: lead.product,
-      productColor: lead.product?.color
+      contactPerson: lead.contactPerson
     });
     
-    // Create notification for managers/admins
-    try {
+    // Create notification asynchronously (non-blocking)
+    setImmediate(() => {
       const { createLeadCreationNotification } = require('./notificationController');
-      await createLeadCreationNotification(lead._id, userId);
-    } catch (notifError) {
-      console.error('❌ Failed to create notification:', notifError);
-    }
+      createLeadCreationNotification(lead._id, userId).catch(err => 
+        console.error('❌ Notification error:', err)
+      );
+    });
     
-    res.status(201).json(lead);
+    // Return minimal response immediately
+    res.status(201).json({
+      success: true,
+      message: 'Lead created successfully',
+      lead: {
+        _id: lead._id,
+        contactPerson: lead.contactPerson,
+        companyName: lead.companyName,
+        status: lead.status,
+        createdAt: lead.createdAt
+      }
+    });
   } catch (error) {
     console.error('Error creating lead:', error);
     
@@ -549,19 +552,17 @@ const assignLead = async (req, res) => {
     });
     await lead.save();
     
-    // Create notification for assigned user
-    const { createLeadAssignmentNotification } = require('./notificationController');
-    await createLeadAssignmentNotification(leadId, assignedTo, req.user._id || req.user.id);
-    
-    // Send email to assigned user
-    try {
+    // Create notification and send email asynchronously (non-blocking)
+    setImmediate(() => {
+      const { createLeadAssignmentNotification } = require('./notificationController');
+      createLeadAssignmentNotification(leadId, assignedTo, req.user._id || req.user.id)
+        .catch(err => console.error('❌ Notification error:', err));
+      
       const { sendLeadAssignmentEmail } = require('../services/emailService');
-      await sendLeadAssignmentEmail(assignedUser, lead, req.user);
-      console.log('📧 Assignment email sent to:', assignedUser.email);
-    } catch (emailError) {
-      console.error('❌ Failed to send assignment email:', emailError);
-      // Don't fail the assignment if email fails
-    }
+      sendLeadAssignmentEmail(assignedUser, lead, req.user)
+        .then(() => console.log('📧 Assignment email sent to:', assignedUser.email))
+        .catch(err => console.error('❌ Email error:', err));
+    });
     
     console.log('✅ Lead assigned successfully:', {
       leadId: lead._id,
@@ -573,7 +574,7 @@ const assignLead = async (req, res) => {
     res.json({ 
       success: true,
       message: `Lead assigned successfully to ${assignedUser.name} (${assignedUser.role})`, 
-      lead,
+      leadId: lead._id,
       assignment: {
         assignedTo: assignedUser.name,
         assignedToRole: assignedUser.role,

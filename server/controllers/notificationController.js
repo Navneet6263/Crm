@@ -25,27 +25,13 @@ const getNotifications = async (req, res) => {
     }
     
     const notifications = await Notification.find(query)
-      .populate('leadId', 'contactPerson companyName')
+      .select('title message type isRead priority leadId createdAt')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(Math.min(limit * 1, 50))
+      .skip((page - 1) * limit)
+      .lean();
     
-    const total = await Notification.countDocuments(query);
-    const unreadCount = await Notification.countDocuments({ userId, isRead: false });
-    
-    // Format notifications for frontend
-    const formattedNotifications = notifications.map(notification => ({
-      id: notification._id,
-      title: notification.title,
-      message: notification.message,
-      type: notification.type,
-      isRead: notification.isRead,
-      priority: notification.priority,
-      leadId: notification.leadId?._id,
-      createdAt: notification.createdAt
-    }));
-    
-    res.json(formattedNotifications);
+    res.json(notifications);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ message: 'Error fetching notifications', error: error.message });
@@ -121,22 +107,14 @@ const deleteNotification = async (req, res) => {
 const createLeadAssignmentNotification = async (leadId, assignedToUserId, assignedByUserId) => {
   try {
     const Lead = require('../models/Lead');
-    const lead = await Lead.findById(leadId).populate('assignedBy', 'name role');
+    const lead = await Lead.findById(leadId).select('companyName contactPerson').lean();
     
     if (!lead) {
       console.log('❌ Lead not found for notification:', leadId);
       return;
     }
     
-    const assignedByUser = await User.findById(assignedByUserId);
-    const assignedToUser = await User.findById(assignedToUserId);
-    
-    console.log('📧 Creating lead assignment notification:', {
-      leadId,
-      leadCompany: lead.companyName,
-      assignedTo: assignedToUser?.name,
-      assignedBy: assignedByUser?.name
-    });
+    const assignedByUser = await User.findById(assignedByUserId).select('name').lean();
     
     // Create notification for assigned user
     const notification = await createNotification({
@@ -147,13 +125,7 @@ const createLeadAssignmentNotification = async (leadId, assignedToUserId, assign
       leadId: leadId,
       priority: 'high',
       actionable: true,
-      actionView: 'my-leads',
-      metadata: {
-        leadCompany: lead.companyName,
-        leadContact: lead.contactPerson,
-        assignedBy: assignedByUser?.name,
-        assignedAt: new Date()
-      }
+      actionView: 'my-leads'
     });
     
     console.log('✅ Lead assignment notification created:', notification?._id);
@@ -167,20 +139,22 @@ const createLeadAssignmentNotification = async (leadId, assignedToUserId, assign
 const createLeadCreationNotification = async (leadId, createdByUserId) => {
   try {
     const Lead = require('../models/Lead');
-    const lead = await Lead.findById(leadId);
+    const lead = await Lead.findById(leadId).select('companyName contactPerson').lean();
     
     if (!lead) return;
     
     // Notify all managers and admins about new lead
     const managers = await User.find({ 
       role: { $in: ['admin', 'manager', 'super-admin'] } 
-    });
+    }).select('_id name').lean();
     
-    const createdByUser = await User.findById(createdByUserId);
+    const createdByUser = await User.findById(createdByUserId).select('name').lean();
     
-    for (const manager of managers) {
-      if (manager._id.toString() !== createdByUserId.toString()) {
-        await createNotification({
+    // Create notifications in parallel (non-blocking)
+    const notificationPromises = managers
+      .filter(manager => manager._id.toString() !== createdByUserId.toString())
+      .map(manager => 
+        createNotification({
           title: 'New Lead Created',
           message: `New lead "${lead.companyName || lead.contactPerson}" created by ${createdByUser?.name || 'User'}`,
           type: 'lead_created',
@@ -189,10 +163,10 @@ const createLeadCreationNotification = async (leadId, createdByUserId) => {
           priority: 'medium',
           actionable: true,
           actionView: 'lead-tracker'
-        });
-      }
-    }
+        })
+      );
     
+    await Promise.all(notificationPromises);
     console.log('✅ Lead creation notifications sent to managers');
   } catch (error) {
     console.error('Error creating lead creation notification:', error);
