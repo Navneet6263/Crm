@@ -34,8 +34,14 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       setFormData(prev => ({ ...prev, companyId: 'default-greencall' }));
     }
     fetchProducts();
-    fetchUserProductHistory();
   }, [user]);
+
+  // Lazy load product history after products are loaded
+  useEffect(() => {
+    if (products.length > 0) {
+      fetchUserProductHistory();
+    }
+  }, [products]);
 
   const fetchProducts = async () => {
     try {
@@ -130,8 +136,8 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     onCancel();
   };
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return; // Prevent multiple clicks
+  const handleSubmit = () => {
+    if (isSubmitting) return;
     
     if (!validateForm()) {
       showToast('error', '❌ Please fill all required fields correctly');
@@ -140,50 +146,49 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
 
     setIsSubmitting(true);
     
-    try {
-      const leadData = {
-        contactPerson: formData.contactPerson,
-        companyName: formData.companyName,
-        email: formData.email,
-        phone: formData.phone,
-        industry: formData.industry,
-        leadSource: formData.leadSource,
-        customLeadSource: formData.leadSource === 'other' ? formData.customLeadSource : '',
-        followUpDate: formData.followUpDate || null,
-        estimatedValue: formData.estimatedValue ? parseInt(formData.estimatedValue) : 0,
-        priority: formData.priority,
-        requirements: formData.requirements,
-        assignedTo: formData.assignedTo,
-        status: 'new',
-        product: formData.product
-      };
-      
-      if (user?.role === 'super-admin') {
-        leadData.companyId = formData.companyId || null;
-      }
-      
-      console.log('📝 Final leadData:', leadData);
-      console.log('🏢 CompanyId being sent:', leadData.companyId);
-
-      await onSave(leadData);
-      
-      // Track lead creation in GA4
-      trackLeadCreated({
-        source: leadData.leadSource,
-        status: leadData.status,
-        value: leadData.estimatedValue,
-        priority: leadData.priority,
-        industry: leadData.industry
-      });
-      
-      // Success - close modal (App.js will show success message)
-      setIsSubmitting(false);
-      onCancel(); // Close the modal
-    } catch (error) {
-      console.error('Error saving lead:', error);
-      showToast('error', '❌ Failed to create lead. Please try again.');
-      setIsSubmitting(false);
+    const leadData = {
+      contactPerson: formData.contactPerson,
+      companyName: formData.companyName,
+      email: formData.email,
+      phone: formData.phone,
+      industry: formData.industry,
+      leadSource: formData.leadSource,
+      customLeadSource: formData.leadSource === 'other' ? formData.customLeadSource : '',
+      followUpDate: formData.followUpDate || null,
+      estimatedValue: formData.estimatedValue ? parseInt(formData.estimatedValue) : 0,
+      priority: formData.priority,
+      requirements: formData.requirements,
+      assignedTo: formData.assignedTo,
+      status: 'new',
+      product: formData.product
+    };
+    
+    if (user?.role === 'super-admin') {
+      leadData.companyId = formData.companyId || null;
     }
+    
+    // Optimistic UI - Close modal immediately
+    onCancel();
+    
+    // Background API call
+    onSave(leadData)
+      .then(() => {
+        // Track lead creation in GA4
+        trackLeadCreated({
+          source: leadData.leadSource,
+          status: leadData.status,
+          value: leadData.estimatedValue,
+          priority: leadData.priority,
+          industry: leadData.industry
+        });
+      })
+      .catch((error) => {
+        console.error('Error saving lead:', error);
+        showToast('error', '❌ Failed to create lead. Please try again.');
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   const inputStyle = {

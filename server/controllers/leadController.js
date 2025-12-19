@@ -596,7 +596,8 @@ const getMyLeads = async (req, res) => {
     console.log('👤 User Email:', req.user.email);
     console.log('👤 User Role:', req.user.role);
     
-    const { status, priority, search, page = 1, limit = 50 } = req.query;
+    const { status, priority, search, page = 1, limit = 20 } = req.query;
+    const maxLimit = Math.min(parseInt(limit), 50); // Hard cap at 50
     
     let query = { isActive: true };
     
@@ -654,27 +655,19 @@ const getMyLeads = async (req, res) => {
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
+      .limit(maxLimit)
+      .skip((parseInt(page) - 1) * maxLimit)
       .lean();
 
     const total = await Lead.countDocuments(query);
     
     console.log('📊 Found leads count:', leads.length);
     console.log('📊 Total leads:', total);
-    if (leads.length > 0) {
-      console.log('📊 First lead details:', {
-        id: leads[0]._id,
-        contactPerson: leads[0].contactPerson,
-        createdBy: leads[0].createdBy,
-        assignedTo: leads[0].assignedTo
-      });
-    }
     console.log('=== END MY LEADS ===\n');
 
     res.json({
       leads,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / maxLimit),
       currentPage: page,
       total
     });

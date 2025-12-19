@@ -160,6 +160,8 @@ const leadSchema = new mongoose.Schema({
 
 // Index for better search performance
 leadSchema.index({ contactPerson: 'text', companyName: 'text', email: 'text' });
+leadSchema.index({ assignedTo: 1, createdAt: -1 });
+leadSchema.index({ createdBy: 1, createdAt: -1 });
 leadSchema.index({ assignedTo: 1, status: 1 });
 leadSchema.index({ createdAt: -1 });
 
