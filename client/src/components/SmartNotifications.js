@@ -54,6 +54,15 @@ const SmartNotifications = ({ darkMode, setActiveView, currentUser }) => {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
       
+      // Navigate to lead if leadId exists
+      if (notification.leadId) {
+        // Store leadId in sessionStorage for highlighting
+        sessionStorage.setItem('highlightLeadId', notification.leadId);
+        setActiveView('my-leads');
+        setShowNotifications(false);
+        return;
+      }
+      
       // Handle action if actionable
       if (notification.actionable && notification.actionView) {
         setActiveView(notification.actionView);

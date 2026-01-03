@@ -990,7 +990,7 @@ const getTeamMembers = async (req, res) => {
       ],
       isActive: true 
     })
-    .select('name email role createdAt lastLogin department isActive _id')
+    .select('name email role createdAt lastLogin department isActive managerName managerEmail _id')
     .sort({ createdAt: -1 })
     .lean();
 
@@ -1038,7 +1038,7 @@ const getTeamMembers = async (req, res) => {
 // Create team member for current user's company
 const createTeamMember = async (req, res) => {
   try {
-    const { name, email, role, department, password } = req.body;
+    const { name, email, role, department, password, managerName, managerEmail } = req.body;
     
     console.log('👤 Creating team member - User:', req.user.email, 'Role:', req.user.role);
     
@@ -1173,6 +1173,8 @@ const createTeamMember = async (req, res) => {
       password: userPassword,
       role: role || 'sales',
       department: department?.trim() || '',
+      managerName: managerName?.trim() || '',
+      managerEmail: managerEmail?.trim().toLowerCase() || '',
       isActive: true,
       isTemporaryPassword: true,
       passwordExpiresAt: passwordExpiry,
@@ -1230,7 +1232,7 @@ const createTeamMember = async (req, res) => {
 const updateTeamMember = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { name, email, role, department } = req.body;
+    const { name, email, role, department, managerName, managerEmail } = req.body;
     
     console.log('✏️ Updating team member - User:', req.user.email, 'Target:', userId);
     
@@ -1263,9 +1265,9 @@ const updateTeamMember = async (req, res) => {
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { name, email, role, department },
+      { name, email, role, department, managerName, managerEmail },
       { new: true }
-    ).select('name email role department');
+    ).select('name email role department managerName managerEmail');
 
     console.log('✅ Team member updated:', updatedUser.email);
 

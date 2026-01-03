@@ -43,6 +43,7 @@ const MyLeads = lazy(() => import('./components/MyLeads'));
 const GroupLeads = lazy(() => import('./components/GroupLeads'));
 const LeadHistory = lazy(() => import('./components/LeadHistory'));
 const LeadTracker = lazy(() => import('./components/LeadTracker'));
+const LeadDetailPage = lazy(() => import('./components/LeadDetailPage'));
 const AILeadScoring = lazy(() => import('./components/AILeadScoring'));
 const AutoAssignment = lazy(() => import('./components/AutoAssignment'));
 const DuplicateDetection = lazy(() => import('./components/DuplicateDetection'));
@@ -581,7 +582,8 @@ const AppContent = () => {
           onCancel={() => changeView('dashboard')}
         />
       );
-      case 'my-leads': return <MyLeads crmData={crmData} user={currentUser} darkMode={darkMode} updateCrmData={updateCrmData} />;
+      case 'my-leads': return <MyLeads crmData={crmData} user={currentUser} darkMode={darkMode} updateCrmData={updateCrmData} onNavigate={changeView} />;
+      case 'lead-detail': return <LeadDetailPage leadId={navigationParams?.leadId} darkMode={darkMode} onBack={() => changeView('my-leads')} />;
       case 'group-leads': return <GroupLeads darkMode={darkMode} currentUser={currentUser} />;
       case 'lead-history': return <LeadHistory crmData={crmData} darkMode={darkMode} />;
       case 'lead-tracker': return <LeadTracker crmData={crmData} updateCrmData={updateCrmData} user={currentUser} darkMode={darkMode} />;

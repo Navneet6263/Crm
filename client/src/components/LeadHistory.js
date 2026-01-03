@@ -177,6 +177,43 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     }
   };
 
+  const handleExport = () => {
+    try {
+      const headers = ['Contact Person', 'Company', 'Email', 'Phone', 'Status', 'Priority', 'Estimated Value', 'Created Date', 'Assigned To'];
+      const csvRows = [headers.join(',')];
+
+      filteredLeads.forEach(lead => {
+        const row = [
+          lead.contactPerson || lead.name || '',
+          lead.companyName || lead.company || '',
+          lead.email || '',
+          lead.phone || '',
+          lead.status || '',
+          lead.priority || 'medium',
+          lead.estimatedValue || 0,
+          formatDate(lead.createdDate || lead.createdAt),
+          typeof lead.assignedTo === 'object' ? lead.assignedTo?.name || 'Unassigned' : lead.assignedTo || 'Unassigned'
+        ].map(field => `"${field}"`);
+        csvRows.push(row.join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `lead_history_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export leads. Please try again.');
+    }
+  };
+
   const containerStyle = {
     padding: '0',
     background: darkMode ? '#111827' : '#f9fafb',
@@ -402,6 +439,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
 
           {/* Export Button */}
           <button
+            onClick={handleExport}
             style={{
               padding: '0.75rem 1rem',
               background: 'linear-gradient(135deg, #22c55e, #4ade80)',

@@ -158,11 +158,15 @@ const leadSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better search performance
+// Indexes for performance
 leadSchema.index({ contactPerson: 'text', companyName: 'text', email: 'text' });
 leadSchema.index({ assignedTo: 1, createdAt: -1 });
 leadSchema.index({ createdBy: 1, createdAt: -1 });
 leadSchema.index({ assignedTo: 1, status: 1 });
 leadSchema.index({ createdAt: -1 });
+leadSchema.index({ isActive: 1, createdBy: 1 });
+leadSchema.index({ isActive: 1, assignedTo: 1 });
+leadSchema.index({ status: 1, priority: 1 });
+leadSchema.index({ product: 1 });
 
 module.exports = mongoose.model('Lead', leadSchema);

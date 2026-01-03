@@ -10,16 +10,16 @@ const startLeadReminderCron = () => {
     console.log('📅 Current time:', new Date().toLocaleString('en-IN'));
     
     try {
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
       
       // Find leads that are:
       // 1. Assigned to someone
-      // 2. Assigned more than 2 days ago
+      // 2. Assigned more than 3 days ago
       // 3. Not viewed yet (lastViewedAt is null or before assignedAt)
       const pendingLeads = await Lead.find({
         assignedTo: { $exists: true, $ne: null },
-        assignedAt: { $lte: twoDaysAgo },
+        assignedAt: { $lte: threeDaysAgo },
         isActive: true,
         $or: [
           { lastViewedAt: { $exists: false } },
@@ -45,7 +45,7 @@ const startLeadReminderCron = () => {
           const lastNoteDate = new Date(lastNote.createdAt);
           const daysSinceLastNote = Math.floor((new Date() - lastNoteDate) / (1000 * 60 * 60 * 24));
           
-          if (daysSinceLastNote < 2) {
+          if (daysSinceLastNote < 3) {
             console.log(`✅ Skipping lead ${lead._id} - recent activity found (note added ${daysSinceLastNote} days ago)`);
             continue;
           }

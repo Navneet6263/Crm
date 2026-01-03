@@ -6,6 +6,7 @@ const {
   updateLead,
   deleteLead,
   addNote,
+  logActivity,
   assignLead,
   getMyLeads,
   getLeadsByProduct,
@@ -44,6 +45,7 @@ router.route('/:id')
   .delete(deleteLead);
 
 router.post('/:id/notes', addNote);
+router.post('/:id/activity', logActivity);
 // Remove auth middleware for bulk upload as it has its own auth handling
 const bulkUploadRouter = express.Router();
 bulkUploadRouter.post('/bulk-upload', require('../controllers/bulkUploadController').handleBulkAuth, require('../controllers/bulkUploadController').bulkUploadLeads);

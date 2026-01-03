@@ -20,7 +20,6 @@ const SuperAdminManagement = ({ darkMode = false }) => {
   const fetchSafetyStatus = async () => {
     try {
       const response = await apiService.get('/super-admin/safety-status');
-      console.log('Safety Status Response:', response);
       setSafetyStatus(response.data || response);
     } catch (error) {
       console.error('Error fetching safety status:', error);
@@ -32,7 +31,6 @@ const SuperAdminManagement = ({ darkMode = false }) => {
     try {
       setLoading(true);
       const response = await apiService.get('/super-admin/users');
-      console.log('Super Admins Response:', response);
       setSuperAdmins(response.data || response || []);
     } catch (error) {
       console.error('Error fetching super admins:', error);

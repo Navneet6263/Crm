@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle } from 'lucide-react';
 import apiService from '../services/apiService';
 
-const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
+const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate }) => {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -12,6 +12,23 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [highlightedLeadId, setHighlightedLeadId] = useState(null);
+
+  // Check sessionStorage for leadId from notification
+  useEffect(() => {
+    const leadIdFromNotification = sessionStorage.getItem('highlightLeadId');
+    if (leadIdFromNotification) {
+      setHighlightedLeadId(leadIdFromNotification);
+      sessionStorage.removeItem('highlightLeadId');
+      
+      setTimeout(() => {
+        const element = document.getElementById(`lead-${leadIdFromNotification}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 500);
+    }
+  }, [leads]);
   const [editData, setEditData] = useState({
     contactPerson: '',
     companyName: '',
@@ -757,12 +774,13 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
                 return (
                   <div 
                     key={lead._id || lead.id}
+                    id={`lead-${lead._id || lead.id}`}
                     style={{
-                      backgroundColor: darkMode ? '#374151' : 'white',
+                      backgroundColor: highlightedLeadId === (lead._id || lead.id) ? (darkMode ? '#1e3a5f' : '#dbeafe') : (darkMode ? '#374151' : 'white'),
                       borderRadius: '16px',
                       padding: '24px',
-                      boxShadow: darkMode ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      border: darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
+                      boxShadow: highlightedLeadId === (lead._id || lead.id) ? '0 0 0 3px #3b82f6' : (darkMode ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)'),
+                      border: highlightedLeadId === (lead._id || lead.id) ? '2px solid #3b82f6' : (darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb'),
                       transition: 'all 0.3s ease',
                       cursor: 'pointer',
                       position: 'relative',
@@ -805,13 +823,25 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
                           {(lead.contactPerson || lead.name || 'U').split(' ').map(n => n[0]).join('')}
                         </div>
                         <div>
-                          <h3 style={{
+                          <h3 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onNavigate) {
+                                onNavigate('lead-detail', { leadId: lead._id || lead.id });
+                              }
+                            }}
+                            style={{
                             fontSize: '18px',
                             fontWeight: '600',
-                            color: darkMode ? 'white' : '#111827',
+                            color: '#3b82f6',
                             margin: 0,
-                            marginBottom: '4px'
-                          }}>
+                            marginBottom: '4px',
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                            onMouseEnter={(e) => e.target.style.color = '#2563eb'}
+                            onMouseLeave={(e) => e.target.style.color = '#3b82f6'}
+                          >
                             {lead.contactPerson || lead.name}
                           </h3>
                           <p style={{
@@ -1041,11 +1071,14 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
                 return (
                   <div 
                     key={lead._id || lead.id}
+                    id={`lead-${lead._id || lead.id}`}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       padding: '20px',
+                      backgroundColor: highlightedLeadId === (lead._id || lead.id) ? (darkMode ? '#1e3a5f' : '#dbeafe') : 'transparent',
                       borderBottom: index < paginatedLeads.length - 1 ? `1px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` : 'none',
+                      borderLeft: highlightedLeadId === (lead._id || lead.id) ? '4px solid #3b82f6' : 'none',
                       transition: 'all 0.2s',
                       position: 'relative'
                     }}
@@ -1071,12 +1104,24 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData }) => {
                   {/* Lead Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <h3 style={{
+                      <h3 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onNavigate) {
+                            onNavigate('lead-detail', { leadId: lead._id || lead.id });
+                          }
+                        }}
+                        style={{
                         fontSize: '18px',
                         fontWeight: '600',
-                        color: darkMode ? 'white' : '#111827',
-                        margin: 0
-                      }}>
+                        color: '#3b82f6',
+                        margin: 0,
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                        onMouseEnter={(e) => e.target.style.color = '#2563eb'}
+                        onMouseLeave={(e) => e.target.style.color = '#3b82f6'}
+                      >
                         {lead.contactPerson || lead.name}
                       </h3>
                       <span style={{

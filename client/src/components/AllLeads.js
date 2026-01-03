@@ -54,7 +54,6 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        console.log('🔄 Fetching data with productFilter:', productFilter);
         
         const [leadsResponse, usersResponse, productsResponse] = await Promise.all([
           fetch(`${apiService.getApiUrl()}/leads?limit=10000${productFilter !== 'all' ? `&product=${productFilter}` : ''}`, {
@@ -74,15 +73,6 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
         
         const leadsData = await leadsResponse.json();
         const leads = leadsData.leads || leadsData || [];
-        console.log('📊 Fetched leads:', leads.length);
-        console.log('📊 Sample lead statuses:', leads.slice(0, 3).map(l => ({ status: l.status, assignedTo: !!l.assignedTo })));
-        console.log('🎨 Sample lead products:', leads.slice(0, 3).map(l => ({ 
-          id: l._id, 
-          productData: l.product,
-          productColor: l.product?.color,
-          productName: l.product?.name,
-          productIcon: l.product?.icon
-        })));
         
         setLeads(Array.isArray(leads) ? leads : []);
         setUsers(usersResponse || []);
@@ -91,7 +81,6 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
           const productsData = await productsResponse.json();
           const productsList = Array.isArray(productsData) ? productsData : (productsData.products || productsData || []);
           setProducts(productsList);
-          console.log('📦 Fetched products:', productsList.length);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -106,7 +95,6 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     
     // Listen for global lead updates
     const handleLeadsUpdate = () => {
-      console.log('AllLeads: Received leadsUpdated event');
       fetchData();
     };
     
@@ -160,39 +148,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
-  
-  // Debug filter counts
-  console.log('📊 Filter Debug:', {
-    totalLeads: leads.length,
-    filteredLeads: filteredLeads.length,
-    statusFilter,
-    searchTerm,
-    productFilter,
-    activeCount: leads.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length,
-    pendingCount: leads.filter(l => ['new', 'pending'].includes(l.status)).length,
-    assignedCount: leads.filter(l => l.assignedTo).length,
-    unassignedCount: leads.filter(l => !l.assignedTo).length,
-    sampleLeadProducts: leads.slice(0, 3).map(l => ({ 
-      id: l._id, 
-      product: l.product, 
-      productId: l.product?._id || l.product 
-    }))
-  });
-  
-  // Debug product filter specifically
-  if (productFilter && productFilter !== 'all') {
-    console.log('🔍 Product Filter Debug:', {
-      selectedProductId: productFilter,
-      leadsWithThisProduct: leads.filter(l => {
-        const leadProductId = l.product?._id || l.product;
-        return leadProductId === productFilter;
-      }).length,
-      allLeadProducts: leads.map(l => l.product?._id || l.product).filter(Boolean)
-    });
-  }
 
   const handleLeadSelect = (leadId) => {
-    console.log('Selecting lead ID:', leadId);
     if (selectedLeadId === leadId) {
       setSelectedLeadId(null);
       setShowAssignDropdown(false);
@@ -644,7 +601,13 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
               
               {/* Bulk Upload Button */}
               <button
-                onClick={() => setShowBulkUpload(true)}
+                onClick={() => {
+                  if (window.showToast) {
+                    window.showToast('info', '🚀 Coming Soon! Bulk upload feature is under development.');
+                  } else {
+                    alert('🚀 Coming Soon! Bulk upload feature is under development.');
+                  }
+                }}
                 style={{
                   padding: '0.5rem 1rem',
                   background: '#22c55e',
@@ -670,7 +633,6 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
               <select
                 value={productFilter}
                 onChange={(e) => {
-                  console.log('🔄 Product filter changed to:', e.target.value);
                   setProductFilter(e.target.value);
                 }}
                 style={{

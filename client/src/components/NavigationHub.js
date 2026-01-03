@@ -102,9 +102,7 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
   return (
     <div style={{
       minHeight: '100vh',
-      background: darkMode 
-        ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
-        : 'linear-gradient(135deg, #f9fafb 0%, #f0fdf4 100%)',
+      background: 'linear-gradient(135deg, #ec4899 0%, #f59e0b 25%, #8b5cf6 50%, #3b82f6 75%, #10b981 100%)',
       padding: '2rem',
       position: 'relative',
       overflow: 'hidden'
@@ -116,22 +114,55 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
         left: '5%',
         width: '300px',
         height: '300px',
-        background: 'linear-gradient(45deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.1))',
+        background: 'rgba(255, 255, 255, 0.1)',
         borderRadius: '50%',
         filter: 'blur(60px)',
+        animation: 'float 8s ease-in-out infinite',
         pointerEvents: 'none'
       }} />
       <div style={{
         position: 'absolute',
-        bottom: '10%',
-        right: '5%',
-        width: '250px',
-        height: '250px',
-        background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1))',
+        bottom: '20%',
+        right: '10%',
+        width: '200px',
+        height: '200px',
+        background: 'rgba(255, 255, 255, 0.15)',
         borderRadius: '50%',
-        filter: 'blur(60px)',
+        filter: 'blur(40px)',
+        animation: 'float 10s ease-in-out infinite reverse',
         pointerEvents: 'none'
       }} />
+      <div style={{
+        position: 'absolute',
+        top: '30%',
+        right: '25%',
+        width: '150px',
+        height: '150px',
+        background: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: '50%',
+        filter: 'blur(30px)',
+        animation: 'float 12s ease-in-out infinite',
+        pointerEvents: 'none'
+      }} />
+
+      {/* Animated sparkle dots */}
+      {[...Array(15)].map((_, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            width: Math.random() * 8 + 4 + 'px',
+            height: Math.random() * 8 + 4 + 'px',
+            background: 'rgba(255, 255, 255, 0.6)',
+            borderRadius: '50%',
+            top: Math.random() * 100 + '%',
+            left: Math.random() * 100 + '%',
+            animation: `sparkleFloat ${Math.random() * 4 + 3}s ease-in-out infinite`,
+            animationDelay: `${Math.random() * 3}s`,
+            pointerEvents: 'none'
+          }}
+        />
+      ))}
 
       <div style={{
         maxWidth: '1400px',
@@ -149,14 +180,14 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.5rem',
-            background: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+            background: 'rgba(255, 255, 255, 0.1)',
             padding: '0.5rem 1.5rem',
             borderRadius: '50px',
-            border: `1px solid ${darkMode ? 'rgba(34, 197, 94, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
+            border: '1px solid rgba(255, 255, 255, 0.3)',
             marginBottom: '1.5rem',
             fontSize: '0.875rem',
             fontWeight: '600',
-            color: darkMode ? '#4ade80' : '#16a34a'
+            color: 'rgba(255, 255, 255, 0.9)'
           }}>
             <Sparkles size={16} />
             <span>{getGreeting()}</span>
@@ -165,16 +196,17 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
           <h1 style={{
             fontSize: '3rem',
             fontWeight: '800',
-            color: darkMode ? '#f9fafb' : '#1f2937',
+            color: 'white',
             marginBottom: '0.5rem',
-            letterSpacing: '-0.02em'
+            letterSpacing: '-0.02em',
+            textShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
           }}>
             Welcome back, {userName}
           </h1>
 
           <p style={{
             fontSize: '1.25rem',
-            color: darkMode ? '#d1fae5' : '#166534',
+            color: 'rgba(255, 255, 255, 0.9)',
             fontWeight: '500',
             opacity: 0.9
           }}>
@@ -185,17 +217,13 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
         {/* Continue where you left off */}
         {recentActivity?.lastView && (
           <div style={{
-            background: darkMode 
-              ? 'rgba(31, 41, 55, 0.8)'
-              : 'rgba(255, 255, 255, 0.9)',
+            background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(20px)',
             padding: '1.5rem 2rem',
             borderRadius: '20px',
             marginBottom: '2rem',
-            border: `1px solid ${darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
-            boxShadow: darkMode 
-              ? '0 10px 40px rgba(0, 0, 0, 0.3)'
-              : '0 10px 40px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 32px 64px rgba(0, 0, 0, 0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -232,7 +260,7 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
               <div>
                 <div style={{
                   fontSize: '0.875rem',
-                  color: darkMode ? '#9ca3af' : '#6b7280',
+                  color: '#6b7280',
                   marginBottom: '0.25rem'
                 }}>
                   Continue where you left off
@@ -240,13 +268,13 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
                 <div style={{
                   fontSize: '1.125rem',
                   fontWeight: '600',
-                  color: darkMode ? '#f9fafb' : '#1f2937'
+                  color: '#1f2937'
                 }}>
                   You were viewing: {recentActivity.lastViewName}
                 </div>
               </div>
             </div>
-            <ChevronRight size={24} color={darkMode ? '#9ca3af' : '#6b7280'} />
+            <ChevronRight size={24} color="#6b7280" />
           </div>
         )}
 
@@ -268,18 +296,14 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
                 onMouseEnter={() => setHoveredCard(card.id)}
                 onMouseLeave={() => setHoveredCard(null)}
                 style={{
-                  background: darkMode 
-                    ? 'rgba(31, 41, 55, 0.8)'
-                    : 'rgba(255, 255, 255, 0.9)',
+                  background: 'rgba(255, 255, 255, 0.95)',
                   backdropFilter: 'blur(20px)',
                   padding: '2rem',
                   borderRadius: '24px',
-                  border: `2px solid ${isHovered ? card.color : (darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)')}`,
+                  border: `2px solid ${isHovered ? card.color : 'rgba(255, 255, 255, 0.3)'}`,
                   boxShadow: isHovered
-                    ? `0 20px 60px ${card.color}40`
-                    : darkMode 
-                      ? '0 10px 40px rgba(0, 0, 0, 0.3)'
-                      : '0 10px 40px rgba(0, 0, 0, 0.1)',
+                    ? `0 32px 64px ${card.color}40`
+                    : '0 32px 64px rgba(0, 0, 0, 0.2)',
                   cursor: 'pointer',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
@@ -308,7 +332,7 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
                     width: '60px',
                     height: '60px',
                     borderRadius: '16px',
-                    background: isHovered ? card.gradient : (darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)'),
+                    background: isHovered ? card.gradient : 'rgba(0, 0, 0, 0.03)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -327,7 +351,7 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
                   <h3 style={{
                     fontSize: '1.25rem',
                     fontWeight: '700',
-                    color: darkMode ? '#f9fafb' : '#1f2937',
+                    color: '#1f2937',
                     marginBottom: '0.5rem',
                     transition: 'color 0.3s ease'
                   }}>
@@ -336,7 +360,7 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
 
                   <p style={{
                     fontSize: '0.875rem',
-                    color: darkMode ? '#9ca3af' : '#6b7280',
+                    color: '#6b7280',
                     marginBottom: '1rem',
                     lineHeight: '1.5'
                   }}>
@@ -387,6 +411,26 @@ const NavigationHub = ({ userName, userRole, onNavigate, darkMode, recentActivit
       </div>
 
       <style>{`
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0px) translateX(0px);
+          }
+          50% {
+            transform: translateY(-20px) translateX(10px);
+          }
+        }
+
+        @keyframes sparkleFloat {
+          0%, 100% {
+            transform: translateY(0px) translateX(0px) scale(1);
+            opacity: 0.6;
+          }
+          50% {
+            transform: translateY(-30px) translateX(15px) scale(1.2);
+            opacity: 1;
+          }
+        }
+
         @keyframes fadeInDown {
           from {
             opacity: 0;

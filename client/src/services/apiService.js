@@ -225,7 +225,6 @@ const apiService = {
   getLeads: async () => {
     try {
       const token = localStorage.getItem('authToken');
-      console.log('🎫 Frontend token for leads:', token ? `${token.substring(0, 20)}...` : 'No token');
       
       const response = await fetch(`${API_BASE_URL}/leads?limit=1000`, {
         headers: {
@@ -239,20 +238,16 @@ const apiService = {
       }
       
       const data = await response.json();
-      console.log('📊 Leads Response:', data);
-      
-      // Backend returns { leads: [...], total: number } format
       return data.leads || data || [];
     } catch (error) {
       console.error('Error fetching leads:', error);
-      return []; // Return empty array on error
+      return [];
     }
   },
   
   getAllLeads: async () => {
     try {
       const token = localStorage.getItem('authToken');
-      console.log('🔍 Fetching all leads from backend...');
       
       const response = await fetch(`${API_BASE_URL}/leads?limit=1000`, {
         headers: {
@@ -266,14 +261,10 @@ const apiService = {
       }
       
       const data = await response.json();
-      console.log('📊 Leads API Response:', data);
-      
-      // Backend returns { leads: [...], total: number } format
-      // Return just the leads array for compatibility
       return data.leads || data || [];
     } catch (error) {
       console.error('❌ Error fetching leads:', error);
-      return []; // Return empty array on error
+      return [];
     }
   },
   
@@ -359,8 +350,6 @@ const apiService = {
   },
   
   createLead: async (leadData) => {
-    console.log('📝 Creating lead:', leadData);
-    
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/leads`, {
@@ -377,9 +366,7 @@ const apiService = {
         throw new Error(error.message || 'Failed to create lead');
       }
       
-      const result = await response.json();
-      console.log('✅ Lead created successfully:', result);
-      return result;
+      return await response.json();
     } catch (error) {
       console.error('❌ Error creating lead:', error);
       throw error;
@@ -389,7 +376,6 @@ const apiService = {
   updateLead: async (leadId, leadData) => {
     try {
       const token = localStorage.getItem('authToken');
-      console.log('Updating lead:', leadId, 'with data:', leadData);
       
       const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
         method: 'PUT',
@@ -400,17 +386,12 @@ const apiService = {
         body: JSON.stringify(leadData)
       });
       
-      console.log('Update response status:', response.status);
-      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Update error response:', errorText);
-        throw new Error(`Failed to update lead: ${response.status} ${errorText}`);
+        throw new Error(`Failed to update lead: ${response.status}`);
       }
       
-      const result = await response.json();
-      console.log('Update successful:', result);
-      return result;
+      return await response.json();
     } catch (error) {
       console.error('Error updating lead:', error);
       throw new Error(`Error updating lead: ${error.message}`);
@@ -418,8 +399,6 @@ const apiService = {
   },
   
   deleteLead: async (leadId) => {
-    console.log('🗑️ Deleting lead:', leadId);
-    
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
@@ -435,11 +414,30 @@ const apiService = {
         throw new Error(error.message || 'Failed to delete lead');
       }
       
-      const result = await response.json();
-      console.log('✅ Lead deleted successfully:', result);
-      return result;
+      return await response.json();
     } catch (error) {
       console.error('❌ Error deleting lead:', error);
+      throw error;
+    }
+  },
+  
+  getLeadById: async (leadId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch lead details');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching lead by ID:', error);
       throw error;
     }
   },
@@ -464,6 +462,32 @@ const apiService = {
       return await response.json();
     } catch (error) {
       console.error('Error adding note:', error);
+      throw error;
+    }
+  },
+  
+  addLeadActivity: async (leadId, activityData) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      // Use notes API with activity prefix to differentiate
+      const activityNote = `[ACTIVITY:${activityData.type.toUpperCase()}] ${activityData.description}`;
+      const response = await fetch(`${API_BASE_URL}/leads/${leadId}/notes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: activityNote })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add activity');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error adding activity:', error);
       throw error;
     }
   },
@@ -544,7 +568,6 @@ const apiService = {
   getCustomers: async () => {
     try {
       const token = localStorage.getItem('authToken');
-      console.log('🎫 Frontend token for customers:', token ? `${token.substring(0, 20)}...` : 'No token');
       
       const response = await fetch(`${API_BASE_URL}/customers`, {
         headers: {
@@ -558,13 +581,10 @@ const apiService = {
       }
       
       const data = await response.json();
-      console.log('📊 Customers Response:', data);
-      
-      // Backend returns { customers: [...], total: number } format
       return data.customers || data || [];
     } catch (error) {
       console.error('Error fetching customers:', error);
-      return []; // Return empty array on error
+      return [];
     }
   },
   
