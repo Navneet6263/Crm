@@ -9,9 +9,12 @@ import {
   Activity,
   MessageSquare,
   Plus,
-  X
+  X,
+  Calendar,
+  Check
 } from 'lucide-react';
 import apiService from '../services/apiService';
+import { showToast } from './ToastNotification';
 
 const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   const navigate = onBack || (() => window.history.back());
@@ -21,10 +24,102 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [activityType, setActivityType] = useState('call');
   const [activityDescription, setActivityDescription] = useState('');
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [taskData, setTaskData] = useState({
+    title: '',
+    description: '',
+    type: 'call',
+    priority: 'medium',
+    dueDate: '',
+    dueTime: '',
+    assignedTo: '',
+    emailNotification: false,
+    browserNotification: true,
+    reminderTime: '15',
+    isRecurring: false,
+    recurringPattern: 'daily',
+    recurringEndDate: ''
+  });
+  const [users, setUsers] = useState([]);
 
   useEffect(() => {
     fetchLeadDetails();
+    loadUsers();
   }, [leadId]);
+
+  const loadUsers = async () => {
+    try {
+      const response = await apiService.getUsers();
+      setUsers(response || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    }
+  };
+
+  const handleAddTask = async () => {
+    if (!taskData.title.trim()) {
+      showToast('error', '❌ Task title is required');
+      return;
+    }
+    
+    if (!taskData.dueDate) {
+      showToast('error', '❌ Due date is required');
+      return;
+    }
+
+    if (!taskData.dueTime) {
+      showToast('error', '❌ Time is required');
+      return;
+    }
+    
+    try {
+      const newTask = {
+        ...taskData,
+        relatedTo: 'lead',
+        relatedId: leadId,
+        status: 'pending',
+        emailNotification: false,
+        browserNotification: true,
+        notificationsSent: {
+          fifteenMin: false,
+          tenMin: false,
+          fiveMin: false
+        }
+      };
+      
+      await apiService.createTask(newTask);
+      
+      // Add activity entry
+      const activityDescription = `Task scheduled: "${taskData.title}" on ${new Date(taskData.dueDate).toLocaleDateString()} at ${taskData.dueTime}`;
+      await apiService.addLeadActivity(leadId, { 
+        type: 'task', 
+        description: activityDescription 
+      });
+      
+      // Reset form
+      setTaskData({
+        title: '',
+        description: '',
+        type: 'call',
+        priority: 'medium',
+        dueDate: '',
+        dueTime: '',
+        assignedTo: '',
+        emailNotification: false,
+        browserNotification: true,
+        reminderTime: '15',
+        isRecurring: false,
+        recurringPattern: 'daily',
+        recurringEndDate: ''
+      });
+      setShowAddTask(false);
+      fetchLeadDetails(); // Refresh to show new activity
+      showToast('success', '✅ Task scheduled successfully');
+    } catch (error) {
+      console.error('Error creating task:', error);
+      showToast('error', '❌ Failed to schedule task');
+    }
+  };
 
   const fetchLeadDetails = async () => {
     if (!leadId) {
@@ -210,6 +305,11 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
                 <Mail size={20} />
                 Send Email
               </button>
+
+              <button onClick={() => setShowAddTask(true)} style={{ flex: 1, padding: '1rem', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <Calendar size={20} />
+                Schedule Task
+              </button>
             </div>
           </div>
 
@@ -344,6 +444,386 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
           </div>
         </div>
       </div>
+
+      {/* Add Task Modal */}
+      {showAddTask && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: '1rem',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Schedule Task for {lead?.contactPerson}
+              </h3>
+              <button
+                onClick={() => setShowAddTask(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#6b7280',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Title <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={taskData.title}
+                  onChange={(e) => setTaskData({ ...taskData, title: e.target.value })}
+                  placeholder="Enter task title"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Description
+                </label>
+                <textarea
+                  value={taskData.description}
+                  onChange={(e) => setTaskData({ ...taskData, description: e.target.value })}
+                  placeholder="Enter task description"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.875rem',
+                    minHeight: '100px',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Type
+                  </label>
+                  <select
+                    value={taskData.type}
+                    onChange={(e) => setTaskData({ ...taskData, type: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    <option value="call">Call</option>
+                    <option value="email">Email</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="follow-up">Follow-up</option>
+                    <option value="demo">Demo</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Priority
+                  </label>
+                  <select
+                    value={taskData.priority}
+                    onChange={(e) => setTaskData({ ...taskData, priority: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '1rem',
+                marginBottom: '1rem'
+              }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Due Date <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={taskData.dueDate}
+                    onChange={(e) => setTaskData({ ...taskData, dueDate: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Time <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={taskData.dueTime}
+                    onChange={(e) => setTaskData({ ...taskData, dueTime: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid #e5e7eb',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Assignee
+                </label>
+                <select
+                  value={taskData.assignedTo}
+                  onChange={(e) => setTaskData({ ...taskData, assignedTo: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <option value="">Select Assignee</option>
+                  {Array.isArray(users) && users.map(user => (
+                    <option key={user._id} value={user.name}>{user.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.5rem'
+                }}>
+                  Related Lead
+                </label>
+                <input
+                  type="text"
+                  value={`${lead?.contactPerson} - ${lead?.companyName}`}
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: '6px',
+                    border: '1px solid #e5e7eb',
+                    fontSize: '0.875rem',
+                    background: '#f9fafb',
+                    color: '#6b7280'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                marginBottom: '1rem',
+                padding: '1rem',
+                background: 'rgba(59, 130, 246, 0.05)',
+                borderRadius: '8px',
+                border: '1px solid rgba(59, 130, 246, 0.1)'
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '0.75rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={taskData.emailNotification}
+                    onChange={(e) => setTaskData({ ...taskData, emailNotification: e.target.checked })}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer',
+                      accentColor: '#3b82f6'
+                    }}
+                  />
+                  <span>📧 Send Email Notifications</span>
+                </label>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={taskData.browserNotification}
+                    onChange={(e) => setTaskData({ ...taskData, browserNotification: e.target.checked })}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer',
+                      accentColor: '#10b981'
+                    }}
+                  />
+                  <span>🔔 Browser Notifications</span>
+                </label>
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: '#6b7280',
+                  margin: '0.5rem 0 0 2rem'
+                }}>
+                  Get reminders 15, 10, and 5 minutes before task due time
+                </p>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                marginTop: '1rem'
+              }}>
+                <button
+                  onClick={() => setShowAddTask(false)}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: 'transparent',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    color: '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddTask}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    background: '#8b5cf6',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <Check size={16} />
+                  Schedule Task
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

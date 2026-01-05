@@ -101,10 +101,10 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
     const fetchMyLeads = async () => {
       try {
         setLoading(true);
-        // Primary: Use backend API with no limit
         let leadsData = [];
         try {
-          const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=10000`, {
+          // Use pagination instead of loading all leads at once
+          const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=50&page=1`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'
@@ -115,7 +115,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
           
           // Also fetch group-assigned leads for sales team
           if (user?.role === 'sales') {
-            const groupLeadsResponse = await fetch(`${apiService.getApiUrl()}/leads/group-leads/sales`, {
+            const groupLeadsResponse = await fetch(`${apiService.getApiUrl()}/leads/group-leads/sales?limit=50`, {
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
                 'Content-Type': 'application/json'

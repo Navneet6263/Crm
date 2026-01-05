@@ -44,11 +44,11 @@ const createLead = async (req, res) => {
       });
     }
     
-    // Validate phone number (international format with country code)
-    const phoneDigits = req.body.phone.replace(/[^\d]/g, '');
-    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+    // Validate phone number (should be 10 digits)
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(req.body.phone.replace(/[^\d]/g, ''))) {
       return res.status(400).json({ 
-        message: 'Please enter a valid phone number' 
+        message: 'Please enter a valid 10-digit phone number' 
       });
     }
     
@@ -241,31 +241,28 @@ const createLead = async (req, res) => {
     
     const lead = await Lead.create(leadData);
     
+    // Populate the lead with user and product details
+    await lead.populate('createdBy assignedTo', 'name email');
+    await lead.populate('product', 'name color icon');
+    
     console.log('✅ Lead created successfully:', {
       leadId: lead._id,
-      contactPerson: lead.contactPerson
+      contactPerson: lead.contactPerson,
+      createdBy: lead.createdBy,
+      assignedTo: lead.assignedTo,
+      product: lead.product,
+      productColor: lead.product?.color
     });
     
-    // Create notification asynchronously (non-blocking)
-    setImmediate(() => {
+    // Create notification for managers/admins
+    try {
       const { createLeadCreationNotification } = require('./notificationController');
-      createLeadCreationNotification(lead._id, userId).catch(err => 
-        console.error('❌ Notification error:', err)
-      );
-    });
+      await createLeadCreationNotification(lead._id, userId);
+    } catch (notifError) {
+      console.error('❌ Failed to create notification:', notifError);
+    }
     
-    // Return minimal response immediately
-    res.status(201).json({
-      success: true,
-      message: 'Lead created successfully',
-      lead: {
-        _id: lead._id,
-        contactPerson: lead.contactPerson,
-        companyName: lead.companyName,
-        status: lead.status,
-        createdAt: lead.createdAt
-      }
-    });
+    res.status(201).json(lead);
   } catch (error) {
     console.error('Error creating lead:', error);
     
@@ -289,18 +286,37 @@ const createLead = async (req, res) => {
 
 const getLeads = async (req, res) => {
   try {
-    const { status, priority, assignedTo, search, page = 1, limit = 50, product } = req.query;
+    console.log('\n🔍 === GET ALL LEADS REQUEST ===');
+    console.log('👤 User:', {
+      id: req.user._id,
+      email: req.user.email,
+      role: req.user.role
+    });
+    
+    const { status, priority, assignedTo, search, page = 1, limit = 10000, product } = req.query;
     
     let query = { isActive: true };
     
+    // Check if this is a "My Leads" request based on query parameters or route
     const isMyLeadsRequest = req.query.myLeads === 'true' || req.originalUrl.includes('/my-leads');
     
+    // Role-based filtering
     if (isMyLeadsRequest) {
+      // For "My Leads" section, ALL users (including admin/super-admin) see only their own leads
+      console.log('🔒 My Leads request - showing only user\'s own leads for role:', req.user.role);
       query.$or = [
         { createdBy: req.user._id || req.user.id },
         { assignedTo: req.user._id || req.user.id }
       ];
-    } else if (!['super-admin', 'admin', 'manager'].includes(req.user.role)) {
+    } else if (req.user.role === 'super-admin') {
+      // Super-admin can see all leads from all companies (for All Leads section)
+      console.log('🔑 Super-admin access - showing all leads from all companies');
+    } else if (req.user.role === 'admin' || req.user.role === 'manager') {
+      // Admin and Manager can see all leads (for All Leads section)
+      console.log('🔑 Admin/Manager access - showing all leads');
+    } else {
+      // Normal users can only see leads created by them or assigned to them
+      console.log('🔒 Normal user access - filtering leads');
       query.$or = [
         { createdBy: req.user._id || req.user.id },
         { assignedTo: req.user._id || req.user.id }
@@ -314,27 +330,41 @@ const getLeads = async (req, res) => {
       query.assignedTo = assignedTo;
     }
     if (search) {
-      query.$and = [{
+      const searchQuery = {
         $or: [
           { contactPerson: { $regex: search, $options: 'i' } },
           { companyName: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } },
           { phone: { $regex: search, $options: 'i' } }
         ]
-      }];
+      };
+      
+      if (query.$and) {
+        query.$and.push(searchQuery);
+      } else {
+        query.$and = [searchQuery];
+      }
     }
+    
+    console.log('🔍 Final Query:', JSON.stringify(query, null, 2));
 
-    const [leads, total] = await Promise.all([
-      Lead.find(query)
-        .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue')
-        .populate('createdBy assignedTo', 'name email role')
-        .populate('product', 'name color icon')
-        .sort({ createdAt: -1 })
-        .limit(parseInt(limit))
-        .skip((parseInt(page) - 1) * parseInt(limit))
-        .lean(),
-      Lead.countDocuments(query)
-    ]);
+    const leads = await Lead.find(query)
+      .populate('createdBy assignedTo', 'name email role')
+      .populate('product', 'name color icon')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Lead.countDocuments(query);
+    
+    console.log('📊 Found leads:', leads.length);
+    console.log('🎨 Sample product data in leads:', leads.slice(0, 2).map(l => ({
+      leadId: l._id,
+      productData: l.product,
+      productColor: l.product?.color,
+      productName: l.product?.name
+    })));
+    console.log('=== END GET ALL LEADS ===\n');
 
     res.json({
       leads,
@@ -351,8 +381,7 @@ const getLeads = async (req, res) => {
 const getLeadById = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id)
-      .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue notes activities lastViewedAt')
-      .populate('createdBy assignedTo', 'name email role')
+      .populate('createdBy assignedTo', 'name email')
       .populate('product', 'name color icon')
       .populate('notes.createdBy activities.createdBy', 'name');
     
@@ -395,9 +424,7 @@ const updateLead = async (req, res) => {
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    )
-    .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue activities')
-    .populate('createdBy assignedTo', 'name email role');
+    ).populate('createdBy assignedTo', 'name email role');
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
@@ -474,38 +501,6 @@ const addNote = async (req, res) => {
   }
 };
 
-const logActivity = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { type, description } = req.body;
-    
-    const lead = await Lead.findByIdAndUpdate(
-      id,
-      {
-        $push: {
-          activities: {
-            type,
-            description,
-            createdBy: req.user._id || req.user.id,
-            createdAt: new Date()
-          }
-        }
-      },
-      { new: true }
-    )
-    .populate('activities.createdBy', 'name')
-    .populate('notes.createdBy', 'name');
-    
-    if (!lead) {
-      return res.status(404).json({ message: 'Lead not found' });
-    }
-    
-    res.json(lead);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
 const assignLead = async (req, res) => {
   try {
     const { leadId, assignedTo } = req.body;
@@ -527,14 +522,12 @@ const assignLead = async (req, res) => {
       leadId,
       { 
         assignedTo,
-        status: 'assigned',
+        status: 'assigned', // Update status to assigned
         assignedAt: new Date(),
         assignedBy: req.user._id || req.user.id
       },
       { new: true, runValidators: true }
-    )
-    .select('contactPerson companyName email phone status priority source product createdBy assignedTo assignedBy createdAt updatedAt estimatedValue activities')
-    .populate('createdBy assignedTo assignedBy', 'name email role');
+    ).populate('createdBy assignedTo assignedBy', 'name email role');
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
@@ -549,17 +542,19 @@ const assignLead = async (req, res) => {
     });
     await lead.save();
     
-    // Create notification and send email asynchronously (non-blocking)
-    setImmediate(() => {
-      const { createLeadAssignmentNotification } = require('./notificationController');
-      createLeadAssignmentNotification(leadId, assignedTo, req.user._id || req.user.id)
-        .catch(err => console.error('❌ Notification error:', err));
-      
+    // Create notification for assigned user
+    const { createLeadAssignmentNotification } = require('./notificationController');
+    await createLeadAssignmentNotification(leadId, assignedTo, req.user._id || req.user.id);
+    
+    // Send email to assigned user
+    try {
       const { sendLeadAssignmentEmail } = require('../services/emailService');
-      sendLeadAssignmentEmail(assignedUser, lead, req.user)
-        .then(() => console.log('📧 Assignment email sent to:', assignedUser.email))
-        .catch(err => console.error('❌ Email error:', err));
-    });
+      await sendLeadAssignmentEmail(assignedUser, lead, req.user);
+      console.log('📧 Assignment email sent to:', assignedUser.email);
+    } catch (emailError) {
+      console.error('❌ Failed to send assignment email:', emailError);
+      // Don't fail the assignment if email fails
+    }
     
     console.log('✅ Lead assigned successfully:', {
       leadId: lead._id,
@@ -571,7 +566,7 @@ const assignLead = async (req, res) => {
     res.json({ 
       success: true,
       message: `Lead assigned successfully to ${assignedUser.name} (${assignedUser.role})`, 
-      leadId: lead._id,
+      lead,
       assignment: {
         assignedTo: assignedUser.name,
         assignedToRole: assignedUser.role,
@@ -588,47 +583,88 @@ const assignLead = async (req, res) => {
 const getMyLeads = async (req, res) => {
   const mongoose = require('mongoose');
   try {
-    const { status, priority, search, page = 1, limit = 20 } = req.query;
-    const maxLimit = Math.min(parseInt(limit), 50);
+    console.log('\n🔍 === MY LEADS REQUEST ===');
+    console.log('👤 User ID:', req.user._id);
+    console.log('👤 User Email:', req.user.email);
+    console.log('👤 User Role:', req.user.role);
+    
+    const { status, priority, search, page = 1, limit = 10000 } = req.query;
     
     let query = { isActive: true };
     
+    // All users (including super admin) get leads created by them or assigned to them
     const userId = req.user._id || req.user.id;
+    console.log('🔑 Using userId for query:', userId, 'Type:', typeof userId);
+    
+    // Convert to ObjectId if it's a string
     const userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+    console.log('🔑 Converted to ObjectId:', userObjectId);
+    
+    // First, let's check all leads this user created
+    const createdLeads = await Lead.find({ createdBy: userObjectId, isActive: true }).select('_id contactPerson createdBy');
+    console.log('📊 Leads created by this user:', createdLeads.length);
+    if (createdLeads.length > 0) {
+      console.log('📊 Sample created lead:', {
+        id: createdLeads[0]._id,
+        contactPerson: createdLeads[0].contactPerson,
+        createdBy: createdLeads[0].createdBy
+      });
+    }
+    
+    // Check leads assigned to this user
+    const assignedLeads = await Lead.find({ assignedTo: userObjectId, isActive: true }).select('_id contactPerson assignedTo');
+    console.log('📊 Leads assigned to this user:', assignedLeads.length);
     
     query.$or = [
-      { createdBy: userObjectId },
-      { assignedTo: userObjectId }
+      { createdBy: userObjectId },  // Leads created by this user
+      { assignedTo: userObjectId }  // Leads assigned to this user
     ];
+    
+    console.log('🔍 Query:', JSON.stringify(query, null, 2));
     
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (search) {
-      query.$and = [{
+      const searchQuery = {
         $or: [
           { contactPerson: { $regex: search, $options: 'i' } },
           { companyName: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } },
           { phone: { $regex: search, $options: 'i' } }
         ]
-      }];
+      };
+      
+      if (query.$and) {
+        query.$and.push(searchQuery);
+      } else {
+        query.$and = [searchQuery];
+      }
     }
 
-    const [leads, total] = await Promise.all([
-      Lead.find(query)
-        .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue')
-        .populate('createdBy assignedTo', 'name email role')
-        .populate('product', 'name color icon')
-        .sort({ createdAt: -1 })
-        .limit(maxLimit)
-        .skip((parseInt(page) - 1) * maxLimit)
-        .lean(),
-      Lead.countDocuments(query)
-    ]);
+    const leads = await Lead.find(query)
+      .populate('createdBy assignedTo', 'name email role')
+      .populate('product', 'name color icon')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Lead.countDocuments(query);
+    
+    console.log('📊 Found leads count:', leads.length);
+    console.log('📊 Total leads:', total);
+    if (leads.length > 0) {
+      console.log('📊 First lead details:', {
+        id: leads[0]._id,
+        contactPerson: leads[0].contactPerson,
+        createdBy: leads[0].createdBy,
+        assignedTo: leads[0].assignedTo
+      });
+    }
+    console.log('=== END MY LEADS ===\n');
 
     res.json({
       leads,
-      totalPages: Math.ceil(total / maxLimit),
+      totalPages: Math.ceil(total / limit),
       currentPage: page,
       total
     });
@@ -641,7 +677,7 @@ const getMyLeads = async (req, res) => {
 const getLeadsByProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 10000 } = req.query;
     
     let query = { isActive: true, product: productId };
     
@@ -659,20 +695,18 @@ const getLeadsByProduct = async (req, res) => {
     }
     
     const leads = await Lead.find(query)
-      .select('contactPerson companyName email phone status priority source product createdBy assignedTo createdAt updatedAt estimatedValue')
       .populate('createdBy assignedTo', 'name email role')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .lean();
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
 
     const total = await Lead.countDocuments(query);
     
     res.json({
       leads,
       totalPages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
+      currentPage: page,
       total
     });
   } catch (error) {
@@ -808,7 +842,6 @@ const acceptGroupLead = async (req, res) => {
     
     await lead.save();
     await lead.populate('assignedTo', 'name email role');
-    await lead.populate('product', 'name color icon');
     
     res.json({ success: true, message: 'Lead accepted successfully', lead });
   } catch (error) {
@@ -855,7 +888,6 @@ const getPendingGroupLeads = async (req, res) => {
     };
     
     const leads = await Lead.find(query)
-      .select('contactPerson companyName email phone status priority source product createdBy createdAt')
       .populate('createdBy', 'name email')
       .populate('product', 'name color icon')
       .sort({ createdAt: -1 });
@@ -869,47 +901,19 @@ const getPendingGroupLeads = async (req, res) => {
 
 const getSalesTeamStats = async (req, res) => {
   try {
-    // Get company ID from user
-    let userCompanyId;
-    if (req.user.role === 'super-admin') {
-      // SuperAdmin can see all companies or specific company if provided
-      userCompanyId = req.query.companyId || null;
-    } else {
-      // Other users only see their own company
-      userCompanyId = req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
-    }
-    
-    // Build user query with company filter
-    const userQuery = {
+    // Get all sales users
+    const salesUsers = await User.find({
       role: { $in: ['sales', 'sales-rep', 'sales-manager', 'senior-manager'] },
       isActive: true
-    };
-    
-    // Add company filter for non-superadmin or when superadmin selects a company
-    if (userCompanyId) {
-      userQuery.$or = [
-        { companyId: userCompanyId },
-        { tenantId: userCompanyId }
-      ];
-    }
-    
-    // Get sales users from current company only
-    const salesUsers = await User.find(userQuery).select('name email role companyId tenantId');
+    }).select('name email role');
     
     // Get stats for each user
     const stats = await Promise.all(salesUsers.map(async (user) => {
-      // Count accepted leads (assigned to this user) from same company
-      const leadQuery = {
+      // Count accepted leads (assigned to this user)
+      const acceptedCount = await Lead.countDocuments({
         assignedTo: user._id,
         isActive: true
-      };
-      
-      // Add company filter to leads as well
-      if (userCompanyId) {
-        leadQuery.companyId = userCompanyId;
-      }
-      
-      const acceptedCount = await Lead.countDocuments(leadQuery);
+      });
       
       return {
         userId: user._id,
@@ -920,18 +924,12 @@ const getSalesTeamStats = async (req, res) => {
       };
     }));
     
-    // Get pending group leads count for current company
-    const pendingQuery = {
+    // Get pending group leads count
+    const pendingCount = await Lead.countDocuments({
       status: 'pending-acceptance',
       assignedToGroup: 'sales',
       isActive: true
-    };
-    
-    if (userCompanyId) {
-      pendingQuery.companyId = userCompanyId;
-    }
-    
-    const pendingCount = await Lead.countDocuments(pendingQuery);
+    });
     
     res.json({ stats, pendingLeads: pendingCount });
   } catch (error) {
@@ -947,7 +945,6 @@ module.exports = {
   updateLead,
   deleteLead,
   addNote,
-  logActivity,
   assignLead,
   getMyLeads,
   getLeadsByProduct,

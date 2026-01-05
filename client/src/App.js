@@ -332,25 +332,18 @@ const AppContent = () => {
         
         // Then check localStorage token
         const token = localStorage.getItem('authToken');
-        if (!token) {
-          console.log('No token found in localStorage');
-          return;
-        }
+        if (!token) return;
         
         // Check with backend if session is still valid
         const authData = await apiService.checkAuth();
         if (authData && authData.success && authData.user) {
-          console.log('✅ Auto-login successful:', authData.user.name);
           setCurrentUser(authData.user);
           setIsLoggedIn(true);
           setShowWelcomeScreen(true);
         } else {
-          // Invalid session, clear token
           localStorage.removeItem('authToken');
-          console.log('Invalid session, cleared token');
         }
       } catch (error) {
-        console.log('Auto-login failed:', error.message);
         localStorage.removeItem('authToken');
       }
     };
@@ -534,7 +527,6 @@ const AppContent = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('🔄 Loading CRM data...');
         const [leadsResponse, customers] = await Promise.all([
           fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
             headers: {
@@ -546,10 +538,8 @@ const AppContent = () => {
         ]);
         const leadsData = await leadsResponse.json();
         const leads = leadsData.leads || [];
-        console.log('✅ Data loaded:', { leads: leads?.length || 0, customers: customers?.length || 0 });
         updateCrmData({ leads: leads || [], customers: customers || [] });
       } catch (error) {
-        console.error('❌ Error loading data:', error);
         updateCrmData({ leads: [], customers: [] });
       }
     };

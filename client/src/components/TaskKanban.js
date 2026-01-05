@@ -38,7 +38,7 @@ const TaskKanban = ({ darkMode }) => {
     priority: 'medium',
     dueDate: '',
     dueTime: '',
-    assignee: '',
+    assignedTo: '',
     type: 'call',
     relatedTo: 'lead',
     relatedId: '',
@@ -227,7 +227,18 @@ const TaskKanban = ({ darkMode }) => {
     try {
       setLoading(true);
       const response = await apiService.getTasks();
-      setTasks(response.tasks || []);
+      
+      // Handle different response formats
+      let tasksArray = [];
+      if (response.tasks) {
+        tasksArray = response.tasks;
+      } else if (Array.isArray(response)) {
+        tasksArray = response;
+      } else {
+        tasksArray = [];
+      }
+      
+      setTasks(tasksArray);
     } catch (error) {
       console.error('Error loading tasks:', error);
       showToast('error', '❌ Failed to load tasks');
@@ -322,7 +333,9 @@ const TaskKanban = ({ darkMode }) => {
       };
       
       const createdTask = await apiService.createTask(taskData);
-      setTasks([...tasks, createdTask]);
+      
+      // Reload tasks from backend to ensure consistency
+      await loadTasks();
       
       // Show success notification
       if (notificationsEnabled && newTask.browserNotification) {
@@ -336,7 +349,7 @@ const TaskKanban = ({ darkMode }) => {
         priority: 'medium',
         dueDate: '',
         dueTime: '',
-        assignee: '',
+        assignedTo: '',
         type: 'call',
         relatedTo: 'lead',
         relatedId: '',
@@ -469,7 +482,7 @@ const TaskKanban = ({ darkMode }) => {
         return (
           task.title.toLowerCase().includes(query) ||
           (task.description && task.description.toLowerCase().includes(query)) ||
-          (task.assignee && task.assignee.toLowerCase().includes(query))
+          (task.assignedTo && task.assignedTo.toLowerCase().includes(query))
         );
       }
       
@@ -991,7 +1004,7 @@ const TaskKanban = ({ darkMode }) => {
                     gap: '0.25rem'
                   }}>
                     <User size={12} />
-                    {task.assignee || 'Unassigned'}
+                    {task.assignedTo || 'Unassigned'}
                   </div>
                 </div>
               </div>
@@ -1127,7 +1140,7 @@ const TaskKanban = ({ darkMode }) => {
                     gap: '0.25rem'
                   }}>
                     <User size={12} />
-                    {task.assignee || 'Unassigned'}
+                    {task.assignedTo || 'Unassigned'}
                   </div>
                 </div>
               </div>
@@ -1265,7 +1278,7 @@ const TaskKanban = ({ darkMode }) => {
                     gap: '0.25rem'
                   }}>
                     <User size={12} />
-                    {task.assignee || 'Unassigned'}
+                    {task.assignedTo || 'Unassigned'}
                   </div>
                 </div>
               </div>
@@ -1524,8 +1537,8 @@ const TaskKanban = ({ darkMode }) => {
                   Assignee
                 </label>
                 <select
-                  value={newTask.assignee}
-                  onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
+                  value={newTask.assignedTo}
+                  onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '0.75rem',
@@ -1965,8 +1978,8 @@ const TaskKanban = ({ darkMode }) => {
                     Assignee
                   </label>
                   <select
-                    value={editingTask.assignee || ''}
-                    onChange={(e) => setEditingTask({ ...editingTask, assignee: e.target.value })}
+                    value={editingTask.assignedTo || ''}
+                    onChange={(e) => setEditingTask({ ...editingTask, assignedTo: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
