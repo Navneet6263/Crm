@@ -4,7 +4,15 @@ const Lead = require('../models/Lead');
 // Get all products
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.find({ isActive: true })
+    // Filter products by company
+    const query = { isActive: true };
+    
+    // Only show products from user's company
+    if (req.user.companyId) {
+      query.companyId = req.user.companyId;
+    }
+    
+    const products = await Product.find(query)
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
     
@@ -34,9 +42,10 @@ const createProduct = async (req, res) => {
   try {
     const { name, color, icon } = req.body;
     
-    // Check if product already exists
+    // Check if product already exists in this company
     const existingProduct = await Product.findOne({ 
       name: { $regex: new RegExp(`^${name}$`, 'i') },
+      companyId: req.user.companyId,
       isActive: true 
     });
     

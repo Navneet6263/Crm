@@ -297,6 +297,11 @@ const getLeads = async (req, res) => {
     
     let query = { isActive: true };
     
+    // Filter by company - IMPORTANT for privacy
+    if (req.user.companyId) {
+      query.companyId = req.user.companyId;
+    }
+    
     // Check if this is a "My Leads" request based on query parameters or route
     const isMyLeadsRequest = req.query.myLeads === 'true' || req.originalUrl.includes('/my-leads');
     
@@ -311,9 +316,10 @@ const getLeads = async (req, res) => {
     } else if (req.user.role === 'super-admin') {
       // Super-admin can see all leads from all companies (for All Leads section)
       console.log('🔑 Super-admin access - showing all leads from all companies');
+      delete query.companyId; // Remove company filter for super-admin
     } else if (req.user.role === 'admin' || req.user.role === 'manager') {
-      // Admin and Manager can see all leads (for All Leads section)
-      console.log('🔑 Admin/Manager access - showing all leads');
+      // Admin and Manager can see all leads from their company only
+      console.log('🔑 Admin/Manager access - showing all leads from their company');
     } else {
       // Normal users can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
@@ -592,6 +598,11 @@ const getMyLeads = async (req, res) => {
     
     let query = { isActive: true };
     
+    // Filter by company - IMPORTANT for privacy
+    if (req.user.companyId) {
+      query.companyId = req.user.companyId;
+    }
+    
     // All users (including super admin) get leads created by them or assigned to them
     const userId = req.user._id || req.user.id;
     console.log('🔑 Using userId for query:', userId, 'Type:', typeof userId);
@@ -681,9 +692,15 @@ const getLeadsByProduct = async (req, res) => {
     
     let query = { isActive: true, product: productId };
     
+    // Filter by company - IMPORTANT for privacy
+    if (req.user.companyId) {
+      query.companyId = req.user.companyId;
+    }
+    
     // Role-based filtering
     if (req.user.role === 'super-admin') {
       // Super-admin can see all leads
+      delete query.companyId;
     } else if (req.user.role === 'admin' || req.user.role === 'manager') {
       // Admin and Manager can see all leads
     } else {
