@@ -938,6 +938,29 @@ const getSalesTeamStats = async (req, res) => {
   }
 };
 
+const logActivity = async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    const userId = req.user._id || req.user.id;
+    lead.activities.push({
+      type: req.body.type || 'note',
+      description: req.body.description,
+      createdBy: userId
+    });
+
+    await lead.save();
+    await lead.populate('activities.createdBy', 'name');
+    
+    res.json(lead);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -945,6 +968,7 @@ module.exports = {
   updateLead,
   deleteLead,
   addNote,
+  logActivity,
   assignLead,
   getMyLeads,
   getLeadsByProduct,

@@ -20,6 +20,7 @@ const {
 const { auth } = require('../middleware/auth');
 const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
 const { updateLeadViewTime } = require('../middleware/leadViewMiddleware');
+const { handleBulkAuth, bulkUploadLeads } = require('../controllers/bulkUploadController');
 
 const router = express.Router();
 
@@ -46,11 +47,6 @@ router.route('/:id')
 
 router.post('/:id/notes', addNote);
 router.post('/:id/activity', logActivity);
-// Remove auth middleware for bulk upload as it has its own auth handling
-const bulkUploadRouter = express.Router();
-bulkUploadRouter.post('/bulk-upload', require('../controllers/bulkUploadController').handleBulkAuth, require('../controllers/bulkUploadController').bulkUploadLeads);
-
-// Mount bulk upload without auth middleware
-router.use('/', bulkUploadRouter);
+router.post('/bulk-upload', handleBulkAuth, bulkUploadLeads);
 
 module.exports = router;
