@@ -127,7 +127,7 @@ const AppContent = () => {
     assignments: []
   });
 
-  // Update search results whenever term changes
+  // Update search results whenever term changes - Role-based filtering
   useEffect(() => {
     if (!globalSearchTerm || globalSearchTerm.trim().length < 1) {
       setSearchResults([]);
@@ -136,15 +136,35 @@ const AppContent = () => {
     
     const lower = globalSearchTerm.toLowerCase().trim();
     const results = [];
+    const userRole = currentUser?.role;
 
-    // Always show pages first - they should always be available
+    // Role-based page filtering
     menuSections.forEach(section => {
       section.items.forEach(item => {
         if (item.label.toLowerCase().includes(lower)) {
-          // Check permissions
-          const hasPermission = (!item.adminOnly && !item.superAdminOnly) || 
-                               (item.adminOnly && ['admin', 'manager', 'senior-manager', 'super-admin'].includes(currentUser?.role)) ||
-                               (item.superAdminOnly && currentUser?.role === 'super-admin');
+          // Check permissions based on user role and item restrictions
+          let hasPermission = true;
+          
+          // Check admin-only restrictions
+          if (item.adminOnly && !['admin', 'manager', 'senior-manager', 'super-admin'].includes(userRole)) {
+            hasPermission = false;
+          }
+          
+          // Check super-admin-only restrictions
+          if (item.superAdminOnly && userRole !== 'super-admin') {
+            hasPermission = false;
+          }
+          
+          // Check sales-only restrictions (Group Leads should only show for sales)
+          if (item.salesOnly && userRole !== 'sales') {
+            console.log(`🚫 Blocking ${item.label} for ${userRole} (salesOnly: ${item.salesOnly})`);
+            hasPermission = false;
+          }
+          
+          // Special case: Hide "All Leads" for sales users, show "My Leads" instead
+          if (item.id === 'leads' && userRole === 'sales') {
+            hasPermission = false;
+          }
           
           if (hasPermission) {
             results.push({ 
@@ -159,9 +179,30 @@ const AppContent = () => {
       });
     });
 
-    // Search leads
+    // Role-based lead filtering
     if (crmData.leads && Array.isArray(crmData.leads)) {
-      crmData.leads.forEach(lead => {
+      let filteredLeads = crmData.leads;
+      
+      // Filter leads based on user role
+      if (userRole === 'sales') {
+        // Sales users can only see their own leads
+        filteredLeads = crmData.leads.filter(lead => 
+          lead.assignedTo === currentUser?.id || 
+          lead.assignedTo === currentUser?.email ||
+          lead.createdBy === currentUser?.id
+        );
+      } else if (userRole === 'manager') {
+        // Managers can see their team's leads
+        filteredLeads = crmData.leads.filter(lead => 
+          lead.assignedTo === currentUser?.id || 
+          lead.assignedTo === currentUser?.email ||
+          lead.createdBy === currentUser?.id ||
+          lead.managerEmail === currentUser?.email
+        );
+      }
+      // Admin, senior-manager, and super-admin can see all leads
+      
+      filteredLeads.forEach(lead => {
         const searchableFields = [
           lead.name,
           lead.contactPerson, 
@@ -187,9 +228,30 @@ const AppContent = () => {
       });
     }
 
-    // Search customers
+    // Role-based customer filtering
     if (crmData.customers && Array.isArray(crmData.customers)) {
-      crmData.customers.forEach(customer => {
+      let filteredCustomers = crmData.customers;
+      
+      // Filter customers based on user role
+      if (userRole === 'sales') {
+        // Sales users can only see customers they're assigned to
+        filteredCustomers = crmData.customers.filter(customer => 
+          customer.assignedTo === currentUser?.id || 
+          customer.assignedTo === currentUser?.email ||
+          customer.createdBy === currentUser?.id
+        );
+      } else if (userRole === 'manager') {
+        // Managers can see their team's customers
+        filteredCustomers = crmData.customers.filter(customer => 
+          customer.assignedTo === currentUser?.id || 
+          customer.assignedTo === currentUser?.email ||
+          customer.createdBy === currentUser?.id ||
+          customer.managerEmail === currentUser?.email
+        );
+      }
+      // Admin, senior-manager, and super-admin can see all customers
+      
+      filteredCustomers.forEach(customer => {
         const searchableFields = [
           customer.name,
           customer.contactPerson,
@@ -214,23 +276,32 @@ const AppContent = () => {
       });
     }
 
-    // Add common search suggestions
-    const suggestions = [
-      { id: 'add-enquiry', name: 'Add New Lead', type: 'Action', subtitle: 'Create a new lead' },
-      { id: 'analytics', name: 'View Analytics', type: 'Action', subtitle: 'Dashboard analytics' },
-      { id: 'leads', name: 'All Leads', type: 'Action', subtitle: 'View all leads' },
-      { id: 'customers', name: 'Customers', type: 'Action', subtitle: 'Manage customers' },
-      { id: 'settings', name: 'Settings', type: 'Action', subtitle: 'System settings' }
+    // Role-based action suggestions
+    const baseSuggestions = [
+      { id: 'add-enquiry', name: 'Add New Lead', type: 'Action', subtitle: 'Create a new lead', roles: ['all'] },
+      { id: 'my-leads', name: 'My Leads', type: 'Action', subtitle: 'View my assigned leads', roles: ['sales', 'manager'] },
+      { id: 'leads', name: 'All Leads', type: 'Action', subtitle: 'View all leads', roles: ['admin', 'manager', 'senior-manager', 'super-admin'] },
+      { id: 'customers', name: 'Customers', type: 'Action', subtitle: 'Manage customers', roles: ['all'] },
+      { id: 'analytics', name: 'View Analytics', type: 'Action', subtitle: 'Dashboard analytics', roles: ['admin', 'manager', 'senior-manager', 'super-admin'] },
+      { id: 'settings', name: 'Settings', type: 'Action', subtitle: 'System settings', roles: ['all'] }
     ];
     
-    suggestions.forEach(suggestion => {
-      if (suggestion.name.toLowerCase().includes(lower) && 
+    baseSuggestions.forEach(suggestion => {
+      const hasRoleAccess = suggestion.roles.includes('all') || suggestion.roles.includes(userRole);
+      
+      if (hasRoleAccess && 
+          suggestion.name.toLowerCase().includes(lower) && 
           !results.some(r => r.id === suggestion.id)) {
-        results.push(suggestion);
+        results.push({
+          id: suggestion.id,
+          name: suggestion.name,
+          type: suggestion.type,
+          subtitle: suggestion.subtitle
+        });
       }
     });
 
-    console.log('Search results for "' + globalSearchTerm + '":', results);
+    console.log(`Search results for "${globalSearchTerm}" (Role: ${userRole}):`, results);
     setSearchResults(results.slice(0, 8));
   }, [globalSearchTerm, crmData, currentUser]);
 
@@ -765,6 +836,7 @@ const AppContent = () => {
                 searchTerm={globalSearchTerm}
                 setSearchTerm={setGlobalSearchTerm}
                 searchResults={searchResults}
+                currentUser={currentUser}
                 onNavigate={(id) => {
                   // Handle different types of navigation
                   if (id.startsWith('lead-')) {

@@ -56,7 +56,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
         setLoading(true);
         
         const [leadsResponse, usersResponse, productsResponse] = await Promise.all([
-          fetch(`${apiService.getApiUrl()}/leads?limit=100${productFilter !== 'all' ? `&product=${productFilter}` : ''}`, {
+          fetch(`${apiService.getApiUrl()}/leads?limit=10000${productFilter !== 'all' ? `&product=${productFilter}` : ''}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'

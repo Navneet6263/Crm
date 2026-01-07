@@ -6,7 +6,8 @@ const SearchBar = ({
   searchTerm,
   setSearchTerm,
   searchResults = [],
-  onNavigate = () => {}
+  onNavigate = () => {},
+  currentUser = null
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef(null);
@@ -46,6 +47,24 @@ const SearchBar = ({
 
 
 
+  // Get role-based placeholder text
+  const getPlaceholderText = () => {
+    const role = currentUser?.role;
+    switch (role) {
+      case 'sales':
+        return 'Search my leads, customers, or tasks...';
+      case 'manager':
+        return 'Search team leads, customers, or reports...';
+      case 'admin':
+      case 'senior-manager':
+        return 'Search leads, customers, users, or analytics...';
+      case 'super-admin':
+        return 'Search all data, users, or system settings...';
+      default:
+        return 'Search leads, customers, or tasks...';
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (focusedIndex >= 0 && searchResults[focusedIndex]) {
@@ -65,7 +84,7 @@ const SearchBar = ({
               <form onSubmit={handleSubmit}>
         <input
           type="text"
-          placeholder="Search leads, customers, or tasks..."
+          placeholder={getPlaceholderText()}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={handleKeyDown}

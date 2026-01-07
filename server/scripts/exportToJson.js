@@ -9,6 +9,15 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const Customer = require('../models/Customer');
 const Product = require('../models/Product');
+const SupportTicket = require('../models/SupportTicket');
+const Task = require('../models/Task');
+const TokenBlacklist = require('../models/TokenBlacklist');
+const UserActivity = require('../models/UserActivity');
+const AuditLog = require('../models/AuditLog');
+const Calendar = require('../models/Calendar');
+const Communication = require('../models/Communication');
+const DemoRequest = require('../models/DemoRequest');
+const Notification = require('../models/Notification');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/green-crm', {
@@ -71,6 +80,87 @@ const exportToJson = async () => {
     );
     console.log(`✅ Exported ${products.length} products`);
 
+    // Export Support Tickets
+    console.log('🎫 Exporting support tickets...');
+    const supportTickets = await SupportTicket.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'supportTickets.json'),
+      JSON.stringify(supportTickets, null, 2)
+    );
+    console.log(`✅ Exported ${supportTickets.length} support tickets`);
+
+    // Export Tasks
+    console.log('✅ Exporting tasks...');
+    const tasks = await Task.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'tasks.json'),
+      JSON.stringify(tasks, null, 2)
+    );
+    console.log(`✅ Exported ${tasks.length} tasks`);
+
+    // Export Token Blacklist
+    console.log('🔒 Exporting token blacklist...');
+    const tokenBlacklist = await TokenBlacklist.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'tokenBlacklist.json'),
+      JSON.stringify(tokenBlacklist, null, 2)
+    );
+    console.log(`✅ Exported ${tokenBlacklist.length} blacklisted tokens`);
+
+    // Export User Activity
+    console.log('📊 Exporting user activity...');
+    const userActivity = await UserActivity.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'userActivity.json'),
+      JSON.stringify(userActivity, null, 2)
+    );
+    console.log(`✅ Exported ${userActivity.length} user activities`);
+
+    // Export Audit Logs
+    console.log('📝 Exporting audit logs...');
+    const auditLogs = await AuditLog.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'auditLogs.json'),
+      JSON.stringify(auditLogs, null, 2)
+    );
+    console.log(`✅ Exported ${auditLogs.length} audit logs`);
+
+    // Export Calendars
+    console.log('📅 Exporting calendars...');
+    const calendars = await Calendar.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'calendars.json'),
+      JSON.stringify(calendars, null, 2)
+    );
+    console.log(`✅ Exported ${calendars.length} calendars`);
+
+    // Export Communications
+    console.log('💬 Exporting communications...');
+    const communications = await Communication.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'communications.json'),
+      JSON.stringify(communications, null, 2)
+    );
+    console.log(`✅ Exported ${communications.length} communications`);
+
+    // Export Demo Requests
+    console.log('🎯 Exporting demo requests...');
+    const demoRequests = await DemoRequest.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'demoRequests.json'),
+      JSON.stringify(demoRequests, null, 2)
+    );
+    console.log(`✅ Exported ${demoRequests.length} demo requests`);
+
+    // Export Notifications
+    console.log('🔔 Exporting notifications...');
+    const notifications = await Notification.find({}).lean();
+    fs.writeFileSync(
+      path.join(exportDir, 'notifications.json'),
+      JSON.stringify(notifications, null, 2)
+    );
+    console.log(`✅ Exported ${notifications.length} notifications`);
+
     // Export all in one file
     console.log('📦 Creating complete backup...');
     const completeBackup = {
@@ -79,7 +169,16 @@ const exportToJson = async () => {
       users,
       companies,
       customers,
-      products
+      products,
+      supportTickets,
+      tasks,
+      tokenBlacklist,
+      userActivity,
+      auditLogs,
+      calendars,
+      communications,
+      demoRequests,
+      notifications
     };
     fs.writeFileSync(
       path.join(exportDir, 'complete-backup.json'),
