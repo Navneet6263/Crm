@@ -66,6 +66,8 @@ const CompanyUserManagement = lazy(() => import('./components/CompanyUserManagem
 const PlanLimitsDisplay = lazy(() => import('./components/PlanLimitsDisplay'));
 const CompanyManagement = lazy(() => import('./components/CompanyManagement'));
 const NotFound = lazy(() => import('./components/NotFound'));
+const WorkflowDashboard = lazy(() => import('./components/WorkflowDashboard'));
+const WorkflowHistory = lazy(() => import('./components/WorkflowHistory'));
 
 
 // Loading component
@@ -623,6 +625,9 @@ const AppContent = () => {
   const renderView = () => {
     switch(activeView) {
       case 'dashboard': 
+        if (currentUser?.role === 'legal-team' || currentUser?.role === 'finance-team') {
+          return <WorkflowDashboard currentUser={currentUser} darkMode={darkMode} />;
+        }
         if (currentUser?.role === 'super-admin' || currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.role === 'senior-manager') {
           return <SuperAdminDashboard darkMode={darkMode} currentUser={currentUser} onNavigate={changeView} />;
         }
@@ -716,6 +721,18 @@ const AppContent = () => {
           reports: 5
         }} darkMode={darkMode} />;
       case 'billing': return <BillingManagement darkMode={darkMode} userRole={currentUser?.role} />;
+      
+      case 'workflow-dashboard':
+        if (!['legal-team', 'finance-team'].includes(currentUser?.role)) {
+          return <AccessDenied darkMode={darkMode} message="Only Legal and Finance teams can access this dashboard" />;
+        }
+        return <WorkflowDashboard currentUser={currentUser} darkMode={darkMode} />;
+      
+      case 'workflow-history':
+        if (!['legal-team', 'finance-team'].includes(currentUser?.role)) {
+          return <AccessDenied darkMode={darkMode} message="Only Legal and Finance teams can access work history" />;
+        }
+        return <WorkflowHistory currentUser={currentUser} darkMode={darkMode} />;
 
       case '404': return <NotFound darkMode={darkMode} onGoHome={() => changeView('dashboard')} />;
       default: return <ProfessionalDashboard crmData={crmData} user={currentUser} darkMode={darkMode} setActiveView={changeView} />;

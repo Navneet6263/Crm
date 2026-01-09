@@ -153,7 +153,106 @@ const leadSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     required: true
-  }
+  },
+  
+  // Workflow Management Fields
+  workflowStage: {
+    type: String,
+    enum: ['sales', 'legal', 'finance', 'completed'],
+    default: 'sales'
+  },
+  assignedToLegal: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  assignedToFinance: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  
+  // Legal Team Data
+  legalDocuments: [{
+    fileName: String,
+    fileUrl: String,
+    fileSize: Number,
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    documentType: {
+      type: String,
+      enum: ['agreement', 'contract', 'other'],
+      default: 'agreement'
+    }
+  }],
+  agreementStatus: {
+    type: String,
+    enum: ['pending', 'uploaded', 'approved'],
+    default: 'pending'
+  },
+  legalApprovedAt: Date,
+  legalApprovedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  
+  // Finance Team Data
+  financeDocuments: [{
+    fileName: String,
+    fileUrl: String,
+    fileSize: Number,
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    documentType: {
+      type: String,
+      enum: ['invoice', 'tax-invoice', 'receipt', 'other'],
+      default: 'invoice'
+    }
+  }],
+  invoiceNumber: String,
+  invoiceAmount: Number,
+  taxInvoiceNumber: String,
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'partial', 'completed'],
+    default: 'pending'
+  },
+  paymentCompletedAt: Date,
+  
+  // Transfer History
+  transferHistory: [{
+    from: {
+      type: String,
+      enum: ['sales', 'legal', 'finance']
+    },
+    to: {
+      type: String,
+      enum: ['legal', 'finance', 'completed']
+    },
+    transferredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    transferredTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    transferredAt: {
+      type: Date,
+      default: Date.now
+    },
+    notes: String
+  }]
 }, {
   timestamps: true
 });
@@ -168,5 +267,8 @@ leadSchema.index({ isActive: 1, createdBy: 1 });
 leadSchema.index({ isActive: 1, assignedTo: 1 });
 leadSchema.index({ status: 1, priority: 1 });
 leadSchema.index({ product: 1 });
+leadSchema.index({ workflowStage: 1 });
+leadSchema.index({ assignedToLegal: 1 });
+leadSchema.index({ assignedToFinance: 1 });
 
 module.exports = mongoose.model('Lead', leadSchema);

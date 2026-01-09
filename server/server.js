@@ -434,6 +434,16 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
     if (req.user.role === 'admin' || req.user.role === 'manager') {
       // Admin and manager can see all company leads
       console.log('🔑 Admin/Manager access - showing all company leads');
+    } else if (req.user.role === 'legal-team' || req.user.role === 'finance-team') {
+      // Legal and Finance teams see only assigned leads
+      console.log('⚖️ Legal/Finance team access - showing assigned leads only');
+      query = {
+        isActive: true,
+        $or: [
+          { assignedToLegal: req.user.id },
+          { assignedToFinance: req.user.id }
+        ]
+      };
     } else if (req.user.role === 'user') {
       // User role can only see their own leads (no company filter)
       console.log('👤 User role - showing only own leads');
@@ -1063,6 +1073,9 @@ app.use('/api/communications', authenticateToken, communicationRoutes);
 app.use('/api/tasks', authenticateToken, taskRoutes);
 app.use('/api/calendar', authenticateToken, calendarRoutes);
 app.use('/api/products', authenticateToken, productRoutes);
+
+// Workflow Routes
+app.use('/api/workflow', authenticateToken, require('./routes/leadWorkflow'));
 
 // Analytics Routes
 app.use('/api/analytics', require('./routes/analyticsRoutes'));

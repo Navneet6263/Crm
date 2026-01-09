@@ -11,10 +11,14 @@ import {
   Plus,
   X,
   Calendar,
-  Check
+  Check,
+  FileText,
+  Download,
+  CheckCircle
 } from 'lucide-react';
 import apiService from '../services/apiService';
 import { showToast } from './ToastNotification';
+import config from '../config';
 
 const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   const navigate = onBack || (() => window.history.back());
@@ -402,6 +406,78 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
               )}
             </div>
           </div>
+
+          {/* Workflow Progress */}
+          {lead.workflowStage && lead.workflowStage !== 'sales' && (
+            <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginTop: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={24} />
+                Workflow Progress
+              </h2>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#22c55e', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem', fontWeight: '600' }}>✓</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>Sales</div>
+                </div>
+                <div style={{ flex: 1, height: '2px', background: lead.workflowStage === 'legal' || lead.workflowStage === 'finance' || lead.workflowStage === 'completed' ? '#22c55e' : '#e5e7eb' }}></div>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: lead.workflowStage === 'legal' || lead.workflowStage === 'finance' || lead.workflowStage === 'completed' ? '#22c55e' : '#e5e7eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem', fontWeight: '600' }}>{lead.workflowStage === 'legal' || lead.workflowStage === 'finance' || lead.workflowStage === 'completed' ? '✓' : '2'}</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>Legal</div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.legalDocuments?.length || 0} docs</div>
+                </div>
+                <div style={{ flex: 1, height: '2px', background: lead.workflowStage === 'finance' || lead.workflowStage === 'completed' ? '#22c55e' : '#e5e7eb' }}></div>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: lead.workflowStage === 'finance' || lead.workflowStage === 'completed' ? '#22c55e' : '#e5e7eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem', fontWeight: '600' }}>{lead.workflowStage === 'finance' || lead.workflowStage === 'completed' ? '✓' : '3'}</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>Finance</div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{lead.financeDocuments?.length || 0} docs</div>
+                </div>
+                <div style={{ flex: 1, height: '2px', background: lead.workflowStage === 'completed' ? '#22c55e' : '#e5e7eb' }}></div>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: lead.workflowStage === 'completed' ? '#22c55e' : '#e5e7eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem', fontWeight: '600' }}>{lead.workflowStage === 'completed' ? '✓' : '4'}</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>Completed</div>
+                </div>
+              </div>
+
+              {lead.legalDocuments && lead.legalDocuments.length > 0 && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>📄 Legal Documents ({lead.legalDocuments.length})</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {lead.legalDocuments.map((doc, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: '#f9fafb', borderRadius: '6px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>{doc.fileName}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{new Date(doc.uploadedAt).toLocaleString()}</div>
+                        </div>
+                        <a href={`${config.api.baseUrl}${doc.fileUrl}`} download style={{ padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', textDecoration: 'none' }}>
+                          <Download size={16} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {lead.financeDocuments && lead.financeDocuments.length > 0 && (
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>💰 Finance Documents ({lead.financeDocuments.length})</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {lead.financeDocuments.map((doc, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: '#f9fafb', borderRadius: '6px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>{doc.fileName}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{new Date(doc.uploadedAt).toLocaleString()}</div>
+                        </div>
+                        <a href={`${config.api.baseUrl}${doc.fileUrl}`} download style={{ padding: '0.5rem', background: '#3b82f6', color: 'white', borderRadius: '6px', textDecoration: 'none' }}>
+                          <Download size={16} />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Column - Notes */}

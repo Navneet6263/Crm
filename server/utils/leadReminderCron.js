@@ -4,6 +4,8 @@ const User = require('../models/User');
 const emailService = require('../services/emailService');
 
 // Run every day at 9 AM
+// TEMPORARILY DISABLED - 3-day reminder messages band kiye hain
+/*
 const startLeadReminderCron = () => {
   cron.schedule('0 9 * * *', async () => {
     console.log('🔔 Running automated lead reminder cron job at 9 AM...');
@@ -99,6 +101,11 @@ const startLeadReminderCron = () => {
   });
   
   console.log('✅ Lead reminder cron job scheduled (runs daily at 9 AM)');
+};
+*/
+
+const startLeadReminderCron = () => {
+  console.log('⏸️ Lead reminder cron job is DISABLED');
 };
 
 module.exports = { startLeadReminderCron };

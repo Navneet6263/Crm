@@ -27,7 +27,8 @@ import {
   Shield,
   Briefcase,
   Server,
-  Package
+  Package,
+  History
 } from 'lucide-react';
 
 const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole, darkMode }) => {
@@ -45,6 +46,7 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
       items: [
         { id: 'add-enquiry', icon: UserPlus, label: 'Add Lead', color: '#22c55e' },
         { id: 'my-leads', icon: Users, label: 'My Leads', color: '#8b5cf6' },
+        { id: 'workflow-history', icon: History, label: 'History', color: '#6b7280' },
         { id: 'group-leads', icon: Target, label: 'Group Leads', color: '#f59e0b', salesOnly: true },
         { id: 'leads', icon: Target, label: 'All Leads', color: '#f59e0b' },
         { id: 'lead-history', icon: Clock, label: 'Lead History', color: '#6b7280' },
@@ -101,6 +103,11 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
   ];
 
   const hasAccess = (item) => {
+    // Legal and Finance teams - show Dashboard, My Leads, History, and Support
+    if (['legal-team', 'finance-team'].includes(userRole)) {
+      return ['dashboard', 'my-leads', 'workflow-history', 'support'].includes(item.id);
+    }
+    
     if (item.superAdminOnly && userRole !== 'super-admin') return false;
     if (item.adminOnly && !['super-admin', 'admin', 'manager', 'senior-manager'].includes(userRole)) return false;
     if (item.salesOnly && !['sales', 'sales-rep', 'senior-manager', 'sales-manager'].includes(userRole)) return false;

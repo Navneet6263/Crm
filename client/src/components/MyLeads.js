@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle } from 'lucide-react';
+import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle, Send } from 'lucide-react';
 import apiService from '../services/apiService';
 
 const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate }) => {
@@ -44,6 +44,8 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
   const [newNote, setNewNote] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferLeadId, setTransferLeadId] = useState(null);
 
   const handleAcceptLead = async (leadId) => {
     try {
@@ -97,14 +99,76 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
     }
   };
 
+  const handleTransferToLegal = async () => {
+    try {
+      // Get first available legal team member
+      const legalUsersResponse = await fetch(`${apiService.getApiUrl()}/workflow/users/legal-team`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!legalUsersResponse.ok) throw new Error('Failed to fetch legal team');
+      
+      const { users } = await legalUsersResponse.json();
+      const assignedToLegal = users && users.length > 0 ? users[0]._id : null;
+      
+      if (!assignedToLegal) {
+        alert('❌ No legal team members available');
+        return;
+      }
+      
+      const response = await fetch(`${apiService.getApiUrl()}/workflow/${transferLeadId}/transfer-to-legal`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          assignedToLegal,
+          notes: 'Transferred from sales to legal team'
+        })
+      });
+      
+      if (!response.ok) throw new Error('Transfer failed');
+      
+      setShowTransferModal(false);
+      setTransferLeadId(null);
+      
+      if (window.showToast) {
+        window.showToast('success', '✅ Lead transferred to Legal Team');
+      } else {
+        alert('✅ Lead transferred to Legal Team');
+      }
+      
+      // Refresh leads
+      window.dispatchEvent(new CustomEvent('leadsUpdated'));
+    } catch (error) {
+      console.error('Error transferring lead:', error);
+      alert('❌ Failed to transfer lead');
+    }
+  };
+
   useEffect(() => {
     const fetchMyLeads = async () => {
       try {
         setLoading(true);
         let leadsData = [];
         try {
-          // Use pagination instead of loading all leads at once
-          const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=50&page=1`, {
+          // For legal-team and finance-team, fetch their assigned leads
+          if (user?.role === 'legal-team' || user?.role === 'finance-team') {
+            const response = await fetch(`${apiService.getApiUrl()}/workflow/my-assigned`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            const data = await response.json();
+            leadsData = data.leads || [];
+          } else {
+            // Use pagination instead of loading all leads at once
+            const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=50&page=1`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'
@@ -166,6 +230,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
               });
             }
           }
+        }
         } catch (apiError) {
           // Fallback: Use crmData prop if available
           if (crmData && crmData.leads) {
@@ -533,15 +598,15 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                   color: darkMode ? 'white' : '#111827',
                   margin: 0
                 }}>
-                  My Leads
+                  {user?.role === 'legal-team' ? '⚖️ Legal Team - My Leads' : user?.role === 'finance-team' ? '💰 Finance Team - My Leads' : 'My Leads'}
                 </h1>
                 <p style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '1.125rem', margin: 0 }}>
-                  Manage your assigned leads and track your sales pipeline
+                  {user?.role === 'legal-team' ? 'Manage agreements and legal documents' : user?.role === 'finance-team' ? 'Manage invoices and payments' : 'Manage your assigned leads and track your sales pipeline'}
                 </p>
               </div>
             </div>
             
-            {/* View Toggle */}
+            {user?.role !== 'legal-team' && user?.role !== 'finance-team' && (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
                 onClick={() => setViewMode('grid')}
@@ -572,9 +637,10 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                 List
               </button>
             </div>
+            )}
           </div>
           
-          {/* Enhanced Filters */}
+          {user?.role !== 'legal-team' && user?.role !== 'finance-team' && (
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Search Bar */}
             <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
@@ -645,9 +711,10 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
               ))}
             </select>
           </div>
+          )}
         </div>
 
-        {/* Enhanced Stats */}
+        {user?.role !== 'legal-team' && user?.role !== 'finance-team' && (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -740,6 +807,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
             <div style={{ color: darkMode ? '#d1d5db' : '#6b7280' }}>Closed Won</div>
           </div>
         </div>
+        )}
 
         {/* Leads Display */}
         <div style={{
@@ -1010,6 +1078,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                               View
                             </button>
                             
+                            {lead.workflowStage !== 'completed' && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1035,6 +1104,36 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                               <Edit size={14} />
                               Edit
                             </button>
+                            )}
+                            
+                            {lead.status === 'closed-won' && !lead.workflowStatus && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTransferLeadId(lead._id || lead.id);
+                                  setShowTransferModal(true);
+                                }}
+                                style={{
+                                  background: '#8b5cf6',
+                                  color: 'white',
+                                  border: 'none',
+                                  padding: '8px 12px',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = '#7c3aed'}
+                                onMouseLeave={(e) => e.target.style.background = '#8b5cf6'}
+                              >
+                                <Send size={14} />
+                                Legal
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -1246,6 +1345,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       </button>
                       
                       {/* Edit Button */}
+                      {lead.workflowStage !== 'completed' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1272,6 +1372,37 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                         <Edit size={14} />
                         Edit
                       </button>
+                      )}
+                      
+                      {lead.status === 'closed-won' && !lead.workflowStatus && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransferLeadId(lead._id || lead.id);
+                            setShowTransferModal(true);
+                          }}
+                          style={{
+                            background: '#8b5cf6',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = '#7c3aed'}
+                          onMouseLeave={(e) => e.target.style.background = '#8b5cf6'}
+                          title="Transfer to Legal Team"
+                        >
+                          <Send size={14} />
+                          Legal
+                        </button>
+                      )}
                       
                       {/* Status Update */}
                       <select
@@ -2094,6 +2225,80 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     Update Lead
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Transfer to Legal Modal */}
+        {showTransferModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: darkMode ? '#1f2937' : 'white',
+              borderRadius: '16px',
+              padding: '2rem',
+              maxWidth: '400px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                color: darkMode ? 'white' : '#1f2937',
+                marginBottom: '1rem'
+              }}>
+                Transfer to Legal Team?
+              </h3>
+              <p style={{
+                color: darkMode ? '#9ca3af' : '#6b7280',
+                marginBottom: '1.5rem'
+              }}>
+                This will transfer the lead to the Legal Team for agreement processing.
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowTransferModal(false);
+                    setTransferLeadId(null);
+                  }}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    borderRadius: '8px',
+                    background: 'transparent',
+                    color: darkMode ? '#d1d5db' : '#374151',
+                    cursor: 'pointer',
+                    fontSize: '1rem'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleTransferToLegal}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    border: 'none',
+                    borderRadius: '8px',
+                    background: '#8b5cf6',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Transfer
+                </button>
               </div>
             </div>
           </div>

@@ -81,6 +81,8 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
     { value: 'manager', label: 'Manager', icon: FaUserShield, color: '#667eea' },
     { value: 'sales', label: 'Sales Representative', icon: FaUserTie, color: '#22c55e' },
     { value: 'support', label: 'Support', icon: FaEye, color: '#f59e0b' },
+    { value: 'legal-team', label: 'Legal Team', icon: FaUserShield, color: '#8b5cf6' },
+    { value: 'finance-team', label: 'Finance Team', icon: FaUserTie, color: '#10b981' },
     { value: 'user', label: 'User', icon: FaUsers, color: '#6b7280' }
   ];
 
@@ -661,6 +663,8 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                 <option value="sales">Sales Representative</option>
                 <option value="manager">Manager</option>
                 <option value="support">Support</option>
+                <option value="legal-team">Legal Team</option>
+                <option value="finance-team">Finance Team</option>
               </select>
               
               <input
@@ -724,6 +728,8 @@ const CompanyUserManagement = ({ currentUser, darkMode }) => {
                   {newUser.role === 'manager' && 'Can manage team members, view all leads, and access reports.'}
                   {newUser.role === 'sales' && 'Can manage own leads, create new leads, and view basic reports.'}
                   {newUser.role === 'support' && 'Can view leads, provide customer support, and access help desk.'}
+                  {newUser.role === 'legal-team' && 'Can manage legal documents, upload agreements, and transfer to finance.'}
+                  {newUser.role === 'finance-team' && 'Can manage invoices, upload tax documents, and mark deals complete.'}
                 </p>
                 {(newUser.role === 'sales' || newUser.role === 'support') && (
                   <div style={{

@@ -852,6 +852,8 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                   <option value="senior-manager">Senior Manager</option>
                   <option value="admin">Admin</option>
                   <option value="support">Support</option>
+                  <option value="legal-team">Legal Team</option>
+                  <option value="finance-team">Finance Team</option>
                 </select>
               </div>
               
@@ -1080,6 +1082,8 @@ const EmployeeManagement = ({ darkMode, currentUser }) => {
                   <option value="senior-manager">Senior Manager</option>
                   <option value="admin">Admin</option>
                   <option value="support">Support</option>
+                  <option value="legal-team">Legal Team</option>
+                  <option value="finance-team">Finance Team</option>
                 </select>
               </div>
               

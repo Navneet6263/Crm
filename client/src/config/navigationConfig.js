@@ -87,6 +87,25 @@ export const menuSections = [
   },
 
   {
+    title: 'Workflow Management',
+    items: [
+      { 
+        id: 'workflow-dashboard', 
+        icon: Briefcase, 
+        label: 'My Assigned Leads', 
+        color: '#8b5cf6',
+        workflowOnly: true
+      },
+      { 
+        id: 'workflow-tracker', 
+        icon: Activity, 
+        label: 'Workflow Tracker', 
+        color: '#3b82f6',
+        adminOnly: true
+      }
+    ]
+  },
+  {
     title: 'Business',
     items: [
       { id: 'billing', icon: DollarSign, label: 'Billing & Payments', color: '#22c55e' }
