@@ -88,6 +88,7 @@ export const menuSections = [
 
   {
     title: 'Workflow Management',
+    workflowTeamOnly: true,
     items: [
       { 
         id: 'workflow-dashboard', 
@@ -97,11 +98,11 @@ export const menuSections = [
         workflowOnly: true
       },
       { 
-        id: 'workflow-tracker', 
+        id: 'workflow-history', 
         icon: Activity, 
-        label: 'Workflow Tracker', 
+        label: 'Work History', 
         color: '#3b82f6',
-        adminOnly: true
+        workflowOnly: true
       }
     ]
   },

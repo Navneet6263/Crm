@@ -95,8 +95,6 @@ const WorkflowDashboard = ({ darkMode, currentUser }) => {
         alert('Documents uploaded successfully!');
         setSelectedFiles([]);
         setInvoiceData({ invoiceNumber: '', invoiceAmount: '', taxInvoiceNumber: '' });
-        
-        // Update selectedLead with new documents
         setSelectedLead(data.lead);
         fetchAssignedLeads();
       } else {

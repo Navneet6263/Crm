@@ -68,6 +68,7 @@ const CompanyManagement = lazy(() => import('./components/CompanyManagement'));
 const NotFound = lazy(() => import('./components/NotFound'));
 const WorkflowDashboard = lazy(() => import('./components/WorkflowDashboard'));
 const WorkflowHistory = lazy(() => import('./components/WorkflowHistory'));
+const WorkflowDocuments = lazy(() => import('./components/WorkflowDocuments'));
 
 
 // Loading component
@@ -115,8 +116,27 @@ const AppContent = () => {
       setActiveView(view);
     };
     
+    // Handle hash-based navigation for lead details
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      const leadMatch = hash.match(/#lead\/(\w+)/);
+      if (leadMatch) {
+        const leadId = leadMatch[1];
+        setActiveView('lead-detail');
+        setNavigationParams({ leadId });
+      }
+    };
+    
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handleHashChange);
+    
+    // Check initial hash
+    handleHashChange();
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handleHashChange);
+    };
   }, []);
 
   // Global search term and results
@@ -649,7 +669,10 @@ const AppContent = () => {
         />
       );
       case 'my-leads': return <MyLeads crmData={crmData} user={currentUser} darkMode={darkMode} updateCrmData={updateCrmData} onNavigate={changeView} />;
-      case 'lead-detail': return <LeadDetailPage leadId={navigationParams?.leadId} darkMode={darkMode} onBack={() => changeView('my-leads')} />;
+      case 'lead-detail': 
+        const leadIdFromUrl = window.location.pathname.match(/\/lead\/(\w+)/)?.[1];
+        const leadIdToUse = navigationParams?.leadId || leadIdFromUrl;
+        return <LeadDetailPage leadId={leadIdToUse} darkMode={darkMode} onBack={() => changeView('my-leads')} />;
       case 'group-leads': return <GroupLeads darkMode={darkMode} currentUser={currentUser} />;
       case 'lead-history': return <LeadHistory crmData={crmData} darkMode={darkMode} />;
       case 'lead-tracker': return <LeadTracker crmData={crmData} updateCrmData={updateCrmData} user={currentUser} darkMode={darkMode} />;
@@ -733,6 +756,12 @@ const AppContent = () => {
           return <AccessDenied darkMode={darkMode} message="Only Legal and Finance teams can access work history" />;
         }
         return <WorkflowHistory currentUser={currentUser} darkMode={darkMode} />;
+      
+      case 'workflow-documents':
+        if (!['legal-team', 'finance-team'].includes(currentUser?.role)) {
+          return <AccessDenied darkMode={darkMode} message="Only Legal and Finance teams can access documents" />;
+        }
+        return <WorkflowDocuments currentUser={currentUser} darkMode={darkMode} />;
 
       case '404': return <NotFound darkMode={darkMode} onGoHome={() => changeView('dashboard')} />;
       default: return <ProfessionalDashboard crmData={crmData} user={currentUser} darkMode={darkMode} setActiveView={changeView} />;

@@ -29,6 +29,7 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   const [activityType, setActivityType] = useState('call');
   const [activityDescription, setActivityDescription] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
+  const [isHighlighted, setIsHighlighted] = useState(false);
   const [taskData, setTaskData] = useState({
     title: '',
     description: '',
@@ -49,6 +50,16 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   useEffect(() => {
     fetchLeadDetails();
     loadUsers();
+    
+    // Check if highlight parameter is present
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('highlight') === 'true') {
+      setIsHighlighted(true);
+      // Remove highlight after 2 seconds
+      setTimeout(() => {
+        setIsHighlighted(false);
+      }, 2000);
+    }
   }, [leadId]);
 
   const loadUsers = async () => {
@@ -223,9 +234,27 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', background: darkMode ? '#1f2937' : '#f9fafb', minHeight: '100vh' }}>
+    <div style={{ 
+      padding: '2rem', 
+      maxWidth: '1200px', 
+      margin: '0 auto', 
+      background: darkMode ? '#1f2937' : '#f9fafb', 
+      minHeight: '100vh',
+      transition: 'all 0.3s ease'
+    }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '1rem', 
+        marginBottom: '2rem',
+        padding: '1rem',
+        borderRadius: '12px',
+        background: isHighlighted ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
+        border: isHighlighted ? '2px solid #22c55e' : '2px solid transparent',
+        boxShadow: isHighlighted ? '0 0 20px rgba(34, 197, 94, 0.3)' : 'none',
+        transition: 'all 0.3s ease'
+      }}>
         <button
           onClick={navigate}
           style={{

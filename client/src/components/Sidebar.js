@@ -46,7 +46,8 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
       items: [
         { id: 'add-enquiry', icon: UserPlus, label: 'Add Lead', color: '#22c55e' },
         { id: 'my-leads', icon: Users, label: 'My Leads', color: '#8b5cf6' },
-        { id: 'workflow-history', icon: History, label: 'History', color: '#6b7280' },
+        { id: 'workflow-history', icon: History, label: 'Work History', color: '#6b7280', workflowOnly: true },
+        { id: 'workflow-documents', icon: FileText, label: 'Documents', color: '#8b5cf6', workflowOnly: true },
         { id: 'group-leads', icon: Target, label: 'Group Leads', color: '#f59e0b', salesOnly: true },
         { id: 'leads', icon: Target, label: 'All Leads', color: '#f59e0b' },
         { id: 'lead-history', icon: Clock, label: 'Lead History', color: '#6b7280' },
@@ -103,9 +104,14 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
   ];
 
   const hasAccess = (item) => {
-    // Legal and Finance teams - show Dashboard, My Leads, History, and Support
+    // Legal and Finance teams - show Dashboard, My Leads, Work History, Documents, and Support
     if (['legal-team', 'finance-team'].includes(userRole)) {
-      return ['dashboard', 'my-leads', 'workflow-history', 'support'].includes(item.id);
+      return ['dashboard', 'my-leads', 'workflow-history', 'workflow-documents', 'support'].includes(item.id);
+    }
+    
+    // Hide workflow-only items from non-workflow teams
+    if (item.workflowOnly && !['legal-team', 'finance-team'].includes(userRole)) {
+      return false;
     }
     
     if (item.superAdminOnly && userRole !== 'super-admin') return false;

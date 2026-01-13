@@ -32,8 +32,13 @@ const SmartNotifications = ({ darkMode, setActiveView, currentUser }) => {
     try {
       const response = await apiService.getNotifications();
       if (response && Array.isArray(response)) {
-        setNotifications(response);
-        setUnreadCount(response.filter(n => !n.isRead).length);
+        // Map _id to id for consistency
+        const mappedNotifications = response.map(n => ({
+          ...n,
+          id: n._id || n.id
+        }));
+        setNotifications(mappedNotifications);
+        setUnreadCount(mappedNotifications.filter(n => !n.isRead).length);
       }
     } catch (error) {
       console.error('Error loading notifications:', error);

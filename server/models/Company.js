@@ -200,6 +200,18 @@ const companySchema = new mongoose.Schema({
     language: {
       type: String,
       default: 'en'
+    },
+    smtp: {
+      host: String,
+      port: Number,
+      secure: Boolean,
+      user: String,
+      pass: String,
+      from: String,
+      enabled: {
+        type: Boolean,
+        default: false
+      }
     }
   },
   createdBy: {

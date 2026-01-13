@@ -20,8 +20,13 @@ const NotificationSystem = ({ darkMode }) => {
     try {
       const response = await apiService.getNotifications();
       if (response && Array.isArray(response)) {
-        setNotifications(response);
-        setUnreadCount(response.filter(n => !n.isRead).length);
+        // Map _id to id for consistency
+        const mappedNotifications = response.map(n => ({
+          ...n,
+          id: n._id || n.id
+        }));
+        setNotifications(mappedNotifications);
+        setUnreadCount(mappedNotifications.filter(n => !n.isRead).length);
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -108,6 +113,21 @@ const NotificationSystem = ({ darkMode }) => {
     if (diffHours < 24) return `${diffHours} hours ago`;
     if (diffDays < 7) return `${diffDays} days ago`;
     return date.toLocaleDateString();
+  };
+
+  const handleNotificationClick = async (notification) => {
+    // Mark as read
+    if (!notification.isRead) {
+      await markAsRead(notification.id);
+    }
+    
+    // Close notification panel
+    setShowNotifications(false);
+    
+    // Navigate to lead detail page with highlight using hash
+    if (notification.leadId) {
+      window.location.hash = `lead/${notification.leadId}?highlight=true`;
+    }
   };
 
   return (
@@ -224,13 +244,29 @@ const NotificationSystem = ({ darkMode }) => {
                 return (
                   <div
                     key={notification.id}
+                    onClick={() => notification.leadId && handleNotificationClick(notification)}
                     style={{
                       padding: '0.75rem',
                       borderRadius: '8px',
                       marginBottom: '0.5rem',
                       background: notification.isRead ? 'transparent' : (darkMode ? '#374151' : '#f9fafb'),
                       borderLeft: `3px solid ${getTypeColor(notification.type)}`,
-                      position: 'relative'
+                      position: 'relative',
+                      cursor: notification.leadId ? 'pointer' : 'default',
+                      transition: 'all 0.2s ease',
+                      ':hover': {
+                        transform: notification.leadId ? 'translateX(4px)' : 'none'
+                      }
+                    }}
+                    onMouseEnter={(e) => {
+                      if (notification.leadId) {
+                        e.currentTarget.style.background = darkMode ? '#4b5563' : '#e5e7eb';
+                        e.currentTarget.style.transform = 'translateX(4px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = notification.isRead ? 'transparent' : (darkMode ? '#374151' : '#f9fafb');
+                      e.currentTarget.style.transform = 'translateX(0)';
                     }}
                   >
                     <div style={{ display: 'flex', gap: '0.75rem' }}>

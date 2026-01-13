@@ -21,6 +21,12 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
       setHighlightedLeadId(leadIdFromNotification);
       sessionStorage.removeItem('highlightLeadId');
       
+      // Remove highlight after 2 seconds
+      setTimeout(() => {
+        setHighlightedLeadId(null);
+      }, 2000);
+      
+      // Scroll to element after a short delay
       setTimeout(() => {
         const element = document.getElementById(`lead-${leadIdFromNotification}`);
         if (element) {
@@ -29,6 +35,32 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
       }, 500);
     }
   }, [leads]);
+  
+  // Continuously check for new highlight requests (for when already on My Leads page)
+  useEffect(() => {
+    const checkHighlight = setInterval(() => {
+      const leadIdFromNotification = sessionStorage.getItem('highlightLeadId');
+      if (leadIdFromNotification) {
+        setHighlightedLeadId(leadIdFromNotification);
+        sessionStorage.removeItem('highlightLeadId');
+        
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+          setHighlightedLeadId(null);
+        }, 2000);
+        
+        // Scroll to element
+        setTimeout(() => {
+          const element = document.getElementById(`lead-${leadIdFromNotification}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+    }, 500); // Check every 500ms
+    
+    return () => clearInterval(checkHighlight);
+  }, []);
   const [editData, setEditData] = useState({
     contactPerson: '',
     companyName: '',

@@ -6,6 +6,7 @@ const { auth } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -26,15 +27,8 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /pdf|doc|docx|jpg|jpeg|png/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only PDF, DOC, DOCX, JPG, JPEG, PNG files are allowed'));
-    }
+    // Allow all file types
+    cb(null, true);
   }
 });
 
@@ -427,6 +421,130 @@ router.get('/users/:role', auth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Send document via email
+router.post('/send-document-email', auth, async (req, res) => {
+  try {
+    const { documentId, leadId, customerEmail, documentName, documentUrl, teamType } = req.body;
+    const { role, email: senderEmail, companyId } = req.user;
+
+    if (!['legal-team', 'finance-team', 'admin', 'super-admin'].includes(role)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const lead = await Lead.findById(leadId);
+    if (!lead) {
+      return res.status(404).json({ message: 'Lead not found' });
+    }
+
+    // Get company SMTP settings
+    const Company = require('../models/Company');
+    const company = await Company.findById(companyId);
+    
+    let transportConfig;
+    
+    // Use company SMTP if configured, otherwise use default
+    if (company?.settings?.smtp?.enabled) {
+      transportConfig = {
+        host: company.settings.smtp.host,
+        port: company.settings.smtp.port,
+        secure: company.settings.smtp.secure,
+        auth: {
+          user: company.settings.smtp.user,
+          pass: company.settings.smtp.pass
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      };
+    } else {
+      // Fallback to default Green Call SMTP
+      transportConfig = {
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT),
+        secure: true,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      };
+    }
+
+    const transporter = nodemailer.createTransport(transportConfig);
+
+    const teamName = teamType === 'legal' ? 'Legal' : 'Finance';
+    const fromEmail = company?.settings?.smtp?.from || process.env.SMTP_FROM;
+    const companyName = company?.name || 'Green Call CRM';
+    
+    // Get production URL from company settings or env
+    const baseUrl = company?.settings?.baseUrl || process.env.PRODUCTION_URL || process.env.BASE_URL || 'http://localhost:5004';
+    const documentFullUrl = `${baseUrl}${documentUrl}`;
+    
+    // Read file for attachment
+    const filePath = path.join(__dirname, '..', documentUrl.startsWith('/') ? documentUrl.substring(1) : documentUrl);
+    
+    console.log(`📂 Looking for file at: ${filePath}`);
+    console.log(`📄 File exists: ${fs.existsSync(filePath)}`);
+    
+    let attachments = [];
+    if (fs.existsSync(filePath)) {
+      attachments.push({
+        filename: documentName,
+        path: filePath
+      });
+      console.log(`✅ File attached: ${documentName}`);
+    } else {
+      console.log(`❌ File not found at: ${filePath}`);
+    }
+
+    const mailOptions = {
+      from: fromEmail,
+      to: customerEmail,
+      subject: `Document from ${teamName} Team - ${companyName}`,
+      attachments: attachments,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #22c55e;">Document from ${teamName} Team</h2>
+          <p>Dear ${lead.contactPerson},</p>
+          <p>Please find the document attached with this email.</p>
+          <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Document Name:</strong> ${documentName}</p>
+            <p><strong>Company:</strong> ${lead.companyName}</p>
+            <p><strong>Team:</strong> ${teamName}</p>
+          </div>
+          ${attachments.length === 0 ? `
+          <p>
+            <a href="${documentFullUrl}" 
+               style="background: #22c55e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Download Document
+            </a>
+          </p>
+          ` : '<p style="color: #22c55e; font-weight: 600;">📎 Document is attached with this email</p>'}
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+            Best regards,<br>
+            ${teamName} Team<br>
+            ${companyName}
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log(`✅ Email sent successfully to ${customerEmail} from ${fromEmail}`);
+
+    res.json({ 
+      message: 'Email sent successfully',
+      success: true
+    });
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
   }
 });
 
