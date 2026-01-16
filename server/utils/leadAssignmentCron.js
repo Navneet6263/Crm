@@ -3,7 +3,13 @@ const Lead = require('../models/Lead');
 const User = require('../models/User');
 const { sendLeadReminderEmail } = require('../services/emailService');
 
+// ⏸️ TEMPORARILY DISABLED - Lead assignment reminder emails band kiye gaye hain
+// Yeh cron job manager ko email bhejti thi jab sales person 2 din se lead pe kaam nahi karta
 const startLeadAssignmentReminderCron = () => {
+  console.log('⏸️ Lead assignment reminder cron job is DISABLED');
+  console.log('⏸️ Reason: AWS IP block issue due to bulk emails');
+  
+  /*
   // Run every day at 9 AM
   cron.schedule('0 9 * * *', async () => {
     console.log('Running lead assignment reminder check...');
@@ -40,6 +46,7 @@ const startLeadAssignmentReminderCron = () => {
   });
   
   console.log('Lead assignment reminder cron job started - runs daily at 9 AM');
+  */
 };
 
 module.exports = { startLeadAssignmentReminderCron };
