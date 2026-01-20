@@ -514,26 +514,48 @@ const EnhancedSupportCenter = ({ darkMode, currentUser }) => {
                 ))}
               </div>
 
-              <form onSubmit={addReply} className="reply-form">
-                <textarea
-                  value={replyMessage}
-                  onChange={(e) => setReplyMessage(e.target.value)}
-                  placeholder="Type your reply..."
-                  rows={3}
-                  required
-                  style={{
-                    backgroundColor: darkMode ? '#1f2937' : 'white',
-                    color: darkMode ? '#ffffff' : '#000000',
-                    border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
-                  }}
-                />
-                <button type="submit" className="btn-primary" style={{
-                  backgroundColor: darkMode ? '#2563eb' : '#3b82f6',
-                  color: '#ffffff'
+              {/* Show reply form only if ticket is not resolved or closed */}
+              {selectedTicket.status !== 'resolved' && selectedTicket.status !== 'closed' && (
+                <form onSubmit={addReply} className="reply-form">
+                  <textarea
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Type your reply..."
+                    rows={3}
+                    required
+                    style={{
+                      backgroundColor: darkMode ? '#1f2937' : 'white',
+                      color: darkMode ? '#ffffff' : '#000000',
+                      border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`
+                    }}
+                  />
+                  <button type="submit" className="btn-primary" style={{
+                    backgroundColor: darkMode ? '#2563eb' : '#3b82f6',
+                    color: '#ffffff'
+                  }}>
+                    Send Reply
+                  </button>
+                </form>
+              )}
+              
+              {/* Show message when ticket is resolved/closed */}
+              {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed') && (
+                <div style={{
+                  padding: '1rem',
+                  backgroundColor: darkMode ? '#1e3a8a' : '#dbeafe',
+                  borderRadius: '8px',
+                  marginTop: '1rem',
+                  textAlign: 'center'
                 }}>
-                  Send Reply
-                </button>
-              </form>
+                  <p style={{ 
+                    color: darkMode ? '#93c5fd' : '#1e40af',
+                    margin: 0,
+                    fontWeight: '500'
+                  }}>
+                    ✅ This ticket has been {selectedTicket.status}. No further replies can be added.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -69,6 +69,7 @@ const NotFound = lazy(() => import('./components/NotFound'));
 const WorkflowDashboard = lazy(() => import('./components/WorkflowDashboard'));
 const WorkflowHistory = lazy(() => import('./components/WorkflowHistory'));
 const WorkflowDocuments = lazy(() => import('./components/WorkflowDocuments'));
+const UserPerformanceReport = lazy(() => import('./components/UserPerformanceReport'));
 
 
 // Loading component
@@ -762,6 +763,12 @@ const AppContent = () => {
           return <AccessDenied darkMode={darkMode} message="Only Legal and Finance teams can access documents" />;
         }
         return <WorkflowDocuments currentUser={currentUser} darkMode={darkMode} />;
+      
+      case 'user-performance':
+        if (!['super-admin', 'admin', 'manager', 'senior-manager'].includes(currentUser?.role)) {
+          return <AccessDenied darkMode={darkMode} message="Only Admin and Managers can access User Performance Report" />;
+        }
+        return <UserPerformanceReport darkMode={darkMode} currentUser={currentUser} />;
 
       case '404': return <NotFound darkMode={darkMode} onGoHome={() => changeView('dashboard')} />;
       default: return <ProfessionalDashboard crmData={crmData} user={currentUser} darkMode={darkMode} setActiveView={changeView} />;

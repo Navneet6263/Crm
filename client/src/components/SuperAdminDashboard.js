@@ -1848,25 +1848,6 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
               <Shield size={16} />
               Super Admin Management
             </button>
-            <button
-              onClick={() => setActiveTab('analytics')}
-              style={{
-                padding: '0.5rem 1rem',
-                background: activeTab === 'analytics' ? 'linear-gradient(135deg, #10b981, #34d399)' : 'transparent',
-                color: activeTab === 'analytics' ? 'white' : (darkMode ? '#cbd5e1' : '#6b7280'),
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <BarChart3 size={16} />
-              CRM Users & Analytics
-            </button>
           </div>
         )}
       </div>
@@ -1874,8 +1855,6 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
       {/* Render based on active tab */}
       {activeTab === 'management' && currentUser?.role === 'super-admin' ? (
         <SuperAdminManagement darkMode={darkMode} />
-      ) : activeTab === 'analytics' && currentUser?.role === 'super-admin' ? (
-        <CRMAnalytics darkMode={darkMode} />
       ) : (
         <>
           {/* Loading State */}

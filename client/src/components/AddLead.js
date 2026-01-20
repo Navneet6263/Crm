@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Building, Mail, Phone, DollarSign, Save, Send, X } from 'lucide-react';
+import { UserPlus, Building, Mail, Phone, DollarSign, Send, X } from 'lucide-react';
 import { showToast } from './ToastNotification';
 import { trackLeadCreated } from '../utils/ga';
 
@@ -112,29 +112,7 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     }
   };
 
-  const handleSaveAsDraft = () => {
-    const leadData = {
-      contactPerson: formData.contactPerson,
-      companyName: formData.companyName,
-      email: formData.email,
-      phone: formData.phone,
-      industry: formData.industry,
-      leadSource: formData.leadSource,
-      estimatedValue: formData.estimatedValue ? parseInt(formData.estimatedValue) : 0,
-      priority: formData.priority,
-      requirements: formData.requirements,
-      assignedTo: formData.assignedTo,
-      status: 'new',
-      isDraft: true
-    };
-    
-    const drafts = JSON.parse(localStorage.getItem('leadDrafts') || '[]');
-    drafts.push({ ...leadData, id: Date.now() });
-    localStorage.setItem('leadDrafts', JSON.stringify(drafts));
-    
-    showToast('success', '📝 Lead saved as draft successfully!');
-    onCancel();
-  };
+
 
   const handleSubmit = () => {
     if (isSubmitting) return;
@@ -594,43 +572,21 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button
-              onClick={onCancel}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                borderRadius: '8px',
-                background: 'transparent',
-                color: darkMode ? '#d1d5db' : '#374151',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: '500'
-              }}
-            >
-              Cancel
-            </button>
-            
-            <button
-              onClick={handleSaveAsDraft}
-              style={{
-                padding: '0.75rem 1.5rem',
-                border: 'none',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #6b7280, #9ca3af)',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}
-            >
-              <Save size={16} />
-              Save as Draft
-            </button>
-          </div>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '0.75rem 1.5rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: 'transparent',
+              color: darkMode ? '#d1d5db' : '#374151',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: '500'
+            }}
+          >
+            Cancel
+          </button>
           
           <button
             onClick={handleSubmit}

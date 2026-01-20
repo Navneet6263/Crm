@@ -29,14 +29,14 @@ const getCRMUsageAnalytics = async (req, res) => {
     }
 
     // Get all users with their status
-    const allUsers = await User.find({}).select('name email isActive createdAt');
+    const allUsers = await User.find({}).select('name email role isActive createdAt');
     const totalUsers = allUsers.length;
     const activeUsers = allUsers.filter(u => u.isActive).length;
     
     // Get user activities
     const activities = await UserActivity.find({
       timestamp: { $gte: startDate }
-    }).populate('userId', 'name email isActive');
+    }).populate('userId', 'name email role isActive');
 
     // Get leads and customers count for conversion rate
     const totalLeads = await Lead.countDocuments();
@@ -54,6 +54,7 @@ const getCRMUsageAnalytics = async (req, res) => {
         userStats[userId] = {
           userName: activity.userId.name,
           userEmail: activity.userId.email,
+          userRole: activity.userId.role,
           isActive: activity.userId.isActive,
           sessions: new Set(),
           totalTime: 0,
@@ -80,6 +81,7 @@ const getCRMUsageAnalytics = async (req, res) => {
       const stats = userStats[userId] || {
         userName: user.name,
         userEmail: user.email,
+        userRole: user.role,
         isActive: user.isActive,
         sessions: new Set(),
         totalTime: 0,
@@ -91,6 +93,7 @@ const getCRMUsageAnalytics = async (req, res) => {
       return {
         userName: stats.userName,
         userEmail: stats.userEmail,
+        userRole: user.role,
         isActive: stats.isActive,
         sessions: stats.sessions.size || 0,
         totalTime: Math.round(stats.totalTime / 60), // Convert to minutes
