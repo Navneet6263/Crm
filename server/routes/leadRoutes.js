@@ -26,24 +26,27 @@ const router = express.Router();
 
 router.use(auth);
 
-router.route('/')
-  .get(getLeads)
-  .post(createLead);
-
+// Non-parameterized routes MUST come before /:id routes
 router.get('/my-leads', getMyLeads);
 router.get('/group-pending', getPendingGroupLeads);
 router.get('/stats/sales-team', getSalesTeamStats);
-router.get('/product/:productId', getLeadsByProduct);
 router.get('/stats/products', getProductLeadStats);
 router.get('/user/product-history', getUserProductHistory);
 router.post('/assign', handleLeadAssignmentNotification, assignLead);
-router.put('/:id/accept', acceptGroupLead);
-router.put('/:id/decline', declineGroupLead);
+router.get('/product/:productId', getLeadsByProduct);
+
+// Parameterized routes come after
+router.route('/')
+  .get(getLeads)
+  .post(createLead);
 
 router.route('/:id')
   .get(updateLeadViewTime, getLeadById)
   .put(updateLead)
   .delete(deleteLead);
+
+router.put('/:id/accept', acceptGroupLead);
+router.put('/:id/decline', declineGroupLead);
 
 router.post('/:id/notes', addNote);
 router.post('/:id/activity', logActivity);

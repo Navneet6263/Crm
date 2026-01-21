@@ -187,20 +187,20 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
       try {
         setLoading(true);
         let leadsData = [];
-        try {
-          // For legal-team and finance-team, fetch their assigned leads
-          if (user?.role === 'legal-team' || user?.role === 'finance-team') {
-            const response = await fetch(`${apiService.getApiUrl()}/workflow/my-assigned`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            const data = await response.json();
-            leadsData = data.leads || [];
-          } else {
-            // Use pagination instead of loading all leads at once
-            const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=50&page=1`, {
+        
+        // For legal-team and finance-team, fetch their assigned leads
+        if (user?.role === 'legal-team' || user?.role === 'finance-team') {
+          const response = await fetch(`${apiService.getApiUrl()}/workflow/my-assigned`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const data = await response.json();
+          leadsData = data.leads || [];
+        } else {
+          // Use pagination instead of loading all leads at once
+          const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=500&page=1`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'
@@ -208,97 +208,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
           });
           const data = await response.json();
           leadsData = Array.isArray(data) ? data : (data.leads || []);
-          
-          // Also fetch group-assigned leads for sales team
-          if (user?.role === 'sales') {
-            const groupLeadsResponse = await fetch(`${apiService.getApiUrl()}/leads/group-leads/sales?limit=50`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            const groupData = await groupLeadsResponse.json();
-            const groupLeads = Array.isArray(groupData) ? groupData : (groupData.leads || []);
-            
-            // Merge group leads with my leads, avoiding duplicates
-            const existingLeadIds = new Set(leadsData.map(l => l._id || l.id));
-            const uniqueGroupLeads = groupLeads.filter(gl => !existingLeadIds.has(gl._id || gl.id));
-            leadsData = [...leadsData, ...uniqueGroupLeads];
-          }
-          
-          // If backend doesn't return leads, try getAllLeads and filter
-          if (leadsData.length === 0) {
-            const allLeadsResponse = await apiService.getAllLeads();
-            const allLeads = Array.isArray(allLeadsResponse) ? allLeadsResponse : (allLeadsResponse.leads || []);
-            
-            if (user && allLeads.length > 0) {
-              const currentUserId = user._id || user.id;
-              
-              leadsData = allLeads.filter(lead => {
-                // Show leads assigned to current user
-                if (lead.assignedTo) {
-                  const assignedUserId = typeof lead.assignedTo === 'object' 
-                    ? lead.assignedTo._id || lead.assignedTo.id
-                    : lead.assignedTo;
-                  if (assignedUserId === currentUserId) {
-                    return true;
-                  }
-                }
-                
-                // Show leads created by current user
-                if (lead.createdBy) {
-                  const createdByUserId = typeof lead.createdBy === 'object'
-                    ? lead.createdBy._id || lead.createdBy.id
-                    : lead.createdBy;
-                  if (createdByUserId === currentUserId) {
-                    return true;
-                  }
-                }
-                
-                // For My Leads section, even admin/super-admin should only see their own leads
-                // Remove this block to ensure all users only see their own leads in My Leads
-                
-                return false;
-              });
-            }
-          }
-        }
-        } catch (apiError) {
-          // Fallback: Use crmData prop if available
-          if (crmData && crmData.leads) {
-            const leadsArray = Array.isArray(crmData.leads) ? crmData.leads : [];
-            
-            leadsData = leadsArray.filter(lead => {
-              if (!user) return true;
-              
-              const currentUserId = user._id || user.id;
-              
-              // Show leads that are assigned to current user
-              if (lead.assignedTo) {
-                const assignedUserId = typeof lead.assignedTo === 'object' 
-                  ? lead.assignedTo._id || lead.assignedTo.id
-                  : lead.assignedTo;
-                if (assignedUserId === currentUserId) {
-                  return true;
-                }
-              }
-              
-              // Show leads created by current user
-              if (lead.createdBy) {
-                const createdByUserId = typeof lead.createdBy === 'object'
-                  ? lead.createdBy._id || lead.createdBy.id
-                  : lead.createdBy;
-                if (createdByUserId === currentUserId) {
-                  return true;
-                }
-              }
-              
-              // For My Leads section, even admin/super-admin should only see their own leads
-              // Remove this block to ensure all users only see their own leads in My Leads
-              
-              return false;
-            });
-          }
         }
         
         setLeads(leadsData);
@@ -1025,65 +934,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     {/* Actions */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {/* Accept/Decline buttons for group-assigned leads */}
-                        {lead.assignedToGroup === 'sales' && lead.status === 'pending-acceptance' && user?.role === 'sales' && (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcceptLead(lead._id || lead.id);
-                              }}
-                              style={{
-                                background: '#22c55e',
-                                color: 'white',
-                                border: 'none',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: '600',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.target.style.background = '#16a34a'}
-                              onMouseLeave={(e) => e.target.style.background = '#22c55e'}
-                            >
-                              ✅ Accept
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeclineLead(lead._id || lead.id);
-                              }}
-                              style={{
-                                background: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: '600',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.target.style.background = '#dc2626'}
-                              onMouseLeave={(e) => e.target.style.background = '#ef4444'}
-                            >
-                              ❌ Decline
-                            </button>
-                          </>
-                        )}
-                        
-                        {/* Regular action buttons */}
-                        {(!lead.assignedToGroup || lead.status !== 'pending-acceptance') && (
-                          <>
-                            <button
+                        <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedLead(lead);
@@ -1110,33 +961,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                               View
                             </button>
                             
-                            {lead.workflowStage !== 'completed' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditLead(lead);
-                              }}
-                              style={{
-                                background: '#f59e0b',
-                                color: 'white',
-                                border: 'none',
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.target.style.background = '#d97706'}
-                              onMouseLeave={(e) => e.target.style.background = '#f59e0b'}
-                            >
-                              <Edit size={14} />
-                              Edit
-                            </button>
-                            )}
                             
                             {lead.status === 'closed-won' && !lead.workflowStatus && (
                               <button
@@ -1166,8 +990,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                                 Legal
                               </button>
                             )}
-                          </>
-                        )}
                       </div>
                       
                       <select

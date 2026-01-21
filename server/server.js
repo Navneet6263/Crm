@@ -692,19 +692,7 @@ app.post('/api/leads/assign', authenticateToken, async (req, res) => {
   }
 });
 
-// Get leads assigned to current user
-app.get('/api/leads/my-leads', authenticateToken, async (req, res) => {
-  try {
-    console.log('🔍 Fetching leads for user:', req.user.email);
-    const userId = req.user._id || req.user.id;
-    const leads = await Lead.find({ assignedTo: userId });
-    console.log('📊 Found', leads.length, 'assigned leads');
-    res.json({ leads });
-  } catch (error) {
-    console.error('❌ Error fetching my leads:', error);
-    res.status(500).json({ message: 'Error fetching assigned leads', error: error.message });
-  }
-});
+
 
 // Customer Routes (Direct implementation to avoid conflicts)
 app.get('/api/customers', authenticateToken, async (req, res) => {

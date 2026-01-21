@@ -590,48 +590,31 @@ const getMyLeads = async (req, res) => {
   const mongoose = require('mongoose');
   try {
     console.log('\n🔍 === MY LEADS REQUEST ===');
-    console.log('👤 User ID:', req.user._id);
+    console.log('USER ID:', req.user._id, typeof req.user._id);
     console.log('👤 User Email:', req.user.email);
     console.log('👤 User Role:', req.user.role);
     
     const { status, priority, search, page = 1, limit = 10000 } = req.query;
     
-    let query = { isActive: true };
+    const userObjectId = new mongoose.Types.ObjectId(req.user._id);
+    
+    let query = {
+      isActive: true,
+      $or: [
+        { createdBy: userObjectId },
+        { assignedTo: userObjectId }
+      ]
+    };
+    
+    console.log('🔍 Query before company filter:', JSON.stringify(query, null, 2));
     
     // Filter by company - IMPORTANT for privacy
     if (req.user.companyId) {
       query.companyId = req.user.companyId;
+      console.log('🏢 Added companyId filter:', req.user.companyId);
     }
     
-    // All users (including super admin) get leads created by them or assigned to them
-    const userId = req.user._id || req.user.id;
-    console.log('🔑 Using userId for query:', userId, 'Type:', typeof userId);
-    
-    // Convert to ObjectId if it's a string
-    const userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-    console.log('🔑 Converted to ObjectId:', userObjectId);
-    
-    // First, let's check all leads this user created
-    const createdLeads = await Lead.find({ createdBy: userObjectId, isActive: true }).select('_id contactPerson createdBy');
-    console.log('📊 Leads created by this user:', createdLeads.length);
-    if (createdLeads.length > 0) {
-      console.log('📊 Sample created lead:', {
-        id: createdLeads[0]._id,
-        contactPerson: createdLeads[0].contactPerson,
-        createdBy: createdLeads[0].createdBy
-      });
-    }
-    
-    // Check leads assigned to this user
-    const assignedLeads = await Lead.find({ assignedTo: userObjectId, isActive: true }).select('_id contactPerson assignedTo');
-    console.log('📊 Leads assigned to this user:', assignedLeads.length);
-    
-    query.$or = [
-      { createdBy: userObjectId },  // Leads created by this user
-      { assignedTo: userObjectId }  // Leads assigned to this user
-    ];
-    
-    console.log('🔍 Query:', JSON.stringify(query, null, 2));
+    console.log('🔍 Final query:', JSON.stringify(query, null, 2));
     
     if (status) query.status = status;
     if (priority) query.priority = priority;
@@ -662,15 +645,6 @@ const getMyLeads = async (req, res) => {
     const total = await Lead.countDocuments(query);
     
     console.log('📊 Found leads count:', leads.length);
-    console.log('📊 Total leads:', total);
-    if (leads.length > 0) {
-      console.log('📊 First lead details:', {
-        id: leads[0]._id,
-        contactPerson: leads[0].contactPerson,
-        createdBy: leads[0].createdBy,
-        assignedTo: leads[0].assignedTo
-      });
-    }
     console.log('=== END MY LEADS ===\n');
 
     res.json({
