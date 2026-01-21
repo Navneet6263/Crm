@@ -54,7 +54,6 @@ export const menuSections = [
     title: 'AI & Analytics',
     items: [
       { id: 'ai-assistant', icon: Brain, label: 'AI Assistant', color: '#8b5cf6' },
-      { id: 'lead-scoring', icon: Star, label: 'AI Lead Scoring', color: '#f59e0b', adminOnly: true },
       { id: 'analytics', icon: TrendingUp, label: 'Analytics', color: '#22c55e' },
       { id: 'user-performance', icon: Activity, label: 'User Performance', color: '#3b82f6', adminOnly: true },
       { id: 'automation', icon: Zap, label: 'Automation', color: '#f59e0b' }

@@ -15,7 +15,8 @@ const {
   acceptGroupLead,
   declineGroupLead,
   getPendingGroupLeads,
-  getSalesTeamStats
+  getSalesTeamStats,
+  calculateLeadScore
 } = require('../controllers/leadController');
 const { auth } = require('../middleware/auth');
 const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
@@ -47,6 +48,7 @@ router.route('/:id')
 
 router.put('/:id/accept', acceptGroupLead);
 router.put('/:id/decline', declineGroupLead);
+router.post('/:id/score', calculateLeadScore);
 
 router.post('/:id/notes', addNote);
 router.post('/:id/activity', logActivity);

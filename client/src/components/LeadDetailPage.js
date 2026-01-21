@@ -14,7 +14,11 @@ import {
   Check,
   FileText,
   Download,
-  CheckCircle
+  CheckCircle,
+  TrendingUp,
+  Flame,
+  Snowflake,
+  BarChart3
 } from 'lucide-react';
 import apiService from '../services/apiService';
 import { showToast } from './ToastNotification';
@@ -144,10 +148,31 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
     try {
       const response = await apiService.getLeadById(leadId);
       setLead(response);
+      
+      // Auto-calculate score if not present
+      if (!response.leadScore) {
+        calculateLeadScore();
+      }
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching lead:', error);
       setLoading(false);
+    }
+  };
+
+  const calculateLeadScore = async () => {
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5004/api'}/leads/${leadId}/score`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      fetchLeadDetails();
+    } catch (error) {
+      console.error('Error calculating score:', error);
     }
   };
 
@@ -270,6 +295,72 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
           <ArrowLeft size={20} />
         </button>
         <h1 style={{ fontSize: '2rem', fontWeight: '700', margin: 0 }}>{lead.contactPerson}</h1>
+      </div>
+
+      {/* Lead Intelligence Stats */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '1rem', 
+        marginBottom: '2rem' 
+      }}>
+        {/* Lead Score */}
+        <div style={{ 
+          background: darkMode ? '#374151' : 'white', 
+          borderRadius: '12px', 
+          padding: '1.5rem', 
+          textAlign: 'center',
+          boxShadow: darkMode ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
+          border: darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb'
+        }}>
+          <BarChart3 size={24} style={{ color: '#3b82f6', margin: '0 auto 0.5rem' }} />
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: darkMode ? 'white' : '#111827' }}>
+            {lead.leadScore || 0}
+          </div>
+          <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Lead Score</div>
+        </div>
+
+        {/* Temperature */}
+        <div style={{ 
+          background: lead.leadTemperature === 'hot' ? '#fee2e2' : lead.leadTemperature === 'warm' ? '#fef3c7' : '#dbeafe',
+          borderRadius: '12px', 
+          padding: '1.5rem', 
+          textAlign: 'center',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          border: `2px solid ${lead.leadTemperature === 'hot' ? '#ef4444' : lead.leadTemperature === 'warm' ? '#f59e0b' : '#3b82f6'}`
+        }}>
+          {lead.leadTemperature === 'hot' ? <Flame size={24} style={{ color: '#ef4444', margin: '0 auto 0.5rem' }} /> :
+           lead.leadTemperature === 'warm' ? <TrendingUp size={24} style={{ color: '#f59e0b', margin: '0 auto 0.5rem' }} /> :
+           <Snowflake size={24} style={{ color: '#3b82f6', margin: '0 auto 0.5rem' }} />}
+          <div style={{ 
+            fontSize: '1.5rem', 
+            fontWeight: 'bold', 
+            color: lead.leadTemperature === 'hot' ? '#dc2626' : lead.leadTemperature === 'warm' ? '#d97706' : '#1d4ed8',
+            textTransform: 'uppercase' 
+          }}>
+            {lead.leadTemperature || 'COLD'}
+          </div>
+          <div style={{ 
+            fontSize: '0.875rem', 
+            color: lead.leadTemperature === 'hot' ? '#dc2626' : lead.leadTemperature === 'warm' ? '#d97706' : '#1d4ed8'
+          }}>Temperature</div>
+        </div>
+
+        {/* Conversion Probability */}
+        <div style={{ 
+          background: darkMode ? '#374151' : 'white', 
+          borderRadius: '12px', 
+          padding: '1.5rem', 
+          textAlign: 'center',
+          boxShadow: darkMode ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
+          border: darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb'
+        }}>
+          <Activity size={24} style={{ color: '#10b981', margin: '0 auto 0.5rem' }} />
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: darkMode ? 'white' : '#111827' }}>
+            {lead.conversionProbability || 0}%
+          </div>
+          <div style={{ fontSize: '0.875rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>Win Probability</div>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>

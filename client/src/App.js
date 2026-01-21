@@ -44,7 +44,6 @@ const GroupLeads = lazy(() => import('./components/GroupLeads'));
 const LeadHistory = lazy(() => import('./components/LeadHistory'));
 const LeadTracker = lazy(() => import('./components/LeadTracker'));
 const LeadDetailPage = lazy(() => import('./components/LeadDetailPage'));
-const AILeadScoring = lazy(() => import('./components/AILeadScoring'));
 const AutoAssignment = lazy(() => import('./components/AutoAssignment'));
 const DuplicateDetection = lazy(() => import('./components/DuplicateDetection'));
 const ProfessionalDataTable = lazy(() => import('./components/DataTable'));
@@ -677,12 +676,6 @@ const AppContent = () => {
       case 'group-leads': return <GroupLeads darkMode={darkMode} currentUser={currentUser} />;
       case 'lead-history': return <LeadHistory crmData={crmData} darkMode={darkMode} />;
       case 'lead-tracker': return <LeadTracker crmData={crmData} updateCrmData={updateCrmData} user={currentUser} darkMode={darkMode} />;
-      case 'lead-scoring': 
-        if (!rbacService.hasPermission(currentUser?.role, 'view_lead_scoring')) {
-          return <AccessDenied darkMode={darkMode} message="You don't have permission to access Lead Scoring" />;
-        }
-        console.log('🔍 Lead Scoring - Leads Data:', crmData.leads?.length || 0, 'leads');
-        return <AILeadScoring leads={crmData.leads || []} darkMode={darkMode} />;
       case 'auto-assignment': 
         if (!rbacService.hasPermission(currentUser?.role, 'view_auto_assignment')) {
           return <AccessDenied darkMode={darkMode} message="You don't have permission to access Auto Assignment" />;

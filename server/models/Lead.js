@@ -141,6 +141,99 @@ const leadSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  
+  // Lead Scoring & Intelligence
+  leadScore: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  leadTemperature: {
+    type: String,
+    enum: ['hot', 'warm', 'cold'],
+    default: 'warm'
+  },
+  conversionProbability: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  
+  // Communication Tracking
+  communications: [{
+    type: {
+      type: String,
+      enum: ['email', 'call', 'whatsapp', 'sms', 'meeting']
+    },
+    subject: String,
+    content: String,
+    duration: Number,
+    status: String,
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  
+  // Follow-up & Reminders
+  reminders: [{
+    title: String,
+    description: String,
+    dueDate: Date,
+    status: {
+      type: String,
+      enum: ['pending', 'completed', 'cancelled'],
+      default: 'pending'
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    completedAt: Date
+  }],
+  
+  // Lead Velocity Tracking
+  stageHistory: [{
+    stage: String,
+    enteredAt: Date,
+    exitedAt: Date,
+    duration: Number
+  }],
+  
+  // Lost Lead Tracking
+  lostReason: String,
+  lostReasonDetails: String,
+  lostAt: Date,
+  
+  // Response Time Tracking
+  firstResponseAt: Date,
+  firstResponseTime: Number,
+  avgResponseTime: Number,
+  
+  // Engagement Metrics
+  lastContactedAt: Date,
+  totalInteractions: {
+    type: Number,
+    default: 0
+  },
+  emailsSent: {
+    type: Number,
+    default: 0
+  },
+  callsMade: {
+    type: Number,
+    default: 0
+  },
+  meetingsHeld: {
+    type: Number,
+    default: 0
+  },
   createdBySuperAdmin: {
     type: Boolean,
     default: false

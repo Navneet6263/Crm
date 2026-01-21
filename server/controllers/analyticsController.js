@@ -43,42 +43,23 @@ const getCRMUsageAnalytics = async (req, res) => {
     const closedWonLeads = await Lead.countDocuments({ status: 'closed-won' });
     const conversionRate = totalLeads > 0 ? Math.round((closedWonLeads / totalLeads) * 100) : 0;
 
+    // Get all leads for accurate tracking
+    const allLeads = await Lead.find({
+      createdAt: { $gte: startDate }
+    }).select('createdBy createdAt assignedTo status notes activities').populate('createdBy', 'name email');
+    
+    // Get all customers
+    const allCustomers = await Customer.find({
+      createdAt: { $gte: startDate }
+    }).select('createdBy createdAt').populate('createdBy', 'name email');
+
     // Calculate user-wise statistics
     const userStats = {};
     
-    activities.forEach(activity => {
-      const userId = activity.userId?._id?.toString();
-      if (!userId) return;
-      
-      if (!userStats[userId]) {
-        userStats[userId] = {
-          userName: activity.userId.name,
-          userEmail: activity.userId.email,
-          userRole: activity.userId.role,
-          isActive: activity.userId.isActive,
-          sessions: new Set(),
-          totalTime: 0,
-          leadsAdded: 0,
-          customersAdded: 0,
-          lastActive: activity.timestamp
-        };
-      }
-      
-      userStats[userId].sessions.add(activity.sessionId);
-      userStats[userId].totalTime += activity.duration || 0;
-      
-      if (activity.action === 'lead_created') userStats[userId].leadsAdded++;
-      if (activity.action === 'customer_created') userStats[userId].customersAdded++;
-      
-      if (activity.timestamp > userStats[userId].lastActive) {
-        userStats[userId].lastActive = activity.timestamp;
-      }
-    });
-
-    // Convert to array and format
-    const userActivity = allUsers.map(user => {
+    // Initialize all users
+    allUsers.forEach(user => {
       const userId = user._id.toString();
-      const stats = userStats[userId] || {
+      userStats[userId] = {
         userName: user.name,
         userEmail: user.email,
         userRole: user.role,
@@ -89,6 +70,47 @@ const getCRMUsageAnalytics = async (req, res) => {
         customersAdded: 0,
         lastActive: user.createdAt
       };
+    });
+    
+    // Track from activities
+    activities.forEach(activity => {
+      const userId = activity.userId?._id?.toString();
+      if (!userId || !userStats[userId]) return;
+      
+      userStats[userId].sessions.add(activity.sessionId);
+      userStats[userId].totalTime += activity.duration || 0;
+      
+      if (activity.timestamp > userStats[userId].lastActive) {
+        userStats[userId].lastActive = activity.timestamp;
+      }
+    });
+    
+    // Track leads created by each user
+    allLeads.forEach(lead => {
+      const createdById = lead.createdBy?._id?.toString() || lead.createdBy?.toString();
+      if (createdById && userStats[createdById]) {
+        userStats[createdById].leadsAdded++;
+        if (lead.createdAt > userStats[createdById].lastActive) {
+          userStats[createdById].lastActive = lead.createdAt;
+        }
+      }
+    });
+    
+    // Track customers created by each user
+    allCustomers.forEach(customer => {
+      const createdById = customer.createdBy?._id?.toString() || customer.createdBy?.toString();
+      if (createdById && userStats[createdById]) {
+        userStats[createdById].customersAdded++;
+        if (customer.createdAt > userStats[createdById].lastActive) {
+          userStats[createdById].lastActive = customer.createdAt;
+        }
+      }
+    });
+
+    // Convert to array and format
+    const userActivity = allUsers.map(user => {
+      const userId = user._id.toString();
+      const stats = userStats[userId];
       
       return {
         userName: stats.userName,
@@ -116,7 +138,7 @@ const getCRMUsageAnalytics = async (req, res) => {
       .slice(0, 10);
 
     // Calculate overall stats
-    const totalActiveUsers = Object.keys(userStats).length;
+    const totalActiveUsers = Object.values(userStats).filter(s => s.sessions.size > 0 || s.leadsAdded > 0 || s.customersAdded > 0).length;
     const totalSessions = new Set(activities.map(a => a.sessionId)).size;
     const avgSessionTime = totalSessions > 0 
       ? Math.round(activities.reduce((sum, a) => sum + (a.duration || 0), 0) / totalSessions / 60)
@@ -134,9 +156,9 @@ const getCRMUsageAnalytics = async (req, res) => {
       activeUsers,
       totalLeadsProcessed: totalLeads,
       conversionRate,
-      userActivity: userActivity.sort((a, b) => b.sessions - a.sessions),
+      userActivity: userActivity.sort((a, b) => b.leadsAdded - a.leadsAdded),
       featureUsage: featureUsageArray,
-      message: `Analytics data for ${range} period. Showing ${userActivity.length} users with activity tracking.`
+      message: `Analytics data for ${range} period. Showing ${userActivity.length} users with accurate lead/customer tracking.`
     });
   } catch (error) {
     console.error('Error fetching CRM analytics:', error);

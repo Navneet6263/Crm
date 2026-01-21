@@ -952,6 +952,262 @@ const logActivity = async (req, res) => {
   }
 };
 
+// Lead Scoring & Intelligence
+const calculateLeadScore = async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    let score = 0;
+    
+    // Engagement score (40 points)
+    score += Math.min(lead.totalInteractions * 5, 20);
+    score += Math.min(lead.emailsSent * 3, 10);
+    score += Math.min(lead.callsMade * 5, 10);
+    
+    // Value score (30 points)
+    if (lead.estimatedValue > 100000) score += 30;
+    else if (lead.estimatedValue > 50000) score += 20;
+    else if (lead.estimatedValue > 10000) score += 10;
+    
+    // Activity score (30 points)
+    const daysSinceCreated = (Date.now() - lead.createdAt) / (1000 * 60 * 60 * 24);
+    if (daysSinceCreated < 7) score += 15;
+    else if (daysSinceCreated < 30) score += 10;
+    
+    if (lead.lastContactedAt) {
+      const daysSinceContact = (Date.now() - lead.lastContactedAt) / (1000 * 60 * 60 * 24);
+      if (daysSinceContact < 3) score += 15;
+      else if (daysSinceContact < 7) score += 10;
+      else if (daysSinceContact < 14) score += 5;
+    }
+    
+    // Determine temperature
+    let temperature = 'cold';
+    if (score >= 70) temperature = 'hot';
+    else if (score >= 40) temperature = 'warm';
+    
+    lead.leadScore = Math.min(score, 100);
+    lead.leadTemperature = temperature;
+    lead.conversionProbability = Math.min(score * 0.8, 100);
+    
+    await lead.save();
+    res.json({ score: lead.leadScore, temperature, probability: lead.conversionProbability });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Communication Tracking
+const logCommunication = async (req, res) => {
+  try {
+    const { type, subject, content, duration, status } = req.body;
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    lead.communications.push({
+      type,
+      subject,
+      content,
+      duration,
+      status,
+      createdBy: req.user._id || req.user.id
+    });
+    
+    // Update engagement metrics
+    lead.totalInteractions++;
+    lead.lastContactedAt = new Date();
+    if (type === 'email') lead.emailsSent++;
+    if (type === 'call') lead.callsMade++;
+    if (type === 'meeting') lead.meetingsHeld++;
+    
+    // Track first response
+    if (!lead.firstResponseAt) {
+      lead.firstResponseAt = new Date();
+      lead.firstResponseTime = (Date.now() - lead.createdAt) / (1000 * 60);
+    }
+    
+    await lead.save();
+    res.json(lead);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Reminder Management
+const addReminder = async (req, res) => {
+  try {
+    const { title, description, dueDate } = req.body;
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    lead.reminders.push({
+      title,
+      description,
+      dueDate: new Date(dueDate),
+      createdBy: req.user._id || req.user.id
+    });
+    
+    await lead.save();
+    res.json(lead);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const completeReminder = async (req, res) => {
+  try {
+    const { reminderId } = req.body;
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    const reminder = lead.reminders.id(reminderId);
+    if (reminder) {
+      reminder.status = 'completed';
+      reminder.completedAt = new Date();
+      await lead.save();
+    }
+    
+    res.json(lead);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Lead Analytics
+const getLeadAnalytics = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const query = { isActive: true };
+    
+    if (startDate && endDate) {
+      query.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    }
+    
+    // Role-based filtering
+    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      query.$or = [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ];
+    }
+    
+    const leads = await Lead.find(query);
+    
+    const analytics = {
+      total: leads.length,
+      byStatus: {},
+      byTemperature: { hot: 0, warm: 0, cold: 0 },
+      avgScore: 0,
+      avgValue: 0,
+      avgResponseTime: 0,
+      conversionRate: 0,
+      totalValue: 0
+    };
+    
+    leads.forEach(lead => {
+      analytics.byStatus[lead.status] = (analytics.byStatus[lead.status] || 0) + 1;
+      analytics.byTemperature[lead.leadTemperature]++;
+      analytics.avgScore += lead.leadScore || 0;
+      analytics.avgValue += lead.estimatedValue || 0;
+      analytics.totalValue += lead.estimatedValue || 0;
+      if (lead.firstResponseTime) analytics.avgResponseTime += lead.firstResponseTime;
+    });
+    
+    if (leads.length > 0) {
+      analytics.avgScore = Math.round(analytics.avgScore / leads.length);
+      analytics.avgValue = Math.round(analytics.avgValue / leads.length);
+      analytics.avgResponseTime = Math.round(analytics.avgResponseTime / leads.length);
+      const closedWon = analytics.byStatus['closed-won'] || 0;
+      analytics.conversionRate = Math.round((closedWon / leads.length) * 100);
+    }
+    
+    res.json(analytics);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Stale Leads Detection
+const getStaleLeads = async (req, res) => {
+  try {
+    const daysThreshold = parseInt(req.query.days) || 7;
+    const thresholdDate = new Date(Date.now() - daysThreshold * 24 * 60 * 60 * 1000);
+    
+    const query = {
+      isActive: true,
+      status: { $nin: ['closed-won', 'closed-lost'] },
+      $or: [
+        { lastContactedAt: { $lt: thresholdDate } },
+        { lastContactedAt: null, createdAt: { $lt: thresholdDate } }
+      ]
+    };
+    
+    if (req.user.role !== 'super-admin' && req.user.role !== 'admin') {
+      query.$and = [{
+        $or: [
+          { createdBy: req.user._id },
+          { assignedTo: req.user._id }
+        ]
+      }];
+    }
+    
+    const staleLeads = await Lead.find(query)
+      .populate('assignedTo', 'name email')
+      .populate('product', 'name color')
+      .sort({ lastContactedAt: 1 });
+    
+    res.json({ count: staleLeads.length, leads: staleLeads });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Mark Lead as Lost
+const markLeadAsLost = async (req, res) => {
+  try {
+    const { reason, details } = req.body;
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    lead.status = 'closed-lost';
+    lead.lostReason = reason;
+    lead.lostReasonDetails = details;
+    lead.lostAt = new Date();
+    
+    lead.activities.push({
+      type: 'status_change',
+      description: `Lead marked as lost: ${reason}`,
+      createdBy: req.user._id || req.user.id
+    });
+    
+    await lead.save();
+    res.json(lead);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Bulk Update Leads
+const bulkUpdateLeads = async (req, res) => {
+  try {
+    const { leadIds, updates } = req.body;
+    
+    if (!['admin', 'super-admin', 'manager'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    
+    await Lead.updateMany(
+      { _id: { $in: leadIds } },
+      { $set: updates }
+    );
+    
+    res.json({ success: true, message: `${leadIds.length} leads updated` });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -968,5 +1224,6 @@ module.exports = {
   acceptGroupLead,
   declineGroupLead,
   getPendingGroupLeads,
-  getSalesTeamStats
+  getSalesTeamStats,
+  calculateLeadScore
 };
