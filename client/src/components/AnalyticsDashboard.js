@@ -133,11 +133,16 @@ const AnalyticsDashboard = ({ darkMode }) => {
     // Lead source distribution
     const sourceCount = {};
     leads.forEach(lead => {
-      const source = lead.source || 'Other';
+      const source = lead.leadSource || lead.source || 'Other';
       sourceCount[source] = (sourceCount[source] || 0) + 1;
     });
     
-    const leadSources = Object.entries(sourceCount).map(([name, value]) => ({ name, value }));
+    const leadSources = Object.entries(sourceCount)
+      .map(([name, value]) => ({ 
+        name: name.charAt(0).toUpperCase() + name.slice(1).replace('-', ' '), 
+        value 
+      }))
+      .sort((a, b) => b.value - a.value);
 
     // KPI calculations
     const totalLeads = leads.length;
@@ -489,18 +494,20 @@ const AnalyticsDashboard = ({ darkMode }) => {
           }}>
             Lead Source Distribution
           </h3>
-          <div style={{ height: '300px' }}>
+          <div style={{ height: '280px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={analyticsData.leadSources}
                   cx="50%"
-                  cy="50%"
+                  cy="45%"
                   labelLine={false}
-                  outerRadius={80}
+                  outerRadius={70}
+                  innerRadius={40}
                   fill="#8884d8"
                   dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={false}
+                  paddingAngle={2}
                 >
                   {analyticsData.leadSources.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -510,10 +517,27 @@ const AnalyticsDashboard = ({ darkMode }) => {
                   contentStyle={{ 
                     background: darkMode ? '#1f2937' : 'white',
                     border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                    color: darkMode ? 'white' : '#1f2937'
+                    color: darkMode ? 'white' : '#1f2937',
+                    borderRadius: '8px',
+                    padding: '8px 12px'
                   }} 
+                  formatter={(value, name) => [`${value} leads`, name]}
                 />
-                <Legend />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={50}
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{
+                    fontSize: '12px',
+                    paddingTop: '10px'
+                  }}
+                  formatter={(value, entry) => {
+                    const total = analyticsData.leadSources.reduce((sum, item) => sum + item.value, 0);
+                    const percent = total > 0 ? ((entry.payload.value / total) * 100).toFixed(0) : 0;
+                    return `${value} (${percent}%)`;
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>

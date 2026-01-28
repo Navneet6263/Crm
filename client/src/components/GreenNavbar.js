@@ -57,7 +57,7 @@ const GreenNavbar = ({ onAdminLogin, onSignUp, onSignIn, darkMode, toggleDarkMod
           fontSize: '1.25rem',
           color: darkMode ? '#4ade80' : '#16a34a'
         }}>
-          Green Call CRM
+          GreenCrm
         </div>
       </div>
 

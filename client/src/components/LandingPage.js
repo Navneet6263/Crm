@@ -2119,7 +2119,7 @@ const LandingPage = ({ onStartFreeTrial, onAdminLogin, onSignUp, onSignIn, onCus
                 fontWeight: '700',
                 color: darkMode ? '#f9fafb' : '#1f2937',
                 marginBottom: '1.5rem'
-              }}>GreenCall CRM</div>
+              }}>GreenCrm</div>
               <p style={{
                 color: darkMode ? '#d1d5db' : '#4b5563',
                 lineHeight: '1.6',

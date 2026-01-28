@@ -247,16 +247,8 @@ const Sidebar = ({ activeView, setActiveView, collapsed, setCollapsed, userRole,
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text'
             }}>
-              Green Call
+              GreenCrm
             </h1>
-            <p style={{
-              fontSize: '0.75rem',
-              color: darkMode ? '#9ca3af' : '#6b7280',
-              margin: 0,
-              fontWeight: '500'
-            }}>
-              CRM System
-            </p>
           </div>
         )}
       </div>
