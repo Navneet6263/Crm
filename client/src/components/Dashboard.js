@@ -14,7 +14,11 @@ import {
   X,
   UserPlus,
   Trophy,
-  Star
+  Star,
+  Send,
+  BarChart2,
+  PieChart,
+  Mail
 } from 'lucide-react';
 import apiService from '../services/apiService';
 
@@ -28,6 +32,10 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
   const [demoRequests, setDemoRequests] = useState([]);
   const [leads, setLeads] = useState([]);
   const [performanceScore, setPerformanceScore] = useState(0);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [managerEmail, setManagerEmail] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [monthlyStats, setMonthlyStats] = useState({});
   
   // Check if user is sales/support (not admin)
   const isSalesUser = user?.role && !['super-admin', 'admin', 'manager', 'senior-manager'].includes(user.role);
@@ -66,6 +74,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
     if (crmData.leads && Array.isArray(crmData.leads)) {
       setLeads(crmData.leads);
       console.log('📋 Dashboard using leads from crmData:', crmData.leads.length);
+      console.log('📊 Assigned leads:', crmData.leads.filter(l => l.assignedTo).length);
     }
   }, [crmData.leads]);
   
@@ -76,6 +85,30 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
     const wonCount = Array.isArray(leads) ? leads.filter(l => l.status === 'closed-won' || l.status === 'converted').length : 0;
     const totalCount = leads.length;
     const score = totalCount > 0 ? Math.round((wonCount / totalCount) * 100) : 0;
+    
+    // Calculate monthly stats
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthLeads = Array.isArray(leads) ? leads.filter(l => {
+      const createdDate = new Date(l.createdDate || l.createdAt || Date.now());
+      return createdDate >= monthStart;
+    }) : [];
+    
+    console.log('📅 Monthly leads calculation:', {
+      totalLeads: leads.length,
+      monthLeads: monthLeads.length,
+      monthStart: monthStart.toISOString(),
+      assignedCount: monthLeads.filter(l => l.assignedTo).length
+    });
+    
+    const monthlyData = {
+      totalLeads: monthLeads.length,
+      assignedLeads: monthLeads.filter(l => l.assignedTo).length,
+      wonLeads: monthLeads.filter(l => l.status === 'closed-won' || l.status === 'converted').length,
+      activeLeads: monthLeads.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length,
+      activities: monthLeads.length * 3
+    };
+    setMonthlyStats(monthlyData);
     
     const stats = {
       totalLeads: leads.length,
@@ -246,6 +279,44 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
     }
   };
 
+  const handleSendPerformance = async () => {
+    if (!managerEmail || !managerEmail.includes('@')) {
+      alert('Please enter a valid manager email');
+      return;
+    }
+    
+    setSendingEmail(true);
+    try {
+      // Prepare performance data
+      const performanceData = {
+        userName: user?.name,
+        userEmail: user?.email,
+        managerEmail: managerEmail,
+        month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+        stats: {
+          totalLeads: quickStats.totalLeads,
+          assignedLeads: monthlyStats.assignedLeads,
+          wonLeads: monthlyStats.wonLeads,
+          activeLeads: monthlyStats.activeLeads,
+          conversionRate: quickStats.conversionRate,
+          performanceScore: performanceScore,
+          activities: monthlyStats.activities
+        }
+      };
+      
+      // Send email via API
+      await apiService.sendPerformanceReport(performanceData);
+      alert('✅ Performance report sent successfully to ' + managerEmail);
+      setShowEmailModal(false);
+      setManagerEmail('');
+    } catch (error) {
+      console.error('Failed to send performance report:', error);
+      alert('❌ Failed to send report. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <div style={containerStyle}>
       {/* Animated Background Elements */}
@@ -283,17 +354,34 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
           from { transform: translateY(30px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
+        }
+        @keyframes wave {
+          0%, 100% { transform: translateX(0) translateY(0); }
+          25% { transform: translateX(5px) translateY(-5px); }
+          50% { transform: translateX(0) translateY(-10px); }
+          75% { transform: translateX(-5px) translateY(-5px); }
+        }
+        @keyframes ripple {
+          0% { transform: scale(1); opacity: 0.8; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
       `}</style>
       
-      {/* Modern Glassmorphism Header */}
+      {/* Simple Clean Header */}
       <div style={{
-        background: darkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+        background: darkMode 
+          ? 'rgba(30, 41, 59, 0.5)'
+          : 'rgba(255, 255, 255, 0.5)',
         backdropFilter: 'blur(20px)',
-        borderRadius: '0 0 32px 32px',
-        padding: '2rem 3rem',
+        borderRadius: '0 0 24px 24px',
+        padding: '1.5rem 3rem',
         marginBottom: '2rem',
         border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
-        boxShadow: darkMode ? '0 8px 32px rgba(0, 0, 0, 0.3)' : '0 8px 32px rgba(0, 0, 0, 0.1)',
+        borderTop: 'none',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
         position: 'relative',
         zIndex: 10
       }}>
@@ -301,64 +389,33 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
           <div style={{ animation: 'slideInUp 0.8s ease-out' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
               <div style={{
-                width: '60px',
-                height: '60px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '20px',
+                width: '48px',
+                height: '48px',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'pulse 2s infinite'
+                justifyContent: 'center'
               }}>
-                <Users size={32} color="white" />
+                <Users size={24} color="white" />
               </div>
               <div style={{ flex: 1 }}>
                 <h1 style={{
-                  fontSize: '2.5rem',
-                  fontWeight: '800',
-                  background: darkMode ? 'linear-gradient(135deg, #f8fafc, #e2e8f0)' : 'linear-gradient(135deg, #1e293b, #475569)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  margin: 0,
-                  letterSpacing: '-0.02em'
+                  fontSize: '1.75rem',
+                  fontWeight: '700',
+                  color: darkMode ? '#f8fafc' : '#1e293b',
+                  margin: 0
                 }}>
                   Welcome back, {user?.name || 'User'}!
                 </h1>
                 <p style={{
                   color: darkMode ? '#94a3b8' : '#64748b',
-                  fontSize: '1.125rem',
-                  margin: 0,
-                  fontWeight: '500'
+                  fontSize: '0.95rem',
+                  margin: 0
                 }}>
-                  Here's your sales empire today
+                  Here's your sales overview
                 </p>
               </div>
-              
-              {/* Performance Score Badge for Sales Users */}
-              {isSalesUser && (
-                <div style={{
-                  padding: '20px 24px',
-                  background: performanceScore >= 70 
-                    ? 'linear-gradient(135deg, #22c55e, #16a34a)'
-                    : performanceScore >= 40
-                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                    : 'linear-gradient(135deg, #ef4444, #dc2626)',
-                  borderRadius: '16px',
-                  textAlign: 'center',
-                  boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', justifyContent: 'center' }}>
-                    <Trophy size={20} color="white" />
-                    <span style={{ color: 'white', fontSize: '14px', fontWeight: '600' }}>Performance</span>
-                  </div>
-                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'white' }}>
-                    {performanceScore}%
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.9)', marginTop: '4px' }}>
-                    {performanceScore >= 70 ? 'Excellent!' : performanceScore >= 40 ? 'Good Job!' : 'Keep Going!'}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           
@@ -437,12 +494,12 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
       </div>
 
       <div style={{ padding: '0 3rem' }}>
-      {/* Enhanced Quick Stats */}
+      {/* Enhanced Quick Stats - Compact & Glassmorphic */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '2rem',
-        marginBottom: '3rem',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: '1.25rem',
+        marginBottom: '2rem',
         position: 'relative',
         zIndex: 5
       }}>
@@ -493,110 +550,104 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                 handleStatCardClick(stat);
               }}
               style={{
-                padding: '2.5rem',
+                padding: '1.5rem',
                 position: 'relative',
                 overflow: 'hidden',
                 cursor: 'pointer',
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 background: darkMode 
-                  ? 'rgba(30, 41, 59, 0.8)' 
-                  : 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
+                  ? 'rgba(30, 41, 59, 0.6)' 
+                  : 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(16px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+                borderRadius: '20px',
+                border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.15)' : 'rgba(255, 255, 255, 0.3)'}`,
                 boxShadow: darkMode 
-                  ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
-                  : '0 8px 32px rgba(0, 0, 0, 0.1)',
+                  ? '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+                  : '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
                 color: darkMode ? '#f8fafc' : '#1f2937',
-                animation: `slideInUp 0.6s ease-out ${index * 0.1}s both`
+                animation: `slideInUp 0.5s ease-out ${index * 0.08}s both`
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-12px) scale(1.03)';
-                e.currentTarget.style.boxShadow = `0 25px 50px ${stat.color}40`;
+                e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                e.currentTarget.style.boxShadow = `0 20px 40px ${stat.color}35, inset 0 1px 0 rgba(255, 255, 255, 0.1)`;
                 e.currentTarget.style.background = darkMode 
-                  ? `rgba(30, 41, 59, 0.95)` 
-                  : `rgba(255, 255, 255, 0.95)`;
+                  ? `rgba(30, 41, 59, 0.85)` 
+                  : `rgba(255, 255, 255, 0.9)`;
+                e.currentTarget.style.borderColor = `${stat.color}40`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
                 e.currentTarget.style.boxShadow = darkMode 
-                  ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
-                  : '0 8px 32px rgba(0, 0, 0, 0.1)';
+                  ? '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+                  : '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)';
                 e.currentTarget.style.background = darkMode 
-                  ? 'rgba(30, 41, 59, 0.8)' 
-                  : 'rgba(255, 255, 255, 0.9)';
+                  ? 'rgba(30, 41, 59, 0.6)' 
+                  : 'rgba(255, 255, 255, 0.7)';
+                e.currentTarget.style.borderColor = darkMode ? 'rgba(148, 163, 184, 0.15)' : 'rgba(255, 255, 255, 0.3)';
               }}
             >
-              {/* Animated Background Orbs */}
+              {/* Glassmorphic Background Orbs */}
               <div style={{
                 position: 'absolute',
-                top: '-40%',
-                right: '-20%',
-                width: '120px',
-                height: '120px',
-                background: stat.bgGradient,
+                top: '-30%',
+                right: '-15%',
+                width: '100px',
+                height: '100px',
+                background: `radial-gradient(circle, ${stat.color}25, transparent 70%)`,
                 borderRadius: '50%',
-                opacity: 0.2,
-                animation: 'float 4s ease-in-out infinite'
+                filter: 'blur(20px)',
+                opacity: 0.6,
+                animation: 'float 5s ease-in-out infinite'
               }} />
               <div style={{
                 position: 'absolute',
-                top: '60%',
+                bottom: '-20%',
                 left: '-10%',
                 width: '80px',
                 height: '80px',
-                background: `radial-gradient(circle, ${stat.color}30, transparent)`,
+                background: `radial-gradient(circle, ${stat.color}20, transparent 70%)`,
                 borderRadius: '50%',
-                opacity: 0.4,
-                animation: 'float 6s ease-in-out infinite reverse'
-              }} />
-              <div style={{
-                position: 'absolute',
-                top: '15%',
-                right: '15%',
-                width: '60px',
-                height: '60px',
-                background: `${stat.color}15`,
-                borderRadius: '50%',
-                opacity: 0.8,
-                animation: 'pulse 3s infinite'
+                filter: 'blur(15px)',
+                opacity: 0.5,
+                animation: 'float 7s ease-in-out infinite reverse'
               }} />
               
               <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <div style={{
-                    padding: '1.25rem',
+                    padding: '0.875rem',
                     background: stat.bgGradient,
-                    borderRadius: '20px',
-                    boxShadow: `0 12px 30px ${stat.color}50`,
-                    transform: 'rotate(-8deg)',
+                    borderRadius: '16px',
+                    boxShadow: `0 8px 20px ${stat.color}40`,
+                    transform: 'rotate(-5deg)',
                     transition: 'all 0.3s ease'
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.transform = 'rotate(0deg) scale(1.1)';
+                    e.target.style.transform = 'rotate(0deg) scale(1.08)';
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.transform = 'rotate(-8deg) scale(1)';
+                    e.target.style.transform = 'rotate(-5deg) scale(1)';
                   }}>
-                    <Icon size={32} color="white" />
+                    <Icon size={24} color="white" />
                   </div>
                   
                   <div style={{
-                    padding: '0.75rem 1rem',
+                    padding: '0.5rem 0.75rem',
                     background: stat.change.startsWith('+') 
-                      ? 'rgba(34, 197, 94, 0.15)' 
-                      : 'rgba(239, 68, 68, 0.15)',
-                    borderRadius: '25px',
-                    fontSize: '0.875rem',
+                      ? 'rgba(34, 197, 94, 0.12)' 
+                      : 'rgba(239, 68, 68, 0.12)',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
                     color: stat.change.startsWith('+') ? '#16a34a' : '#dc2626',
-                    fontWeight: '700',
-                    border: `2px solid ${stat.change.startsWith('+') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                    backdropFilter: 'blur(10px)',
+                    fontWeight: '600',
+                    border: `1px solid ${stat.change.startsWith('+') ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                    backdropFilter: 'blur(8px)',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem'
+                    gap: '0.35rem'
                   }}>
-                    <TrendingUp size={14} />
+                    <TrendingUp size={12} />
                     {stat.change}
                   </div>
                 </div>
@@ -606,51 +657,60 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                     display: 'flex',
                     alignItems: 'baseline',
                     gap: '0.5rem',
-                    marginBottom: '0.75rem'
+                    marginBottom: '0.5rem'
                   }}>
                     <h3 style={{
-                      fontSize: '3rem',
-                      fontWeight: '900',
+                      fontSize: '2.25rem',
+                      fontWeight: '800',
                       margin: 0,
-                      background: darkMode 
-                        ? 'linear-gradient(135deg, #f8fafc, #e2e8f0)' 
-                        : 'linear-gradient(135deg, #1e293b, #475569)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      letterSpacing: '-0.02em',
+                      color: darkMode ? '#f8fafc' : '#1e293b',
+                      letterSpacing: '-0.03em',
                       lineHeight: '1'
                     }}>
                       {stat.value}
                     </h3>
                     <div style={{
-                      padding: '0.25rem 0.5rem',
-                      background: `${stat.color}20`,
-                      borderRadius: '8px',
-                      fontSize: '0.75rem',
-                      fontWeight: '600',
-                      color: stat.color
+                      padding: '0.2rem 0.4rem',
+                      background: `${stat.color}18`,
+                      borderRadius: '6px',
+                      fontSize: '0.65rem',
+                      fontWeight: '700',
+                      color: stat.color,
+                      letterSpacing: '0.05em'
                     }}>
                       LIVE
                     </div>
                   </div>
                   <p style={{
                     color: darkMode ? '#94a3b8' : '#64748b',
-                    fontSize: '1.125rem',
+                    fontSize: '0.95rem',
                     margin: 0,
                     fontWeight: '600',
-                    letterSpacing: '0.025em'
+                    letterSpacing: '0.01em'
                   }}>
                     {stat.title}
                   </p>
                   <div style={{
-                    marginTop: '0.5rem',
-                    padding: '0.5rem 0',
-                    borderTop: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(0, 0, 0, 0.05)'}`,
-                    fontSize: '0.875rem',
+                    marginTop: '0.75rem',
+                    padding: '0.5rem 0.75rem',
+                    background: darkMode ? 'rgba(15, 23, 42, 0.4)' : 'rgba(248, 250, 252, 0.6)',
+                    backdropFilter: 'blur(8px)',
+                    borderRadius: '10px',
+                    fontSize: '0.7rem',
                     color: darkMode ? '#64748b' : '#94a3b8',
-                    fontWeight: '500'
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
                   }}>
-                     Updated just now
+                    <div style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: '#22c55e',
+                      animation: 'pulse 2s infinite'
+                    }} />
+                    Updated just now
                   </div>
                 </div>
               </div>
@@ -659,6 +719,287 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
         })}
       </div>
       </div>
+
+      {/* Performance Charts for Sales Users - Enhanced with Graphs */}
+      {isSalesUser && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '1.25rem',
+          marginBottom: '2rem',
+          padding: '0 3rem'
+        }}>
+          {/* Monthly Performance Chart - Bar Graph */}
+          <div style={{
+            ...cardStyle,
+            padding: '1.5rem',
+            background: darkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(16px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+            border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.15)' : 'rgba(255, 255, 255, 0.3)'}`,
+            boxShadow: darkMode 
+              ? '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+              : '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <h3 style={{
+                fontSize: '1rem',
+                fontWeight: '700',
+                color: darkMode ? '#f8fafc' : '#1f2937',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <BarChart2 size={18} color="#3b82f6" />
+                Monthly Performance
+              </h3>
+              <div style={{
+                fontSize: '0.75rem',
+                color: darkMode ? '#cbd5e1' : '#64748b',
+                background: darkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '6px',
+                fontWeight: '600'
+              }}>
+                {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </div>
+            </div>
+            {/* Bar Chart */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', height: '180px', marginBottom: '1rem' }}>
+              {[
+                { label: 'Total', value: monthlyStats.totalLeads || 0, color: '#3b82f6', max: 50 },
+                { label: 'Assigned', value: monthlyStats.assignedLeads || 0, color: '#8b5cf6', max: 50 },
+                { label: 'Won', value: monthlyStats.wonLeads || 0, color: '#22c55e', max: 50 },
+                { label: 'Active', value: monthlyStats.activeLeads || 0, color: '#f59e0b', max: 50 }
+              ].map((item, idx) => {
+                const heightPercent = Math.min((item.value / item.max) * 100, 100);
+                return (
+                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      position: 'relative'
+                    }}>
+                      <div style={{
+                        width: '100%',
+                        height: `${heightPercent}%`,
+                        background: `linear-gradient(180deg, ${item.color}, ${item.color}dd)`,
+                        borderRadius: '8px 8px 4px 4px',
+                        position: 'relative',
+                        boxShadow: `0 4px 12px ${item.color}40`,
+                        transition: 'all 0.5s ease',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.transform = 'scaleY(1.05)';
+                        e.target.style.boxShadow = `0 8px 20px ${item.color}60`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.transform = 'scaleY(1)';
+                        e.target.style.boxShadow = `0 4px 12px ${item.color}40`;
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: '-24px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: item.color,
+                          background: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '6px',
+                          whiteSpace: 'nowrap',
+                          backdropFilter: 'blur(8px)'
+                        }}>
+                          {item.value}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: '600' }}>{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Progress Bars */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {[
+                { label: 'Total Leads', value: monthlyStats.totalLeads || 0, color: '#3b82f6', max: 50 },
+                { label: 'Won', value: monthlyStats.wonLeads || 0, color: '#22c55e', max: 50 }
+              ].map((item, idx) => (
+                <div key={idx}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: darkMode ? '#cbd5e1' : '#64748b', fontWeight: '600' }}>{item.label}</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '700', color: item.color }}>{item.value}</span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '6px',
+                    background: darkMode ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)',
+                    borderRadius: '3px',
+                    overflow: 'hidden',
+                    backdropFilter: 'blur(4px)'
+                  }}>
+                    <div style={{
+                      width: `${Math.min((item.value / item.max) * 100, 100)}%`,
+                      height: '100%',
+                      background: `linear-gradient(90deg, ${item.color}, ${item.color}cc)`,
+                      borderRadius: '3px',
+                      transition: 'width 0.8s ease',
+                      boxShadow: `0 0 8px ${item.color}60`
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Activity Summary - Circular Progress */}
+          <div style={{
+            ...cardStyle,
+            padding: '1.5rem',
+            background: darkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(16px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+            border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.15)' : 'rgba(255, 255, 255, 0.3)'}`,
+            boxShadow: darkMode 
+              ? '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+              : '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <h3 style={{
+                fontSize: '1rem',
+                fontWeight: '700',
+                color: darkMode ? '#f8fafc' : '#1f2937',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <PieChart size={18} color="#22c55e" />
+                Activity Summary
+              </h3>
+            </div>
+            {/* Circular Progress Chart */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', height: '140px' }}>
+              <div style={{
+                width: '140px',
+                height: '140px',
+                borderRadius: '50%',
+                background: `conic-gradient(
+                  #3b82f6 0deg ${(monthlyStats.activities || 0) * 3.6}deg,
+                  #22c55e ${(monthlyStats.activities || 0) * 3.6}deg ${(monthlyStats.activities || 0) * 3.6 + (monthlyStats.wonLeads || 0) * 7.2}deg,
+                  #f59e0b ${(monthlyStats.activities || 0) * 3.6 + (monthlyStats.wonLeads || 0) * 7.2}deg ${(monthlyStats.activities || 0) * 3.6 + (monthlyStats.wonLeads || 0) * 7.2 + (monthlyStats.activeLeads || 0) * 7.2}deg,
+                  ${darkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)'} ${(monthlyStats.activities || 0) * 3.6 + (monthlyStats.wonLeads || 0) * 7.2 + (monthlyStats.activeLeads || 0) * 7.2}deg
+                )`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+                position: 'relative'
+              }}>
+                <div style={{
+                  width: '100px',
+                  height: '100px',
+                  borderRadius: '50%',
+                  background: darkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(12px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#22c55e' }}>{performanceScore}%</div>
+                  <div style={{ fontSize: '0.65rem', color: darkMode ? '#94a3b8' : '#64748b', fontWeight: '600' }}>Performance</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Send to Manager Button - Enhanced */}
+          <div style={{
+            ...cardStyle,
+            padding: '1.5rem',
+            background: darkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(16px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+            border: `1px solid ${darkMode ? 'rgba(148, 163, 184, 0.15)' : 'rgba(255, 255, 255, 0.3)'}`,
+            boxShadow: darkMode 
+              ? '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+              : '0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            textAlign: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Animated Background */}
+            <div style={{
+              position: 'absolute',
+              top: '-50%',
+              right: '-50%',
+              width: '200px',
+              height: '200px',
+              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15), transparent 70%)',
+              borderRadius: '50%',
+              animation: 'float 6s ease-in-out infinite'
+            }} />
+            <Mail size={40} color="#3b82f6" style={{ marginBottom: '1rem', position: 'relative', zIndex: 1 }} />
+            <h3 style={{
+              fontSize: '1rem',
+              fontWeight: '700',
+              color: darkMode ? '#f8fafc' : '#1f2937',
+              marginBottom: '0.5rem',
+              position: 'relative',
+              zIndex: 1
+            }}>Share Performance</h3>
+            <p style={{
+              fontSize: '0.8rem',
+              color: darkMode ? '#cbd5e1' : '#64748b',
+              marginBottom: '1.25rem',
+              position: 'relative',
+              zIndex: 1
+            }}>Send monthly report to manager</p>
+            <button
+              onClick={() => setShowEmailModal(true)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                position: 'relative',
+                zIndex: 1
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-3px) scale(1.05)';
+                e.target.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0) scale(1)';
+                e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+              }}
+            >
+              <Send size={16} />
+              Send to Manager
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Today's Goals for Sales Users */}
       {isSalesUser && (
@@ -729,7 +1070,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
             <h3 style={{
               fontSize: '1.25rem',
               fontWeight: '600',
-              color: darkMode ? 'white' : '#1f2937',
+              color: darkMode ? '#f8fafc' : '#1f2937',
               margin: 0,
               display: 'flex',
               alignItems: 'center',
@@ -791,14 +1132,14 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                     <p style={{
                       fontSize: '0.875rem',
                       fontWeight: '500',
-                      color: darkMode ? 'white' : '#1f2937',
+                      color: darkMode ? '#f8fafc' : '#1f2937',
                       margin: '0 0 0.25rem 0'
                     }}>
                       {activity.message}
                     </p>
                     <p style={{
                       fontSize: '0.75rem',
-                      color: darkMode ? '#9ca3af' : '#6b7280',
+                      color: darkMode ? '#cbd5e1' : '#6b7280',
                       margin: 0,
                       display: 'flex',
                       alignItems: 'center',
@@ -820,7 +1161,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
             <h3 style={{
               fontSize: '1.25rem',
               fontWeight: '600',
-              color: darkMode ? 'white' : '#1f2937',
+              color: darkMode ? '#f8fafc' : '#1f2937',
               margin: 0,
               display: 'flex',
               alignItems: 'center',
@@ -857,7 +1198,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                   <h4 style={{
                     fontSize: '0.875rem',
                     fontWeight: '600',
-                    color: darkMode ? 'white' : '#1f2937',
+                    color: darkMode ? '#f8fafc' : '#1f2937',
                     margin: 0
                   }}>
                     {task.title}
@@ -878,7 +1219,7 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                 
                 <p style={{
                   fontSize: '0.75rem',
-                  color: darkMode ? '#9ca3af' : '#6b7280',
+                  color: darkMode ? '#cbd5e1' : '#6b7280',
                   margin: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -951,6 +1292,102 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
       )}
 
 
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div style={modalOverlayStyle} onClick={() => setShowEmailModal(false)}>
+          <div style={{
+            ...modalContentStyle,
+            maxWidth: '400px'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Send Performance Report</h3>
+              <button onClick={() => setShowEmailModal(false)} style={closeButtonStyle}>&times;</button>
+            </div>
+            <div style={{ padding: '1rem 0' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: darkMode ? '#d1d5db' : '#374151',
+                marginBottom: '0.5rem'
+              }}>Manager's Email</label>
+              <input
+                type="email"
+                value={managerEmail}
+                onChange={(e) => setManagerEmail(e.target.value)}
+                placeholder="manager@company.com"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  background: darkMode ? '#374151' : 'white',
+                  color: darkMode ? 'white' : '#1f2937',
+                  outline: 'none'
+                }}
+              />
+              <div style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                background: darkMode ? '#374151' : '#f9fafb',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                color: darkMode ? '#9ca3af' : '#6b7280'
+              }}>
+                <strong>Report includes:</strong>
+                <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.5rem' }}>
+                  <li>Total leads worked: {quickStats.totalLeads}</li>
+                  <li>Leads assigned: {monthlyStats.assignedLeads}</li>
+                  <li>Conversion rate: {quickStats.conversionRate}%</li>
+                  <li>Performance score: {performanceScore}%</li>
+                  <li>Monthly activities: {monthlyStats.activities}</li>
+                </ul>
+              </div>
+              <button
+                onClick={handleSendPerformance}
+                disabled={sendingEmail}
+                style={{
+                  width: '100%',
+                  marginTop: '1rem',
+                  padding: '0.75rem',
+                  background: sendingEmail ? '#9ca3af' : 'linear-gradient(135deg, #22c55e, #16a34a)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: sendingEmail ? 'not-allowed' : 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                {sendingEmail ? (
+                  <>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid white',
+                      borderTop: '2px solid transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Send Report
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div style={modalOverlayStyle} onClick={() => setIsModalOpen(false)}>

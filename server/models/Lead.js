@@ -26,6 +26,33 @@ const leadSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  address: {
+    street: {
+      type: String,
+      trim: true
+    },
+    city: {
+      type: String,
+      trim: true
+    },
+    state: {
+      type: String,
+      trim: true
+    },
+    postalCode: {
+      type: String,
+      trim: true
+    },
+    country: {
+      type: String,
+      trim: true,
+      default: 'India'
+    },
+    fullAddress: {
+      type: String,
+      trim: true
+    }
+  },
   industry: {
     type: String,
     trim: true

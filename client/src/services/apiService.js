@@ -2008,6 +2008,31 @@ const apiService = {
       console.error('Error fetching sales team stats:', error);
       return { stats: [], pendingLeads: 0 };
     }
+  },
+
+  // Send performance report to manager
+  sendPerformanceReport: async (performanceData) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/performance/send-report`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(performanceData)
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to send performance report');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error sending performance report:', error);
+      throw error;
+    }
   }
 
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle, Send } from 'lucide-react';
+import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle, Send, MapPin } from 'lucide-react';
 import apiService from '../services/apiService';
 
 const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate }) => {
@@ -71,7 +71,14 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
     status: '',
     priority: '',
     estimatedValue: '',
-    requirements: ''
+    requirements: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'India'
+    }
   });
   const [newNote, setNewNote] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -305,7 +312,14 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
       status: lead.status || 'new',
       priority: lead.priority || 'medium',
       estimatedValue: lead.estimatedValue || '',
-      requirements: lead.requirements || ''
+      requirements: lead.requirements || '',
+      address: {
+        street: lead.address?.street || '',
+        city: lead.address?.city || '',
+        state: lead.address?.state || '',
+        postalCode: lead.address?.postalCode || '',
+        country: lead.address?.country || 'India'
+      }
     });
     setNewNote('');
     setShowEditModal(true);
@@ -352,11 +366,11 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
       
       // Create updated lead object with all fields
       const updatedLeadData = {
-        ...originalLead, // Keep all existing data
+        ...originalLead,
         contactPerson: editData.contactPerson,
-        name: editData.contactPerson, // For backward compatibility
+        name: editData.contactPerson,
         companyName: editData.companyName,
-        company: editData.companyName, // For backward compatibility
+        company: editData.companyName,
         email: editData.email,
         phone: editData.phone,
         industry: editData.industry,
@@ -365,6 +379,13 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         priority: editData.priority,
         estimatedValue: editData.estimatedValue,
         requirements: editData.requirements,
+        address: {
+          street: editData.address.street,
+          city: editData.address.city,
+          state: editData.address.state,
+          postalCode: editData.address.postalCode,
+          country: editData.address.country
+        },
         lastActivity: new Date().toISOString(),
         lastUpdatedBy: user?.name || user?.email || 'User'
       };
@@ -1105,6 +1126,12 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                         <Building size={14} />
                         <span>{lead.companyName || lead.company}</span>
                       </div>
+                      {lead.address?.city && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={14} />
+                          <span>{lead.address.city}</span>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Mail size={14} />
                         <span>{lead.email}</span>
@@ -1981,6 +2008,145 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                   </div>
                 )}
                 
+                {/* Address Section */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: darkMode ? '#f3f4f6' : '#1f2937',
+                    marginBottom: '1rem',
+                    borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    paddingBottom: '0.5rem'
+                  }}>📍 Address Information</h4>
+                  
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>Street Address</label>
+                    <input
+                      type="text"
+                      value={editData.address.street}
+                      onChange={(e) => setEditData({...editData, address: {...editData.address, street: e.target.value}})}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        borderRadius: '8px',
+                        background: darkMode ? '#374151' : 'white',
+                        color: darkMode ? 'white' : '#1f2937',
+                        fontSize: '1rem'
+                      }}
+                      placeholder="Enter street address"
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>City</label>
+                      <input
+                        type="text"
+                        value={editData.address.city}
+                        onChange={(e) => setEditData({...editData, address: {...editData.address, city: e.target.value}})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>State</label>
+                      <input
+                        type="text"
+                        value={editData.address.state}
+                        onChange={(e) => setEditData({...editData, address: {...editData.address, state: e.target.value}})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter state"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>Postal Code</label>
+                      <input
+                        type="text"
+                        value={editData.address.postalCode}
+                        onChange={(e) => setEditData({...editData, address: {...editData.address, postalCode: e.target.value}})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter postal code"
+                      />
+                    </div>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        color: darkMode ? '#d1d5db' : '#374151',
+                        marginBottom: '0.5rem'
+                      }}>Country</label>
+                      <input
+                        type="text"
+                        value={editData.address.country}
+                        onChange={(e) => setEditData({...editData, address: {...editData.address, country: e.target.value}})}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          background: darkMode ? '#374151' : 'white',
+                          color: darkMode ? 'white' : '#1f2937',
+                          fontSize: '1rem'
+                        }}
+                        placeholder="Enter country"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Add New Note */}
                 <div style={{ marginBottom: '1rem' }}>
                   <label style={{

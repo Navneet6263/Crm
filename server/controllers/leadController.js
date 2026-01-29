@@ -410,7 +410,7 @@ const getLeadById = async (req, res) => {
 
 const updateLead = async (req, res) => {
   try {
-    console.log('🔄 Updating lead:', req.params.id, 'with data:', req.body);
+    console.log('🔄 Updating lead:', req.params.id, 'with data:', JSON.stringify(req.body, null, 2));
     
     // Clean the request body to prevent validation errors
     const updateData = { ...req.body };
@@ -426,10 +426,23 @@ const updateLead = async (req, res) => {
       delete updateData.assignedTo;
     }
     
+    // Handle address field - ensure it's properly structured
+    if (updateData.address) {
+      console.log('📍 Address data received:', updateData.address);
+      updateData.address = {
+        street: updateData.address.street || '',
+        city: updateData.address.city || '',
+        state: updateData.address.state || '',
+        postalCode: updateData.address.postalCode || '',
+        country: updateData.address.country || 'India'
+      };
+      console.log('📍 Address data after processing:', updateData.address);
+    }
+    
     const lead = await Lead.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: false }
     ).populate('createdBy assignedTo', 'name email role');
     
     if (!lead) {
@@ -446,7 +459,7 @@ const updateLead = async (req, res) => {
       await lead.save();
     }
     
-    console.log('✅ Lead updated successfully');
+    console.log('✅ Lead updated successfully with address:', lead.address);
     res.json(lead);
   } catch (error) {
     console.error('❌ Error updating lead:', error);

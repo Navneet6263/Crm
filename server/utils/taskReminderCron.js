@@ -2,14 +2,12 @@ const cron = require('node-cron');
 const Task = require('../models/Task');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const emailService = require('../services/emailService');
 
-// Har minute check karo tasks ke liye
+// Task reminder - ONLY in-app notifications, NO emails
 const taskReminderCron = cron.schedule('* * * * *', async () => {
   try {
     const now = new Date();
     
-    // Pending aur in-progress tasks fetch karo
     const tasks = await Task.find({
       status: { $in: ['pending', 'in-progress'] },
       dueDate: { $gte: now }
@@ -18,7 +16,6 @@ const taskReminderCron = cron.schedule('* * * * *', async () => {
     for (const task of tasks) {
       const taskDateTime = new Date(task.dueDate);
       
-      // Agar time specified hai to use karo
       if (task.dueTime) {
         const [hours, minutes] = task.dueTime.split(':');
         taskDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
@@ -55,7 +52,6 @@ const taskReminderCron = cron.schedule('* * * * *', async () => {
 
 async function sendReminder(task, timeLeft) {
   try {
-    // In-app notification create karo
     let assignedUser = null;
     if (task.assignedTo) {
       assignedUser = await User.findOne({ name: task.assignedTo });
@@ -63,6 +59,7 @@ async function sendReminder(task, timeLeft) {
 
     const userId = assignedUser ? assignedUser._id : task.createdBy._id;
     
+    // ONLY in-app notification - NO email
     await Notification.create({
       userId: userId,
       type: 'task_reminder',
@@ -73,55 +70,9 @@ async function sendReminder(task, timeLeft) {
       priority: task.priority === 'urgent' || task.priority === 'high' ? 'high' : 'medium'
     });
 
-    // Email notification bhejo agar enabled hai
-    if (task.emailNotification && assignedUser && assignedUser.email) {
-      const taskDateTime = new Date(task.dueDate);
-      if (task.dueTime) {
-        const [hours, minutes] = task.dueTime.split(':');
-        taskDateTime.setHours(parseInt(hours), parseInt(minutes));
-      }
-
-      await emailService.sendEmail({
-        to: assignedUser.email,
-        subject: `⏰ Task Reminder: ${timeLeft} left - ${task.title}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f9fafb; border-radius: 8px;">
-            <h2 style="color: #1f2937; margin-bottom: 16px;">⏰ Task Reminder</h2>
-            <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #ef4444;">
-              <p style="font-size: 16px; color: #374151; margin-bottom: 12px;">
-                <strong>Your task is due in ${timeLeft}!</strong>
-              </p>
-              <p style="color: #6b7280; margin-bottom: 8px;">
-                <strong>Task:</strong> ${task.title}
-              </p>
-              <p style="color: #6b7280; margin-bottom: 8px;">
-                <strong>Description:</strong> ${task.description || 'N/A'}
-              </p>
-              <p style="color: #6b7280; margin-bottom: 8px;">
-                <strong>Due:</strong> ${taskDateTime.toLocaleString()}
-              </p>
-              <p style="color: #6b7280; margin-bottom: 8px;">
-                <strong>Priority:</strong> <span style="color: ${getPriorityColor(task.priority)}; font-weight: bold;">${task.priority.toUpperCase()}</span>
-              </p>
-            </div>
-          </div>
-        `
-      });
-    }
-
-    console.log(`Reminder sent for task: ${task.title} (${timeLeft} left)`);
+    console.log(`✅ In-app notification sent for task: ${task.title} (${timeLeft} left)`);
   } catch (error) {
     console.error('Error sending reminder:', error);
-  }
-}
-
-function getPriorityColor(priority) {
-  switch (priority) {
-    case 'urgent': return '#dc2626';
-    case 'high': return '#ef4444';
-    case 'medium': return '#f59e0b';
-    case 'low': return '#10b981';
-    default: return '#6b7280';
   }
 }
 

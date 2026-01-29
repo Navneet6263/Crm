@@ -2,24 +2,32 @@ const nodemailer = require('nodemailer');
 
 // SMTP Configuration for Green Call
 const smtpTransporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'mail.greencall.co.in',
-  port: parseInt(process.env.SMTP_PORT) || 465,
-  secure: true, // true for 465, false for other ports
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT) || 587,
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    pass: process.env.SMTP_PASS?.replace(/\s/g, '') // Remove spaces from app password
   },
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
   },
-  debug: true, // Enable debug for troubleshooting
+  requireTLS: true,
+  authMethod: 'PLAIN',
+  debug: true,
   logger: true
 });
 
 const SMTP_FROM = process.env.SMTP_FROM || process.env.SMTP_USER;
 
 console.log('✅ SMTP Email Service initialized');
-console.log('📧 SMTP From Email:', SMTP_FROM);
+console.log('📧 SMTP Config:', {
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  user: process.env.SMTP_USER,
+  from: SMTP_FROM
+});
 
 // Helper function to send email via SMTP
 const sendSMTPEmail = async ({ to, subject, html }) => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Building, Mail, Phone, DollarSign, Send, X } from 'lucide-react';
+import { UserPlus, Building, Mail, Phone, DollarSign, Send, X, MapPin } from 'lucide-react';
 import { showToast } from './ToastNotification';
 import { trackLeadCreated } from '../utils/ga';
 
@@ -19,7 +19,14 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
     assignedTo: '',
     status: 'new',
     companyId: 'default-greencall',
-    product: ''
+    product: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'India'
+    }
   });
 
   const [errors, setErrors] = useState({});
@@ -138,7 +145,14 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
       requirements: formData.requirements,
       assignedTo: formData.assignedTo,
       status: 'new',
-      product: formData.product
+      product: formData.product,
+      address: {
+        street: formData.address.street,
+        city: formData.address.city,
+        state: formData.address.state,
+        postalCode: formData.address.postalCode,
+        country: formData.address.country
+      }
     };
     
     if (user?.role === 'super-admin') {
@@ -559,6 +573,94 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
                 placeholder="Describe the client's requirements..."
                 rows="4"
                 style={{ ...inputStyle, resize: 'vertical' }}
+              />
+            </div>
+
+            {/* Address Section */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <h3 style={{
+                fontSize: '1rem',
+                fontWeight: '600',
+                color: darkMode ? '#d1d5db' : '#374151',
+                marginBottom: '1rem',
+                marginTop: '0.5rem'
+              }}>
+                📍 Address Information
+              </h3>
+            </div>
+
+            {/* Street Address */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Street Address</label>
+              <input
+                type="text"
+                value={formData.address.street}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  address: { ...prev.address, street: e.target.value }
+                }))}
+                placeholder="Enter street address"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* City */}
+            <div>
+              <label style={labelStyle}>City</label>
+              <input
+                type="text"
+                value={formData.address.city}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  address: { ...prev.address, city: e.target.value }
+                }))}
+                placeholder="Enter city"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* State */}
+            <div>
+              <label style={labelStyle}>State</label>
+              <input
+                type="text"
+                value={formData.address.state}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  address: { ...prev.address, state: e.target.value }
+                }))}
+                placeholder="Enter state"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Postal Code */}
+            <div>
+              <label style={labelStyle}>Postal Code</label>
+              <input
+                type="text"
+                value={formData.address.postalCode}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  address: { ...prev.address, postalCode: e.target.value }
+                }))}
+                placeholder="Enter postal code"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Country */}
+            <div>
+              <label style={labelStyle}>Country</label>
+              <input
+                type="text"
+                value={formData.address.country}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  address: { ...prev.address, country: e.target.value }
+                }))}
+                placeholder="Enter country"
+                style={inputStyle}
               />
             </div>
           </div>

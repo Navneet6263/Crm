@@ -437,6 +437,48 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
             </div>
           </div>
 
+          {/* Address Section */}
+          {lead.address && (lead.address.street || lead.address.city || lead.address.state || lead.address.postalCode) && (
+            <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', marginTop: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                📍 Address Information
+              </h2>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                {lead.address.street && (
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Street Address</label>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>{lead.address.street}</p>
+                  </div>
+                )}
+                {lead.address.city && (
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>City</label>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>{lead.address.city}</p>
+                  </div>
+                )}
+                {lead.address.state && (
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>State</label>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>{lead.address.state}</p>
+                  </div>
+                )}
+                {lead.address.postalCode && (
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Postal Code</label>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>{lead.address.postalCode}</p>
+                  </div>
+                )}
+                {lead.address.country && (
+                  <div>
+                    <label style={{ fontSize: '0.875rem', color: '#6b7280', display: 'block', marginBottom: '0.5rem' }}>Country</label>
+                    <p style={{ fontSize: '1rem', fontWeight: '600', margin: 0 }}>{lead.address.country}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Activity History */}
           <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
