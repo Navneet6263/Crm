@@ -1065,6 +1065,9 @@ app.use('/api/products', authenticateToken, productRoutes);
 // Workflow Routes
 app.use('/api/workflow', authenticateToken, require('./routes/leadWorkflow'));
 
+// Performance Routes
+app.use('/api/performance', require('./routes/performanceRoutes'));
+
 // Analytics Routes
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 

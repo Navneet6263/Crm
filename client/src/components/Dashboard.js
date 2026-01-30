@@ -36,6 +36,8 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
   const [managerEmail, setManagerEmail] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [monthlyStats, setMonthlyStats] = useState({});
+  const [showLogsModal, setShowLogsModal] = useState(false);
+  const [performanceLogs, setPerformanceLogs] = useState([]);
   
   // Check if user is sales/support (not admin)
   const isSalesUser = user?.role && !['super-admin', 'admin', 'manager', 'senior-manager'].includes(user.role);
@@ -287,7 +289,6 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
     
     setSendingEmail(true);
     try {
-      // Prepare performance data
       const performanceData = {
         userName: user?.name,
         userEmail: user?.email,
@@ -304,7 +305,6 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
         }
       };
       
-      // Send email via API
       await apiService.sendPerformanceReport(performanceData);
       alert('✅ Performance report sent successfully to ' + managerEmail);
       setShowEmailModal(false);
@@ -314,6 +314,19 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
       alert('❌ Failed to send report. Please try again.');
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  const handleViewLogs = async () => {
+    try {
+      const response = await apiService.getPerformanceLogs();
+      if (response.success) {
+        setPerformanceLogs(response.logs);
+        setShowLogsModal(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch logs:', error);
+      alert('❌ Failed to load performance logs');
     }
   };
 
@@ -966,37 +979,68 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
               position: 'relative',
               zIndex: 1
             }}>Send monthly report to manager</p>
-            <button
-              onClick={() => setShowEmailModal(true)}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '700',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
-                position: 'relative',
-                zIndex: 1
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.transform = 'translateY(-3px) scale(1.05)';
-                e.target.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = 'translateY(0) scale(1)';
-                e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
-              }}
-            >
-              <Send size={16} />
-              Send to Manager
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', position: 'relative', zIndex: 1 }}>
+              <button
+                onClick={handleViewLogs}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-3px)';
+                  e.target.style.boxShadow = '0 8px 20px rgba(139, 92, 246, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)';
+                }}
+              >
+                <Activity size={16} />
+                View Logs
+              </button>
+              <button
+                onClick={() => setShowEmailModal(true)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-3px)';
+                  e.target.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                }}
+              >
+                <Send size={16} />
+                Send to Manager
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1384,6 +1428,69 @@ const ProfessionalDashboard = ({ darkMode, crmData, user, setActiveView }) => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance Logs Modal */}
+      {showLogsModal && (
+        <div style={modalOverlayStyle} onClick={() => setShowLogsModal(false)}>
+          <div style={{
+            ...modalContentStyle,
+            maxWidth: '900px'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={modalHeaderStyle}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>Detailed Performance Logs</h3>
+              <button onClick={() => setShowLogsModal(false)} style={closeButtonStyle}>&times;</button>
+            </div>
+            <div style={{ ...modalBodyStyle, maxHeight: '70vh' }}>
+              {performanceLogs.length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ background: darkMode ? '#374151' : '#f9fafb', borderBottom: `2px solid ${darkMode ? '#4b5563' : '#e5e7eb'}` }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Company</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Generated</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Assigned</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Work Duration</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'left' }}>Status</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Activities</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performanceLogs.map((log, idx) => (
+                      <tr key={idx} style={{ borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div style={{ fontWeight: '600' }}>{log.companyName}</div>
+                          <div style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>{log.contactPerson}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div>{new Date(log.generatedAt).toLocaleDateString()}</div>
+                          <div style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>by {log.generatedBy}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div>{new Date(log.assignedAt).toLocaleDateString()}</div>
+                          <div style={{ fontSize: '0.75rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>by {log.assignedBy}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem', fontWeight: '600', color: '#3b82f6' }}>{log.workDuration}</td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <span style={{
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            background: log.status === 'closed-won' ? '#22c55e20' : '#f59e0b20',
+                            color: log.status === 'closed-won' ? '#22c55e' : '#f59e0b'
+                          }}>{log.status}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: '600' }}>{log.totalInteractions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p style={{ textAlign: 'center', padding: '2rem', color: darkMode ? '#9ca3af' : '#6b7280' }}>No performance logs available</p>
+              )}
             </div>
           </div>
         </div>

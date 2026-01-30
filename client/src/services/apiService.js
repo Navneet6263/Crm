@@ -2033,6 +2033,28 @@ const apiService = {
       console.error('Error sending performance report:', error);
       throw error;
     }
+  },
+
+  // Get detailed performance logs
+  getPerformanceLogs: async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/performance/detailed-logs`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch performance logs');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching performance logs:', error);
+      return { success: false, logs: [] };
+    }
   }
 
 };

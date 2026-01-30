@@ -63,20 +63,37 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
           // Extract status changes with details
           const statusChangeDetails = [];
           userLeads.forEach(lead => {
+            // Check activities array for status changes
             if (lead.activities && lead.activities.length > 0) {
               lead.activities.forEach(activity => {
-                if (activity.type === 'status_change' || activity.description?.includes('status')) {
-                  // Parse status change from description
-                  const match = activity.description?.match(/from (\w+) to (\w+)/i) || 
-                               activity.description?.match(/status.*?(\w+)/i);
-                  
+                if (activity.type === 'status_change') {
                   statusChangeDetails.push({
                     leadName: lead.contactPerson || lead.companyName,
                     leadId: lead._id,
-                    description: activity.description,
-                    date: activity.timestamp || activity.createdAt,
-                    currentStatus: lead.status
+                    description: activity.description || `Status changed to ${lead.status}`,
+                    date: activity.createdAt || activity.timestamp,
+                    currentStatus: lead.status,
+                    fromStatus: activity.metadata?.fromStatus || 'unknown',
+                    toStatus: activity.metadata?.toStatus || lead.status
                   });
+                }
+              });
+            }
+            
+            // Also check notes for status change mentions
+            if (lead.notes && lead.notes.length > 0) {
+              lead.notes.forEach(note => {
+                if (note.content && (note.content.toLowerCase().includes('status') || note.content.toLowerCase().includes('changed'))) {
+                  const match = note.content.match(/status.*?(new|contacted|qualified|proposal|negotiation|closed-won|closed-lost)/i);
+                  if (match) {
+                    statusChangeDetails.push({
+                      leadName: lead.contactPerson || lead.companyName,
+                      leadId: lead._id,
+                      description: note.content.substring(0, 100),
+                      date: note.createdAt,
+                      currentStatus: lead.status
+                    });
+                  }
                 }
               });
             }
