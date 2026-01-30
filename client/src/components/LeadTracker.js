@@ -7,6 +7,7 @@ import { exportLeadsToExcel } from '../utils/excelExport';
 const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [originalStatus, setOriginalStatus] = useState('');
   const [updateData, setUpdateData] = useState({
     status: '',
     notes: '',
@@ -129,9 +130,10 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
 
   const handleUpdateLead = (lead) => {
     setSelectedLead(lead);
+    setOriginalStatus(lead.status || 'new');
     setUpdateData({
       status: lead.status || 'new',
-      notes: lead.notes || '',
+      notes: typeof lead.notes === 'string' ? lead.notes : '',
       nextAction: ''
     });
 
@@ -142,6 +144,20 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
 
   const saveUpdate = async () => {
     try {
+      // Check if status changed and note is required
+      if (updateData.status !== originalStatus) {
+        if (!(updateData.notes || '').trim()) {
+          alert('❌ Status changed! Please add notes explaining the reason (minimum 10 words).');
+          return;
+        }
+        
+        const wordCount = (updateData.notes || '').trim().split(/\s+/).length;
+        if (wordCount < 10) {
+          alert(`❌ Please provide at least 10 words in the notes. You provided ${wordCount} words.`);
+          return;
+        }
+      }
+      
       const updatedLead = {
         status: updateData.status,
         notes: updateData.notes,
@@ -1022,18 +1038,9 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                       
                       <select
                         value={lead.status}
-                        onChange={async (e) => {
+                        onChange={(e) => {
                           e.stopPropagation();
-                          const newStatus = e.target.value;
-                          try {
-                            await apiService.updateLead(leadId, { status: newStatus });
-                            const allLeads = await apiService.getAllLeads();
-                            updateCrmData({ leads: allLeads });
-                            alert('Status updated successfully!');
-                          } catch (error) {
-                            console.error('Error updating status:', error);
-                            alert('Failed to update status');
-                          }
+                          handleUpdateLead(lead);
                         }}
                         style={{
                           padding: '6px 8px',
@@ -1205,18 +1212,9 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                       
                       <select
                         value={lead.status}
-                        onChange={async (e) => {
+                        onChange={(e) => {
                           e.stopPropagation();
-                          const newStatus = e.target.value;
-                          try {
-                            await apiService.updateLead(leadId, { status: newStatus });
-                            const allLeads = await apiService.getAllLeads();
-                            updateCrmData({ leads: allLeads });
-                            alert('Status updated successfully!');
-                          } catch (error) {
-                            console.error('Error updating status:', error);
-                            alert('Failed to update status');
-                          }
+                          handleUpdateLead(lead);
                         }}
                         onClick={(e) => e.stopPropagation()}
                         style={{
@@ -1475,7 +1473,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                   color: darkMode ? '#d1d5db' : '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Notes
+                  Notes {updateData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required - min 10 words)</span>}
                 </label>
                 <textarea
                   value={updateData.notes}
@@ -1485,7 +1483,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                    border: `2px solid ${updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10) ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
                     borderRadius: '8px',
                     background: darkMode ? '#374151' : 'white',
                     color: darkMode ? 'white' : '#1f2937',
@@ -1494,6 +1492,15 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                     resize: 'vertical'
                   }}
                 />
+                {updateData.status !== originalStatus && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: (updateData.notes || '').trim().split(/\s+/).length >= 10 ? '#22c55e' : '#ef4444',
+                    marginTop: '0.25rem'
+                  }}>
+                    {(updateData.notes || '').trim() ? `${(updateData.notes || '').trim().split(/\s+/).length} / 10 words` : 'Status changed - notes are required (minimum 10 words)'}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
@@ -1550,20 +1557,22 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                 </button>
                 <button
                   onClick={saveUpdate}
+                  disabled={updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)}
                   style={{
                     padding: '0.75rem 1.5rem',
                     border: 'none',
                     borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                    background: (updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)) ? '#9ca3af' : 'linear-gradient(135deg, #667eea, #764ba2)',
                     color: 'white',
-                    cursor: 'pointer',
+                    cursor: (updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)) ? 'not-allowed' : 'pointer',
                     fontSize: '1rem',
                     fontWeight: '500',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '0.5rem',
-                    width: isMobile ? '100%' : 'auto'
+                    width: isMobile ? '100%' : 'auto',
+                    opacity: (updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)) ? 0.6 : 1
                   }}
                 >
                   <CheckCircle size={16} />

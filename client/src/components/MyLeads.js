@@ -85,6 +85,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
   const itemsPerPage = 30;
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferLeadId, setTransferLeadId] = useState(null);
+  const [originalStatus, setOriginalStatus] = useState('');
 
   const handleAcceptLead = async (leadId) => {
     try {
@@ -263,45 +264,64 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
     const lead = leads.find(l => (l._id || l.id) === leadId);
     const oldStatus = lead?.status;
     
-    try {
-      // Update immediately in local state (optimistic update)
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          (lead._id || lead.id) === leadId ? { ...lead, status: newStatus } : lead
-        )
-      );
+    // If status is changing, ask for reason/activity note
+    if (oldStatus !== newStatus) {
+      const reason = prompt(`Status changing from "${oldStatus}" to "${newStatus}".\n\nPlease provide reason/activity (minimum 10 words):`);
       
-      // Update in backend
-      await apiService.updateLead(leadId, { status: newStatus });
+      if (!reason) {
+        if (window.showToast) {
+          window.showToast('error', '❌ Status change cancelled');
+        }
+        return;
+      }
       
-      // Add history note for status change (in background)
-      if (oldStatus !== newStatus) {
-        const statusNote = `Status changed from "${oldStatus}" to "${newStatus}" by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}`;
-        apiService.addLeadNote(leadId, statusNote).catch(err => 
-          console.error('Error adding status change note:', err)
+      const wordCount = reason.trim().split(/\s+/).length;
+      if (wordCount < 10) {
+        if (window.showToast) {
+          window.showToast('error', `❌ Please provide at least 10 words. You provided ${wordCount} words.`);
+        } else {
+          alert(`Please provide at least 10 words. You provided ${wordCount} words.`);
+        }
+        return;
+      }
+      
+      try {
+        // Update immediately in local state (optimistic update)
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            (lead._id || lead.id) === leadId ? { ...lead, status: newStatus } : lead
+          )
         );
-      }
-      
-      // Show success toast
-      if (window.showToast) {
-        window.showToast('success', `✅ Status updated to ${newStatus}`);
-      }
-    } catch (error) {
-      console.error('Error updating lead status:', error);
-      // Revert on error
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          (lead._id || lead.id) === leadId ? { ...lead, status: oldStatus } : lead
-        )
-      );
-      if (window.showToast) {
-        window.showToast('error', `❌ Failed to update status`);
+        
+        // Update in backend
+        await apiService.updateLead(leadId, { status: newStatus });
+        
+        // Add history note for status change
+        const statusNote = `Status changed from "${oldStatus}" to "${newStatus}" by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}\n\nReason: ${reason}`;
+        await apiService.addLeadNote(leadId, statusNote);
+        
+        // Show success toast
+        if (window.showToast) {
+          window.showToast('success', `✅ Status updated to ${newStatus}`);
+        }
+      } catch (error) {
+        console.error('Error updating lead status:', error);
+        // Revert on error
+        setLeads(prevLeads => 
+          prevLeads.map(lead => 
+            (lead._id || lead.id) === leadId ? { ...lead, status: oldStatus } : lead
+          )
+        );
+        if (window.showToast) {
+          window.showToast('error', `❌ Failed to update status`);
+        }
       }
     }
   };
 
   const handleEditLead = (lead) => {
     setSelectedLead(lead);
+    setOriginalStatus(lead.status || 'new');
     setEditData({
       contactPerson: lead.contactPerson || lead.name || '',
       companyName: lead.companyName || lead.company || '',
@@ -328,6 +348,20 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
   const saveEditLead = async () => {
     try {
       const leadId = selectedLead._id || selectedLead.id;
+      
+      // Check if status changed and note is required
+      if (editData.status !== originalStatus) {
+        if (!newNote.trim()) {
+          alert('❌ Status changed! Please add a note explaining the reason (minimum 10 words).');
+          return;
+        }
+        
+        const wordCount = newNote.trim().split(/\s+/).length;
+        if (wordCount < 10) {
+          alert(`❌ Please provide at least 10 words in the note. You provided ${wordCount} words.`);
+          return;
+        }
+      }
       
       // Track what fields were changed
       const changes = [];
@@ -1013,30 +1047,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                             )}
                       </div>
                       
-                      <select
-                        value={lead.status}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          updateLeadStatus(lead._id || lead.id, e.target.value);
-                        }}
-                        style={{
-                          padding: '6px 8px',
-                          border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
-                          borderRadius: '6px',
-                          backgroundColor: darkMode ? '#1f2937' : 'white',
-                          color: darkMode ? 'white' : '#374151',
-                          fontSize: '12px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="proposal">Proposal</option>
-                        <option value="negotiation">Negotiation</option>
-                        <option value="closed-won">Closed Won</option>
-                        <option value="closed-lost">Closed Lost</option>
-                      </select>
                     </div>
                   </div>
                 );
@@ -1286,32 +1296,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       )}
                       
                       {/* Status Update */}
-                      <select
-                        value={lead.status}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          updateLeadStatus(lead._id || lead.id, e.target.value);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          padding: '8px',
-                          border: `1px solid ${darkMode ? '#4b5563' : '#d1d5db'}`,
-                          borderRadius: '6px',
-                          backgroundColor: darkMode ? '#1f2937' : 'white',
-                          color: darkMode ? 'white' : '#374151',
-                          fontSize: '12px',
-                          minWidth: '100px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="proposal">Proposal</option>
-                        <option value="negotiation">Negotiation</option>
-                        <option value="closed-won">Closed Won</option>
-                        <option value="closed-lost">Closed Lost</option>
-                      </select>
                     </div>
                   </div>
                 );
@@ -2156,7 +2140,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     color: darkMode ? '#d1d5db' : '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Add New Note
+                    Add New Note {editData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required - min 10 words)</span>}
                   </label>
                   <textarea
                     value={newNote}
@@ -2166,7 +2150,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                      border: `2px solid ${editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10) ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
                       borderRadius: '8px',
                       background: darkMode ? '#374151' : 'white',
                       color: darkMode ? 'white' : '#1f2937',
@@ -2174,6 +2158,15 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       resize: 'vertical'
                     }}
                   />
+                  {editData.status !== originalStatus && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: newNote.trim().split(/\s+/).length >= 10 ? '#22c55e' : '#ef4444',
+                      marginTop: '0.25rem'
+                    }}>
+                      {newNote.trim() ? `${newNote.trim().split(/\s+/).length} / 10 words` : 'Status changed - note is required (minimum 10 words)'}
+                    </div>
+                  )}
                   <div style={{
                     fontSize: '0.75rem',
                     color: darkMode ? '#9ca3af' : '#6b7280',
@@ -2228,17 +2221,19 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       console.log('Save clicked');
                       saveEditLead();
                     }}
+                    disabled={editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)}
                     style={{
                       padding: '12px 24px',
                       border: 'none',
                       borderRadius: '8px',
-                      background: '#3b82f6',
+                      background: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? '#9ca3af' : '#3b82f6',
                       color: 'white',
-                      cursor: 'pointer',
+                      cursor: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? 'not-allowed' : 'pointer',
                       fontSize: '16px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      opacity: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? 0.6 : 1
                     }}
                   >
                     <Edit size={16} />

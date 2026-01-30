@@ -40,6 +40,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
     }
   });
   const [newNote, setNewNote] = useState('');
+  const [originalStatus, setOriginalStatus] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
 
@@ -384,6 +385,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
 
   const handleEditLead = (lead) => {
     setSelectedLead(lead);
+    setOriginalStatus(lead.status || 'new');
     setEditData({
       contactPerson: lead.contactPerson || lead.name || '',
       companyName: lead.companyName || lead.company || '',
@@ -410,6 +412,20 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   const saveEditLead = async () => {
     try {
       const leadId = selectedLead._id || selectedLead.id;
+      
+      // Check if status changed and note is required
+      if (editData.status !== originalStatus) {
+        if (!newNote.trim()) {
+          alert('❌ Status changed! Please add a note explaining the reason (minimum 10 words).');
+          return;
+        }
+        
+        const wordCount = newNote.trim().split(/\s+/).length;
+        if (wordCount < 10) {
+          alert(`❌ Please provide at least 10 words in the note. You provided ${wordCount} words.`);
+          return;
+        }
+      }
       
       // Track what fields were changed
       const changes = [];
@@ -1885,24 +1901,32 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                       color: darkMode ? '#d1d5db' : '#374151',
                       marginBottom: '0.5rem'
                     }}>
-                      Add New Note
+                      Add New Note {editData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required - min 10 words)</span>}
                     </label>
                     <textarea
                       value={newNote}
                       onChange={(e) => setNewNote(e.target.value)}
-                      rows="3"
+                      placeholder="Add a note about this lead..."
                       style={{
                         width: '100%',
                         padding: '0.75rem',
-                        border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                        border: `2px solid ${editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10) ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
                         borderRadius: '8px',
                         background: darkMode ? '#374151' : 'white',
                         color: darkMode ? 'white' : '#1f2937',
                         fontSize: '1rem',
                         resize: 'vertical'
                       }}
-                      placeholder="Add a note about this lead..."
                     />
+                    {editData.status !== originalStatus && (
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: newNote.trim().split(/\s+/).length >= 10 ? '#22c55e' : '#ef4444',
+                        marginTop: '0.25rem'
+                      }}>
+                        {newNote.trim() ? `${newNote.trim().split(/\s+/).length} / 10 words` : 'Status changed - note is required (minimum 10 words)'}
+                      </div>
+                    )}
                   </div>
 
                   {/* Address Section */}
@@ -2085,17 +2109,19 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                   </button>
                   <button
                     onClick={saveEditLead}
+                    disabled={editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)}
                     style={{
                       padding: '12px 24px',
                       border: 'none',
                       borderRadius: '8px',
-                      background: '#3b82f6',
+                      background: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? '#9ca3af' : '#3b82f6',
                       color: 'white',
-                      cursor: 'pointer',
+                      cursor: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? 'not-allowed' : 'pointer',
                       fontSize: '16px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      opacity: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? 0.6 : 1
                     }}
                   >
                     <Edit size={16} />
