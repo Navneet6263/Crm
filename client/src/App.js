@@ -7,6 +7,7 @@ import rbacService from './services/rbacService';
 import { menuSections } from './config/navigationConfig';
 import apiService from './services/apiService';
 import { trackPageView, trackUserLogin, trackUserSignup } from './utils/ga';
+import updateChecker from './utils/updateChecker';
 
 import { initTokenCleanup } from './utils/tokenUtils';
 
@@ -361,6 +362,9 @@ const AppContent = () => {
   };
 
   useEffect(() => {
+    // Start update checker
+    updateChecker.start();
+    
     // Check for OAuth callback first
     const handleOAuthCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);

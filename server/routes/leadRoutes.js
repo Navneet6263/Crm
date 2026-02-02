@@ -18,6 +18,7 @@ const {
   getSalesTeamStats,
   calculateLeadScore
 } = require('../controllers/leadController');
+const { getLeadsOptimized, getMyLeadsOptimized } = require('../controllers/leadControllerOptimized');
 const { auth } = require('../middleware/auth');
 const { handleLeadAssignmentNotification } = require('../middleware/leadNotificationMiddleware');
 const { updateLeadViewTime } = require('../middleware/leadViewMiddleware');
@@ -28,7 +29,7 @@ const router = express.Router();
 router.use(auth);
 
 // Non-parameterized routes MUST come before /:id routes
-router.get('/my-leads', getMyLeads);
+router.get('/my-leads', getMyLeadsOptimized);
 router.get('/group-pending', getPendingGroupLeads);
 router.get('/stats/sales-team', getSalesTeamStats);
 router.get('/stats/products', getProductLeadStats);
@@ -38,7 +39,7 @@ router.get('/product/:productId', getLeadsByProduct);
 
 // Parameterized routes come after
 router.route('/')
-  .get(getLeads)
+  .get(getLeadsOptimized)
   .post(createLead);
 
 router.route('/:id')
