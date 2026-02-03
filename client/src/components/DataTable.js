@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Database, 
   Search, 
@@ -41,6 +41,9 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
   const [loading, setLoading] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
   const [editData, setEditData] = useState({});
+  const loadIdRef = useRef(0);
+  const loadAbortRef = useRef(null);
+  const isAppendingRef = useRef(false);
 
   const columns = [
     { id: 'contactPerson', label: 'Contact Person', icon: Users, sortable: true },
@@ -60,35 +63,40 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
     loadData();
     // Initialize selected columns
     setSelectedColumns(columns.slice(0, 7).map(col => col.id));
+
+    return () => {
+      if (loadAbortRef.current) {
+        loadAbortRef.current.abort();
+      }
+    };
   }, []);
 
   const loadData = async () => {
+    const loadId = ++loadIdRef.current;
+    if (loadAbortRef.current) {
+      loadAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+
     setLoading(true);
+    isAppendingRef.current = false;
+
     try {
-      // Fetch all leads without pagination limit
-      const [leadsResponse, customers] = await Promise.all([
-        fetch(`${apiService.getApiUrl()}/leads?limit=1000`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-            'Content-Type': 'application/json'
-          }
-        }),
-        apiService.getCustomers()
-      ]);
-      
-      const leadsData = await leadsResponse.json();
-      const leads = leadsData.leads || leadsData || [];
-      
-      const processedLeads = leads.map((lead, index) => ({
-        ...lead,
-        id: lead.id || lead._id || `lead-${index}`,
-        type: 'lead',
-        contactPerson: lead.name || lead.contactPerson || 'Unknown',
-        companyName: lead.company || lead.companyName || 'Unknown Company',
-        createdDate: lead.createdAt || lead.dateCreated || new Date().toISOString()
-      }));
-      
-      const customersData = customers.map((customer, index) => ({
+      let customersList = [];
+      try {
+        const customersResponse = await apiService.getCustomers();
+        customersList = customersResponse?.customers || customersResponse || [];
+        if (!Array.isArray(customersList)) {
+          customersList = [];
+        }
+      } catch (error) {
+        customersList = [];
+      }
+
+      if (loadId !== loadIdRef.current || controller.signal.aborted) return;
+
+      const customersData = customersList.map((customer, index) => ({
         ...customer,
         id: customer.id || customer._id || `customer-${index}`,
         type: 'customer',
@@ -96,16 +104,49 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
         companyName: customer.company || customer.companyName || 'Unknown Company',
         createdDate: customer.createdAt || customer.dateCreated || new Date().toISOString()
       }));
-      
-      const allData = [...processedLeads, ...customersData];
-      console.log(`Loaded ${processedLeads.length} leads and ${customersData.length} customers`);
-      setData(allData);
-      setFilteredData(allData);
+
+      setData([...customersData]);
+
+      const leadsAccumulator = [];
+
+      await apiService.fetchPagedLeads({
+        path: '/leads',
+        pageSize: 200,
+        signal: controller.signal,
+        onPage: (pageLeads) => {
+          if (loadId !== loadIdRef.current || controller.signal.aborted) return;
+
+          const processedLeads = pageLeads.map((lead, index) => {
+            const fallbackIndex = leadsAccumulator.length + index;
+            return {
+              ...lead,
+              id: lead.id || lead._id || `lead-${fallbackIndex}`,
+              type: 'lead',
+              contactPerson: lead.name || lead.contactPerson || 'Unknown',
+              companyName: lead.company || lead.companyName || 'Unknown Company',
+              createdDate: lead.createdAt || lead.dateCreated || new Date().toISOString()
+            };
+          });
+
+          leadsAccumulator.push(...processedLeads);
+          isAppendingRef.current = true;
+          setData([...leadsAccumulator, ...customersData]);
+        }
+      });
+
+      if (loadId !== loadIdRef.current || controller.signal.aborted) return;
+      if (!leadsAccumulator.length) {
+        isAppendingRef.current = false;
+        setData([...customersData]);
+      }
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error('Error loading data:', error);
       showToast('error', 'Failed to load data');
     } finally {
-      setLoading(false);
+      if (loadId === loadIdRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -153,8 +194,12 @@ const ProfessionalDataTable = ({ darkMode, crmData, updateCrmData }) => {
       }
     });
 
+    const shouldResetPage = !isAppendingRef.current;
     setFilteredData(filtered);
-    setCurrentPage(1);
+    if (shouldResetPage) {
+      setCurrentPage(1);
+    }
+    isAppendingRef.current = false;
   }, [data, searchTerm, sortBy, sortOrder, activeTab]);
 
   const handleSort = (columnId) => {

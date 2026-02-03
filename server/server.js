@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const cookieParser = require('cookie-parser');
+const mongoose = require('mongoose');
+const compression = require('compression');
 const connectDB = require('./config/database');
 
 // Load environment variables
@@ -51,6 +53,9 @@ const app = express();
 
 // Trust proxy for production deployment (Render, Heroku, etc.)
 app.set('trust proxy', 1);
+
+// Response compression
+app.use(compression());
 
 // Increase header size limits for Node.js
 app.use((req, res, next) => {
@@ -165,10 +170,25 @@ const authenticateToken = async (req, res, next) => {
     }
     
     // Get user with populated company information
-    const user = await User.findById(decoded.id)
-      .select('-password')
-      .populate('companyId', 'name plan usage status')
-      .populate('tenantId', 'name plan usage status');
+    const userIdFromToken = decoded.id;
+    let user = null;
+
+    if (userIdFromToken && mongoose.Types.ObjectId.isValid(userIdFromToken)) {
+      user = await User.findById(userIdFromToken)
+        .select('-password')
+        .populate('companyId', 'name plan usage status')
+        .populate('tenantId', 'name plan usage status');
+    }
+
+    if (!user) {
+      const email = decoded.email || (typeof userIdFromToken === 'string' && userIdFromToken.includes('@') ? userIdFromToken : null);
+      if (email) {
+        user = await User.findOne({ email })
+          .select('-password')
+          .populate('companyId', 'name plan usage status')
+          .populate('tenantId', 'name plan usage status');
+      }
+    }
     
     console.log('👤 User found:', user ? `${user.email} (role: ${user.role}, companyId: ${user.companyId?._id || user.tenantId?._id})` : 'Not found');
     
@@ -195,6 +215,48 @@ const authenticateToken = async (req, res, next) => {
     console.log('❌ Token verification failed:', err.message);
     return res.status(403).json({ message: 'Invalid token' });
   }
+};
+
+
+const attachUsersToLeads = async (leads) => {
+  if (!Array.isArray(leads) || leads.length === 0) return leads;
+
+  const ids = new Set();
+  for (const lead of leads) {
+    const createdBy = lead?.createdBy;
+    const assignedTo = lead?.assignedTo;
+
+    if (createdBy) {
+      const id = typeof createdBy === 'string' ? createdBy : createdBy.toString?.();
+      if (id && mongoose.Types.ObjectId.isValid(id)) ids.add(id);
+    }
+    if (assignedTo) {
+      const id = typeof assignedTo === 'string' ? assignedTo : assignedTo.toString?.();
+      if (id && mongoose.Types.ObjectId.isValid(id)) ids.add(id);
+    }
+  }
+
+  if (ids.size === 0) return leads;
+
+  const users = await User.find({ _id: { $in: Array.from(ids) } })
+    .select('name email role')
+    .lean();
+
+  const userMap = new Map(users.map(u => [u._id.toString(), u]));
+
+  return leads.map(lead => {
+    const createdBy = lead?.createdBy;
+    const assignedTo = lead?.assignedTo;
+
+    const createdId = typeof createdBy === 'string' ? createdBy : createdBy?.toString?.();
+    const assignedId = typeof assignedTo === 'string' ? assignedTo : assignedTo?.toString?.();
+
+    return {
+      ...lead,
+      createdBy: createdId && userMap.has(createdId) ? userMap.get(createdId) : createdBy,
+      assignedTo: assignedId && userMap.has(assignedId) ? userMap.get(assignedId) : assignedTo
+    };
+  });
 };
 
 // Auth Routes
@@ -416,15 +478,20 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
       role: req.user.role
     });
     
-    const { status, priority, assignedTo, search, page = 1, limit = 50 } = req.query;
+    const { status, priority, assignedTo, search, page = 1, limit = 50, includeTotal = 'true' } = req.query;
+    const limitNum = Number(limit) > 0 ? Number(limit) : 50;
+    const pageNum = Number(page) > 0 ? Number(page) : 1;
+
+    const companyId = req.user.companyId?._id || req.user.companyId || req.user.tenantId?._id || req.user.tenantId;
+    const hasCompanyId = companyId && mongoose.Types.ObjectId.isValid(companyId);
     
     let query = { isActive: true };
     
     // Company-based filtering (except super-admin and user)
     if (req.user.role !== 'super-admin' && req.user.role !== 'user') {
-      if (req.user.companyId) {
-        query.companyId = req.user.companyId;
-        console.log('🏢 Company-based filtering:', req.user.companyId);
+      if (hasCompanyId) {
+        query.companyId = companyId;
+        console.log('🏢 Company-based filtering:', companyId);
       } else {
         return res.status(403).json({ message: 'User not associated with any company' });
       }
@@ -454,7 +521,7 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
     } else if (req.user.role !== 'super-admin') {
       // Normal users can only see leads created by them or assigned to them
       console.log('🔒 Normal user access - filtering leads');
-      const existingCompanyFilter = query.companyId;
+      const existingCompanyFilter = hasCompanyId ? companyId : null;
       query.$and = [
         { companyId: existingCompanyFilter },
         {
@@ -483,24 +550,33 @@ app.get('/api/leads', authenticateToken, async (req, res) => {
     
     console.log('🔍 Final Query:', JSON.stringify(query, null, 2));
 
-    const leads = await Lead.find(query)
-      .populate('createdBy', 'name email role')
-      .populate('assignedTo', 'name email role')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    const shouldIncludeTotal = includeTotal === 'true';
 
-    const total = await Lead.countDocuments(query);
+    const [leads, total] = await Promise.all([
+      Lead.find(query)
+        .sort({ createdAt: -1, _id: -1 })
+        .limit(limitNum)
+        .skip((pageNum - 1) * limitNum)
+        .lean({ virtuals: true }),
+      shouldIncludeTotal ? Lead.countDocuments(query) : Promise.resolve(undefined)
+    ]);
+
+    const enrichedLeads = await attachUsersToLeads(leads);
     
     console.log('📊 Found leads:', leads.length);
     console.log('=== END GET ALL LEADS ===\n');
 
-    res.json({
-      leads,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
+    const response = {
+      leads: enrichedLeads,
+      currentPage: pageNum
+    };
+
+    if (shouldIncludeTotal) {
+      response.totalPages = Math.ceil(total / limitNum);
+      response.total = total;
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('❌ Error fetching leads:', error);
     res.status(500).json({ message: 'Error fetching leads', error: error.message });

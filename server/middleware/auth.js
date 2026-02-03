@@ -1,11 +1,36 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const { safeLog } = require('../utils/authHelpers');
 
+const loadUserFromToken = async (decoded) => {
+  const id = decoded?.id;
+  let user = null;
+
+  if (id && mongoose.Types.ObjectId.isValid(id)) {
+    user = await User.findById(id)
+      .select('-password')
+      .populate('companyId', 'name plan usage status')
+      .populate('tenantId', 'name plan usage status');
+  }
+
+  if (!user) {
+    const email = decoded?.email || (typeof id === 'string' && id.includes('@') ? id : null);
+    if (email) {
+      user = await User.findOne({ email })
+        .select('-password')
+        .populate('companyId', 'name plan usage status')
+        .populate('tenantId', 'name plan usage status');
+    }
+  }
+
+  return user;
+};
+
 const auth = async (req, res, next) => {
   try {
-    safeLog('info', '🔐 Auth check for:', { method: req.method, path: req.path });
-    safeLog('info', '📋 Headers:', {
+    safeLog('info', '???? Auth check for:', { method: req.method, path: req.path });
+    safeLog('info', '???? Headers:', {
       'Authorization': req.header('Authorization') ? 'Token present' : 'No token',
       'Cookie': req.cookies?.authToken ? 'Cookie present' : 'No cookie'
     });
@@ -13,35 +38,30 @@ const auth = async (req, res, next) => {
     // Check for token in cookies first, then headers
     let token = req.cookies?.authToken || req.header('Authorization')?.replace('Bearer ', '');
     
-    safeLog('info', '🎫 Token extracted:', { hasToken: !!token });
+    safeLog('info', '???? Token extracted:', { hasToken: !!token });
     
     if (!token) {
-      safeLog('warn', '❌ No token provided');
+      safeLog('warn', '??? No token provided');
       return res.status(401).json({ 
         success: false,
         message: 'Access denied. No token provided.' 
       });
     }
 
-
-
     if (!process.env.JWT_SECRET) {
-      safeLog('error', '❌ JWT_SECRET not configured');
+      safeLog('error', '??? JWT_SECRET not configured');
       return res.status(500).json({ 
         success: false,
         message: 'Server configuration error' 
       });
     }
     
-    safeLog('info', '🔍 Verifying token with JWT_SECRET...');
+    safeLog('info', '???? Verifying token with JWT_SECRET...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    safeLog('info', '✅ Token decoded successfully:', { userId: decoded.id });
+    safeLog('info', '??? Token decoded successfully:', { userId: decoded.id });
     
-    const user = await User.findById(decoded.id)
-      .select('-password')
-      .populate('companyId', 'name plan usage status')
-      .populate('tenantId', 'name plan usage status');
-    safeLog('info', '👤 User found:', user ? { 
+    const user = await loadUserFromToken(decoded);
+    safeLog('info', '???? User found:', user ? { 
       email: user.email, 
       role: user.role, 
       companyId: user.companyId?._id || user.tenantId?._id 
@@ -74,10 +94,10 @@ const auth = async (req, res, next) => {
       tenantId: user.tenantId || user.companyId,
       company: user.companyId || user.tenantId
     };
-    safeLog('info', '✅ Token verified for user:', { email: user.email, role: user.role });
+    safeLog('info', '??? Token verified for user:', { email: user.email, role: user.role });
     next();
   } catch (error) {
-    safeLog('error', '❌ Token verification failed:', { message: error.message });
+    safeLog('error', '??? Token verification failed:', { message: error.message });
     
     // Clear invalid cookie
     if (req.cookies?.authToken) {
@@ -111,10 +131,7 @@ const optionalAuth = async (req, res, next) => {
         return next();
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id)
-        .select('-password')
-        .populate('companyId', 'name plan usage status')
-        .populate('tenantId', 'name plan usage status');
+      const user = await loadUserFromToken(decoded);
       
       if (user && user.isActive) {
         req.user = user;

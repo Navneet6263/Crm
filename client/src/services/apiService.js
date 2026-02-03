@@ -226,7 +226,7 @@ const apiService = {
     try {
       const token = localStorage.getItem('authToken');
       
-      const response = await fetch(`${API_BASE_URL}/leads?limit=1000`, {
+      const response = await fetch(`${API_BASE_URL}/leads?limit=1000&includeTotal=false`, {
         headers: {
           'Authorization': `Bearer ${token?.trim()}`,
           'Content-Type': 'application/json'
@@ -249,7 +249,7 @@ const apiService = {
     try {
       const token = localStorage.getItem('authToken');
       
-      const response = await fetch(`${API_BASE_URL}/leads?limit=1000`, {
+      const response = await fetch(`${API_BASE_URL}/leads?limit=1000&includeTotal=false`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -267,11 +267,51 @@ const apiService = {
       return [];
     }
   },
+
+  // Paged leads fetch with background prefetch support
+  fetchPagedLeads: async ({ path = '/leads', params = {}, pageSize = 200, signal, onPage }) => {
+    const token = localStorage.getItem('authToken');
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+
+    const cleanParams = Object.fromEntries(
+      Object.entries(params || {}).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    );
+
+    let page = 1;
+    const maxPages = 1000;
+
+    while (page <= maxPages) {
+      if (signal?.aborted) return;
+      const query = new URLSearchParams({
+        ...cleanParams,
+        limit: String(pageSize),
+        page: String(page),
+        includeTotal: 'false'
+      }).toString();
+
+      const response = await fetch(`${API_BASE_URL}${path}?${query}`, { headers, signal });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Failed to fetch leads');
+      }
+
+      const data = await response.json();
+      const leads = Array.isArray(data?.leads) ? data.leads : (Array.isArray(data) ? data : []);
+
+      if (!leads.length) break;
+      if (onPage) await onPage(leads, page);
+      if (leads.length < pageSize) break;
+      page += 1;
+    }
+  },
   
   getMyLeads: async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_BASE_URL}/leads/my-leads`, {
+      const response = await fetch(`${API_BASE_URL}/leads/my-leads?includeTotal=false`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

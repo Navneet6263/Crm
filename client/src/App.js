@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useContext, useRef, lazy, Suspense } from 'react';
 import { ThemeProvider, ThemeContext } from './context/ThemeContext';
 import './App.css';
 import './styles/buttons.css';
@@ -149,6 +149,8 @@ const AppContent = () => {
     activities: [],
     assignments: []
   });
+  const leadsFetchIdRef = useRef(0);
+  const leadsAbortRef = useRef(null);
 
   // Update search results whenever term changes - Role-based filtering
   useEffect(() => {
@@ -595,21 +597,67 @@ const AppContent = () => {
     setCrmData(prev => ({ ...prev, ...newData }));
   };
 
+  const refreshLeadsAndCustomers = async ({ includeCustomers = true } = {}) => {
+    const fetchId = ++leadsFetchIdRef.current;
+    if (leadsAbortRef.current) {
+      leadsAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    leadsAbortRef.current = controller;
+
+    const leadsAccumulator = [];
+
+    const customersPromise = includeCustomers
+      ? apiService.getCustomers()
+          .then((customersResponse) => {
+            if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+            const customersList = customersResponse?.customers || customersResponse || [];
+            updateCrmData({ customers: Array.isArray(customersList) ? customersList : [] });
+          })
+          .catch((error) => {
+            if (controller.signal.aborted) return;
+            console.error('Error loading customers:', error);
+            if (fetchId === leadsFetchIdRef.current) {
+              updateCrmData({ customers: [] });
+            }
+          })
+      : Promise.resolve();
+
+    try {
+      await apiService.fetchPagedLeads({
+        path: '/leads',
+        pageSize: 200,
+        signal: controller.signal,
+        onPage: (pageLeads) => {
+          if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+          leadsAccumulator.push(...pageLeads);
+          updateCrmData({ leads: [...leadsAccumulator] });
+        }
+      });
+
+      await customersPromise;
+
+      if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+      if (!leadsAccumulator.length) {
+        updateCrmData({ leads: [] });
+      }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.error('Error loading leads:', error);
+      if (fetchId === leadsFetchIdRef.current) {
+        updateCrmData({ leads: [] });
+      }
+    }
+  };
+
   const handleAddLead = async (leadData) => {
     try {
       console.log('📝 Creating lead with data:', leadData);
       const newLead = await apiService.createLead(leadData);
       console.log('✅ Lead created successfully:', newLead);
       
-      // Refresh leads data with no limit
-      const response = await fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      updateCrmData({ leads: data.leads || [] });
+      // Refresh leads data (paged, background)
+      await refreshLeadsAndCustomers({ includeCustomers: false });
       setShowAddLead(false);
       showToast('success', '✅ Lead added successfully!');
       return true; // Success
@@ -622,27 +670,10 @@ const AppContent = () => {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [leadsResponse, customers] = await Promise.all([
-          fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json'
-            }
-          }),
-          apiService.getCustomers()
-        ]);
-        const leadsData = await leadsResponse.json();
-        const leads = leadsData.leads || [];
-        updateCrmData({ leads: leads || [], customers: customers || [] });
-      } catch (error) {
-        updateCrmData({ leads: [], customers: [] });
-      }
-    };
-    
     if (isLoggedIn) {
-      loadData();
+      refreshLeadsAndCustomers({ includeCustomers: true });
+    } else if (leadsAbortRef.current) {
+      leadsAbortRef.current.abort();
     }
   }, [isLoggedIn]);
 
@@ -676,7 +707,10 @@ const AppContent = () => {
       case 'lead-detail': 
         const leadIdFromUrl = window.location.pathname.match(/\/lead\/(\w+)/)?.[1];
         const leadIdToUse = navigationParams?.leadId || leadIdFromUrl;
-        return <LeadDetailPage leadId={leadIdToUse} darkMode={darkMode} onBack={() => changeView('my-leads')} />;
+        const initialLeadFromNav = navigationParams?.initialLead;
+        const initialLeadFromCache = crmData?.leads?.find(lead => (lead._id || lead.id) === leadIdToUse);
+        const initialLead = initialLeadFromNav || initialLeadFromCache || null;
+        return <LeadDetailPage leadId={leadIdToUse} initialLead={initialLead} darkMode={darkMode} onBack={() => changeView('my-leads')} />;
       case 'group-leads': return <GroupLeads darkMode={darkMode} currentUser={currentUser} />;
       case 'lead-history': return <LeadHistory crmData={crmData} darkMode={darkMode} />;
       case 'lead-tracker': return <LeadTracker crmData={crmData} updateCrmData={updateCrmData} user={currentUser} darkMode={darkMode} />;

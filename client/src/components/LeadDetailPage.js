@@ -24,10 +24,10 @@ import apiService from '../services/apiService';
 import { showToast } from './ToastNotification';
 import config from '../config';
 
-const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
+const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }) => {
   const navigate = onBack || (() => window.history.back());
-  const [lead, setLead] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [lead, setLead] = useState(initialLead || null);
+  const [loading, setLoading] = useState(!initialLead);
   const [newNote, setNewNote] = useState('');
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [activityType, setActivityType] = useState('call');
@@ -52,6 +52,15 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
+    const initialMatch = initialLead && ((initialLead._id || initialLead.id) === leadId);
+    if (initialMatch) {
+      setLead(initialLead);
+      setLoading(false);
+    } else {
+      setLead(null);
+      setLoading(true);
+    }
+
     fetchLeadDetails();
     loadUsers();
     
@@ -64,7 +73,7 @@ const LeadDetailPage = ({ leadId, darkMode = false, onBack }) => {
         setIsHighlighted(false);
       }, 2000);
     }
-  }, [leadId]);
+  }, [leadId, initialLead]);
 
   const loadUsers = async () => {
     try {

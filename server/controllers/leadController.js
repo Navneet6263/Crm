@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const Product = require('../models/Product');
 const { getCompanyInfo } = require('../utils/authHelpers');
+const mongoose = require('mongoose');
 
 const createLead = async (req, res) => {
   try {
@@ -384,25 +385,74 @@ const getLeads = async (req, res) => {
   }
 };
 
+const attachUsersToLead = async (lead) => {
+  if (!lead) return lead;
+
+  const ids = new Set();
+  const collectId = (value) => {
+    if (!value) return;
+    const id = typeof value === 'string' ? value : value.toString?.();
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      ids.add(id);
+    }
+  };
+
+  collectId(lead.createdBy);
+  collectId(lead.assignedTo);
+  collectId(lead.assignedBy);
+
+  if (Array.isArray(lead.notes)) {
+    lead.notes.forEach(note => collectId(note.createdBy));
+  }
+  if (Array.isArray(lead.activities)) {
+    lead.activities.forEach(activity => collectId(activity.createdBy));
+  }
+
+  if (ids.size === 0) return lead;
+
+  const users = await User.find({ _id: { $in: Array.from(ids) } })
+    .select('name email role')
+    .lean();
+
+  const userMap = new Map(users.map(user => [user._id.toString(), user]));
+
+  const mapUser = (value) => {
+    if (!value) return value;
+    const id = typeof value === 'string' ? value : value.toString?.();
+    return id && userMap.has(id) ? userMap.get(id) : value;
+  };
+
+  return {
+    ...lead,
+    createdBy: mapUser(lead.createdBy),
+    assignedTo: mapUser(lead.assignedTo),
+    assignedBy: mapUser(lead.assignedBy),
+    notes: Array.isArray(lead.notes)
+      ? lead.notes.map(note => ({ ...note, createdBy: mapUser(note.createdBy) }))
+      : lead.notes,
+    activities: Array.isArray(lead.activities)
+      ? lead.activities.map(activity => ({ ...activity, createdBy: mapUser(activity.createdBy) }))
+      : lead.activities
+  };
+};
+
 const getLeadById = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id)
-      .populate('createdBy assignedTo', 'name email')
+    const leadId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(leadId)) {
+      return res.status(400).json({ message: 'Invalid lead id' });
+    }
+
+    const lead = await Lead.findById(leadId)
       .populate('product', 'name color icon')
-      .populate('notes.createdBy activities.createdBy', 'name');
+      .lean({ virtuals: true });
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-    
-    // Update lastViewedAt if user is the assigned user
-    const userId = req.user._id || req.user.id;
-    if (lead.assignedTo && lead.assignedTo._id.toString() === userId.toString()) {
-      lead.lastViewedAt = new Date();
-      await lead.save();
-    }
-    
-    res.json(lead);
+
+    const enrichedLead = await attachUsersToLead(lead);
+    res.json(enrichedLead);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Mail, Phone, Building, Calendar, Clock, CheckCircle, AlertCircle, Eye, FileText, Edit, Search, Filter, DollarSign, Target, TrendingUp, MessageCircle, Send, MapPin } from 'lucide-react';
 import apiService from '../services/apiService';
 
@@ -13,11 +13,48 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [highlightedLeadId, setHighlightedLeadId] = useState(null);
+  const leadsFetchIdRef = useRef(0);
+  const leadsAbortRef = useRef(null);
+  const leadsRef = useRef([]);
+
+  useEffect(() => {
+    leadsRef.current = leads;
+  }, [leads]);
 
   // Check sessionStorage for leadId from notification
   useEffect(() => {
     const leadIdFromNotification = sessionStorage.getItem('highlightLeadId');
-    if (leadIdFromNotification) {
+    if (!leadIdFromNotification) return;
+
+    const leadExists = leads.some(lead => (lead._id || lead.id) === leadIdFromNotification);
+    if (!leadExists) return;
+
+    setHighlightedLeadId(leadIdFromNotification);
+    sessionStorage.removeItem('highlightLeadId');
+    
+    // Remove highlight after 2 seconds
+    setTimeout(() => {
+      setHighlightedLeadId(null);
+    }, 2000);
+    
+    // Scroll to element after a short delay
+    setTimeout(() => {
+      const element = document.getElementById(`lead-${leadIdFromNotification}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 500);
+  }, [leads]);
+  
+  // Continuously check for new highlight requests (for when already on My Leads page)
+  useEffect(() => {
+    const checkHighlight = setInterval(() => {
+      const leadIdFromNotification = sessionStorage.getItem('highlightLeadId');
+      if (!leadIdFromNotification) return;
+
+      const leadExists = leadsRef.current.some(lead => (lead._id || lead.id) === leadIdFromNotification);
+      if (!leadExists) return;
+
       setHighlightedLeadId(leadIdFromNotification);
       sessionStorage.removeItem('highlightLeadId');
       
@@ -26,37 +63,13 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         setHighlightedLeadId(null);
       }, 2000);
       
-      // Scroll to element after a short delay
+      // Scroll to element
       setTimeout(() => {
         const element = document.getElementById(`lead-${leadIdFromNotification}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 500);
-    }
-  }, [leads]);
-  
-  // Continuously check for new highlight requests (for when already on My Leads page)
-  useEffect(() => {
-    const checkHighlight = setInterval(() => {
-      const leadIdFromNotification = sessionStorage.getItem('highlightLeadId');
-      if (leadIdFromNotification) {
-        setHighlightedLeadId(leadIdFromNotification);
-        sessionStorage.removeItem('highlightLeadId');
-        
-        // Remove highlight after 2 seconds
-        setTimeout(() => {
-          setHighlightedLeadId(null);
-        }, 2000);
-        
-        // Scroll to element
-        setTimeout(() => {
-          const element = document.getElementById(`lead-${leadIdFromNotification}`);
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-      }
+      }, 100);
     }, 500); // Check every 500ms
     
     return () => clearInterval(checkHighlight);
@@ -192,9 +205,20 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
 
   useEffect(() => {
     const fetchMyLeads = async () => {
+      const fetchId = ++leadsFetchIdRef.current;
+      if (leadsAbortRef.current) {
+        leadsAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      leadsAbortRef.current = controller;
+
       try {
         setLoading(true);
-        let leadsData = [];
+        setCurrentPage(1);
+        setLeads([]);
+
+        let firstPageLoaded = false;
+        const leadsAccumulator = [];
         
         // For legal-team and finance-team, fetch their assigned leads
         if (user?.role === 'legal-team' || user?.role === 'finance-team') {
@@ -202,28 +226,43 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
               'Content-Type': 'application/json'
-            }
+            },
+            signal: controller.signal
           });
           const data = await response.json();
-          leadsData = data.leads || [];
+          const leadsData = data.leads || [];
+          if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+          setLeads(leadsData);
         } else {
-          // Use pagination instead of loading all leads at once
-          const response = await fetch(`${apiService.getApiUrl()}/leads/my-leads?limit=500&page=1`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json'
+          await apiService.fetchPagedLeads({
+            path: '/leads/my-leads',
+            pageSize: 200,
+            signal: controller.signal,
+            onPage: (pageLeads) => {
+              if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+              leadsAccumulator.push(...pageLeads);
+              setLeads([...leadsAccumulator]);
+              if (!firstPageLoaded) {
+                setLoading(false);
+                firstPageLoaded = true;
+              }
             }
           });
-          const data = await response.json();
-          leadsData = Array.isArray(data) ? data : (data.leads || []);
+          if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+          if (!leadsAccumulator.length) {
+            setLeads([]);
+          }
         }
-        
-        setLeads(leadsData);
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error('Error fetching my leads:', error);
-        setLeads([]);
+        if (fetchId === leadsFetchIdRef.current) {
+          setLeads([]);
+        }
       } finally {
-        setLoading(false);
+        if (fetchId === leadsFetchIdRef.current && !controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -239,6 +278,9 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
     
     return () => {
       window.removeEventListener('leadsUpdated', handleLeadsUpdate);
+      if (leadsAbortRef.current) {
+        leadsAbortRef.current.abort();
+      }
     };
   }, [crmData, user]);
 
@@ -874,10 +916,10 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                         </div>
                         <div>
                           <h3 
-                            onClick={(e) => {
+                              onClick={(e) => {
                               e.stopPropagation();
                               if (onNavigate) {
-                                onNavigate('lead-detail', { leadId: lead._id || lead.id });
+                                onNavigate('lead-detail', { leadId: lead._id || lead.id, initialLead: lead });
                               }
                             }}
                             style={{
@@ -1078,7 +1120,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onNavigate) {
-                            onNavigate('lead-detail', { leadId: lead._id || lead.id });
+                            onNavigate('lead-detail', { leadId: lead._id || lead.id, initialLead: lead });
                           }
                         }}
                         style={{

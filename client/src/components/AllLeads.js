@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Mail, Phone, Building, Calendar, Star, User, CheckCircle, Clock, Target, Trash2, Upload, Eye, FileText, Edit, MapPin } from 'lucide-react';
 import apiService from '../services/apiService';
 import BulkUpload from './BulkUpload';
@@ -43,6 +43,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   const [originalStatus, setOriginalStatus] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
+  const leadsFetchIdRef = useRef(0);
+  const leadsAbortRef = useRef(null);
 
   // Get current user from localStorage
   useEffect(() => {
@@ -60,56 +62,104 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   // Fetch leads, users, and products on component mount
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        const [leadsResponse, usersResponse, productsResponse] = await Promise.all([
-          fetch(`${apiService.getApiUrl()}/leads?limit=10000${productFilter !== 'all' ? `&product=${productFilter}` : ''}`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json'
-            }
-          }),
-          apiService.getUsers(),
-          fetch(`${apiService.getApiUrl()}/products`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json'
-            }
-          })
-        ]);
-        
-        const leadsData = await leadsResponse.json();
-        const leads = leadsData.leads || leadsData || [];
-        
-        setLeads(Array.isArray(leads) ? leads : []);
-        setUsers(usersResponse || []);
-        
-        if (productsResponse.ok) {
+      const fetchId = ++leadsFetchIdRef.current;
+      if (leadsAbortRef.current) {
+        leadsAbortRef.current.abort();
+      }
+      const controller = new AbortController();
+      leadsAbortRef.current = controller;
+
+      setLoading(true);
+      setCurrentPage(1);
+      setLeads([]);
+
+      const leadsAccumulator = [];
+      let firstPageLoaded = false;
+
+      const usersPromise = apiService.getUsers()
+        .then((usersResponse) => {
+          if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+          const usersList = usersResponse?.users || usersResponse || [];
+          setUsers(Array.isArray(usersList) ? usersList : []);
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          console.error('Error fetching users:', error);
+          if (fetchId === leadsFetchIdRef.current) {
+            setUsers([]);
+          }
+        });
+
+      const productsPromise = fetch(`${apiService.getApiUrl()}/products`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+      })
+        .then(async (productsResponse) => {
+          if (!productsResponse.ok) return;
           const productsData = await productsResponse.json();
           const productsList = Array.isArray(productsData) ? productsData : (productsData.products || productsData || []);
+          if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
           setProducts(productsList);
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          console.error('Error fetching products:', error);
+        });
+
+      try {
+        await apiService.fetchPagedLeads({
+          path: '/leads',
+          params: productFilter !== 'all' ? { product: productFilter } : {},
+          pageSize: 200,
+          signal: controller.signal,
+          onPage: (pageLeads) => {
+            if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+            leadsAccumulator.push(...pageLeads);
+            setLeads([...leadsAccumulator]);
+            if (!firstPageLoaded) {
+              setLoading(false);
+              firstPageLoaded = true;
+            }
+          }
+        });
+
+        await Promise.allSettled([usersPromise, productsPromise]);
+
+        if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+        if (!leadsAccumulator.length) {
+          setLeads([]);
         }
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error('Error fetching data:', error);
-        // Fallback to crmData if API fails
-        setLeads(crmData.leads || []);
+        if (fetchId === leadsFetchIdRef.current) {
+          // Fallback to crmData if API fails
+          setLeads(crmData.leads || []);
+        }
       } finally {
-        setLoading(false);
+        if (fetchId === leadsFetchIdRef.current && !controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
-    
+
     fetchData();
-    
+
     // Listen for global lead updates
     const handleLeadsUpdate = () => {
       fetchData();
     };
-    
+
     window.addEventListener('leadsUpdated', handleLeadsUpdate);
-    
+
     return () => {
       window.removeEventListener('leadsUpdated', handleLeadsUpdate);
+      if (leadsAbortRef.current) {
+        leadsAbortRef.current.abort();
+      }
     };
   }, [productFilter]);
 

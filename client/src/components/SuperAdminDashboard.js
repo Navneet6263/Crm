@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiService from '../services/apiService';
 import config from '../config';
 import { TrendingUp, Users, DollarSign, Phone, ArrowUp, ArrowDown, Check, X, Calendar, Search, User, Mail, CreditCard, Shield, Settings, Plus, Eye, UserCheck, UserX, BarChart3, Activity, Clock, Download } from 'lucide-react';
@@ -1411,6 +1411,8 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   const [modalData, setModalData] = useState([]);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const leadsFetchIdRef = useRef(0);
+  const leadsAbortRef = useRef(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
@@ -1529,32 +1531,60 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
     return () => {
       clearInterval(refreshInterval);
       clearInterval(cleanupInterval);
+      if (leadsAbortRef.current) {
+        leadsAbortRef.current.abort();
+      }
     };
   }, []);
 
   const fetchLeads = async (showNotification = false) => {
+    const fetchId = ++leadsFetchIdRef.current;
+    if (leadsAbortRef.current) {
+      leadsAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    leadsAbortRef.current = controller;
+
     try {
       setLoading(true);
-      const response = await fetch(`${apiService.getApiUrl()}/leads?limit=10000`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
+      const leadsAccumulator = [];
+      let firstPageLoaded = false;
+
+      await apiService.fetchPagedLeads({
+        path: '/leads',
+        pageSize: 200,
+        signal: controller.signal,
+        onPage: (pageLeads) => {
+          if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+          leadsAccumulator.push(...pageLeads);
+          setLeads([...leadsAccumulator]);
+          if (!firstPageLoaded) {
+            setLoading(false);
+            firstPageLoaded = true;
+          }
         }
       });
-      const data = await response.json();
-      const leadsData = data?.leads || data || [];
-      setLeads(Array.isArray(leadsData) ? leadsData : []);
+
+      if (fetchId !== leadsFetchIdRef.current || controller.signal.aborted) return;
+      if (!leadsAccumulator.length) {
+        setLeads([]);
+      }
       if (showNotification) {
-        console.log('✅ Leads refreshed successfully');
+        console.log('Leads refreshed successfully');
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error('Error fetching leads:', error);
-      setLeads([]);
+      if (fetchId === leadsFetchIdRef.current) {
+        setLeads([]);
+      }
       if (showNotification) {
-        console.error('❌ Failed to refresh leads');
+        console.error('Failed to refresh leads');
       }
     } finally {
-      setLoading(false);
+      if (fetchId === leadsFetchIdRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 

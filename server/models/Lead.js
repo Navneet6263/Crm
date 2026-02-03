@@ -390,5 +390,12 @@ leadSchema.index({ product: 1 });
 leadSchema.index({ workflowStage: 1 });
 leadSchema.index({ assignedToLegal: 1 });
 leadSchema.index({ assignedToFinance: 1 });
+leadSchema.index({ phone: 1 });
+leadSchema.index({ createdAt: -1, _id: -1 });
+leadSchema.index({ companyId: 1, isActive: 1, createdAt: -1 });
+leadSchema.index({ companyId: 1, isActive: 1, assignedTo: 1, createdAt: -1 });
+leadSchema.index({ companyId: 1, isActive: 1, createdBy: 1, createdAt: -1 });
+leadSchema.index({ companyId: 1, isActive: 1, status: 1, priority: 1, createdAt: -1 });
+leadSchema.index({ companyId: 1, isActive: 1, product: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Lead', leadSchema);

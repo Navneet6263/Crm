@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Users, Activity, TrendingUp, Clock, BarChart3 } from 'lucide-react';
 import { showToast } from './ToastNotification';
+import apiService from '../services/apiService';
 
 const UserPerformanceReport = ({ darkMode, currentUser }) => {
   const [loading, setLoading] = useState(false);
@@ -21,19 +22,27 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
       
       // Fetch analytics and leads data
-      const [analyticsResponse, leadsResponse] = await Promise.all([
-        fetch(`${apiUrl}/analytics/crm-usage?range=${dateRange}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        }),
-        fetch(`${apiUrl}/leads?limit=10000`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        })
-      ]);
-      
-      if (analyticsResponse.ok && leadsResponse.ok) {
+      const analyticsPromise = fetch(`${apiUrl}/analytics/crm-usage?range=${dateRange}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+
+      const leadsPromise = (async () => {
+        const allLeads = [];
+        await apiService.fetchPagedLeads({
+          path: '/leads',
+          pageSize: 200,
+          onPage: (pageLeads) => {
+            allLeads.push(...pageLeads);
+          }
+        });
+        return allLeads;
+      })();
+
+      const [analyticsResponse, allLeads] = await Promise.all([analyticsPromise, leadsPromise]);
+
+      if (analyticsResponse.ok) {
         const analyticsData = await analyticsResponse.json();
-        const leadsData = await leadsResponse.json();
-        const allLeads = leadsData.leads || [];
+        const allLeadsList = Array.isArray(allLeads) ? allLeads : [];
         
         // Build status change history per user
         const statusChangesByUser = {};
@@ -41,7 +50,7 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
         // Enhance user activity with lead details
         const enhancedUserActivity = analyticsData.userActivity.map(user => {
           // Get leads assigned to this user
-          const userLeads = allLeads.filter(lead => 
+          const userLeads = allLeadsList.filter(lead => 
             lead.assignedTo?._id === user.userEmail || 
             lead.assignedTo?.email === user.userEmail
           );
