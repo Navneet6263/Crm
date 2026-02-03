@@ -147,13 +147,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
       // Check if status changed and note is required
       if (updateData.status !== originalStatus) {
         if (!(updateData.notes || '').trim()) {
-          alert('❌ Status changed! Please add notes explaining the reason (minimum 10 words).');
-          return;
-        }
-        
-        const wordCount = (updateData.notes || '').trim().split(/\s+/).length;
-        if (wordCount < 10) {
-          alert(`❌ Please provide at least 10 words in the notes. You provided ${wordCount} words.`);
+          alert('❌ Status changed! Please add notes explaining the reason.');
           return;
         }
       }
@@ -1473,7 +1467,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                   color: darkMode ? '#d1d5db' : '#374151',
                   marginBottom: '0.5rem'
                 }}>
-                  Notes {updateData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required - min 10 words)</span>}
+                  Notes {updateData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required)</span>}
                 </label>
                 <textarea
                   value={updateData.notes}
@@ -1483,7 +1477,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    border: `2px solid ${updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10) ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
+                    border: `2px solid ${updateData.status !== originalStatus && !(updateData.notes || '').trim() ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
                     borderRadius: '8px',
                     background: darkMode ? '#374151' : 'white',
                     color: darkMode ? 'white' : '#1f2937',
@@ -1498,7 +1492,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                     color: (updateData.notes || '').trim().split(/\s+/).length >= 10 ? '#22c55e' : '#ef4444',
                     marginTop: '0.25rem'
                   }}>
-                    {(updateData.notes || '').trim() ? `${(updateData.notes || '').trim().split(/\s+/).length} / 10 words` : 'Status changed - notes are required (minimum 10 words)'}
+                    {(updateData.notes || '').trim() ? `${(updateData.notes || '').trim().split(/\s+/).length} words` : 'Status changed - notes are required'}
                   </div>
                 )}
               </div>
@@ -1557,14 +1551,14 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                 </button>
                 <button
                   onClick={saveUpdate}
-                  disabled={updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)}
+                  disabled={updateData.status !== originalStatus && !(updateData.notes || '').trim()}
                   style={{
                     padding: '0.75rem 1.5rem',
                     border: 'none',
                     borderRadius: '8px',
-                    background: (updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)) ? '#9ca3af' : 'linear-gradient(135deg, #667eea, #764ba2)',
+                    background: (updateData.status !== originalStatus && !(updateData.notes || '').trim()) ? '#9ca3af' : 'linear-gradient(135deg, #667eea, #764ba2)',
                     color: 'white',
-                    cursor: (updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)) ? 'not-allowed' : 'pointer',
+                    cursor: (updateData.status !== originalStatus && !(updateData.notes || '').trim()) ? 'not-allowed' : 'pointer',
                     fontSize: '1rem',
                     fontWeight: '500',
                     display: 'flex',
@@ -1572,7 +1566,7 @@ const LeadTracker = ({ crmData, updateCrmData, user, darkMode }) => {
                     justifyContent: 'center',
                     gap: '0.5rem',
                     width: isMobile ? '100%' : 'auto',
-                    opacity: (updateData.status !== originalStatus && (!(updateData.notes || '').trim() || (updateData.notes || '').trim().split(/\s+/).length < 10)) ? 0.6 : 1
+                    opacity: (updateData.status !== originalStatus && !(updateData.notes || '').trim()) ? 0.6 : 1
                   }}
                 >
                   <CheckCircle size={16} />

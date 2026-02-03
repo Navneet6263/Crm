@@ -275,15 +275,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         return;
       }
       
-      const wordCount = reason.trim().split(/\s+/).length;
-      if (wordCount < 10) {
-        if (window.showToast) {
-          window.showToast('error', `❌ Please provide at least 10 words. You provided ${wordCount} words.`);
-        } else {
-          alert(`Please provide at least 10 words. You provided ${wordCount} words.`);
-        }
-        return;
-      }
+
       
       try {
         // Update immediately in local state (optimistic update)
@@ -352,13 +344,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
       // Check if status changed and note is required
       if (editData.status !== originalStatus) {
         if (!newNote.trim()) {
-          alert('❌ Status changed! Please add a note explaining the reason (minimum 10 words).');
-          return;
-        }
-        
-        const wordCount = newNote.trim().split(/\s+/).length;
-        if (wordCount < 10) {
-          alert(`❌ Please provide at least 10 words in the note. You provided ${wordCount} words.`);
+          alert('❌ Status changed! Please add a note explaining the reason.');
           return;
         }
       }
@@ -1803,11 +1789,27 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       >
                         <option value="">Select source</option>
                         <option value="website">Website</option>
-                        <option value="social-media">Social Media</option>
+                        <option value="google">Google</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="twitter">Twitter</option>
+                        <option value="youtube">YouTube</option>
                         <option value="referral">Referral</option>
                         <option value="cold-call">Cold Call</option>
                         <option value="email-campaign">Email Campaign</option>
                         <option value="trade-show">Trade Show</option>
+                        <option value="advertisement">Advertisement</option>
+                        <option value="direct-mail">Direct Mail</option>
+                        <option value="partner">Partner</option>
+                        <option value="webinar">Webinar</option>
+                        <option value="content-marketing">Content Marketing</option>
+                        <option value="seo">SEO</option>
+                        <option value="ppc">PPC</option>
+                        <option value="social-media">Social Media</option>
+                        <option value="word-of-mouth">Word of Mouth</option>
+                        <option value="existing-customer">Existing Customer</option>
+                        <option value="walk-in">Walk-in</option>
                         <option value="other">Other</option>
                       </select>
                     </div>
@@ -2140,7 +2142,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     color: darkMode ? '#d1d5db' : '#374151',
                     marginBottom: '0.5rem'
                   }}>
-                    Add New Note {editData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required - min 10 words)</span>}
+                    Add New Note {editData.status !== originalStatus && <span style={{ color: '#ef4444' }}>* (Required)</span>}
                   </label>
                   <textarea
                     value={newNote}
@@ -2150,7 +2152,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     style={{
                       width: '100%',
                       padding: '0.75rem',
-                      border: `2px solid ${editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10) ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
+                      border: `2px solid ${editData.status !== originalStatus && !newNote.trim() ? '#ef4444' : (darkMode ? '#374151' : '#e5e7eb')}`,
                       borderRadius: '8px',
                       background: darkMode ? '#374151' : 'white',
                       color: darkMode ? 'white' : '#1f2937',
@@ -2164,7 +2166,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       color: newNote.trim().split(/\s+/).length >= 10 ? '#22c55e' : '#ef4444',
                       marginTop: '0.25rem'
                     }}>
-                      {newNote.trim() ? `${newNote.trim().split(/\s+/).length} / 10 words` : 'Status changed - note is required (minimum 10 words)'}
+                      {newNote.trim() ? `${newNote.trim().split(/\s+/).length} words` : 'Status changed - note is required'}
                     </div>
                   )}
                   <div style={{
@@ -2221,19 +2223,19 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       console.log('Save clicked');
                       saveEditLead();
                     }}
-                    disabled={editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)}
+                    disabled={editData.status !== originalStatus && !newNote.trim()}
                     style={{
                       padding: '12px 24px',
                       border: 'none',
                       borderRadius: '8px',
-                      background: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? '#9ca3af' : '#3b82f6',
+                      background: (editData.status !== originalStatus && !newNote.trim()) ? '#9ca3af' : '#3b82f6',
                       color: 'white',
-                      cursor: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? 'not-allowed' : 'pointer',
+                      cursor: (editData.status !== originalStatus && !newNote.trim()) ? 'not-allowed' : 'pointer',
                       fontSize: '16px',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '8px',
-                      opacity: (editData.status !== originalStatus && (!newNote.trim() || newNote.trim().split(/\s+/).length < 10)) ? 0.6 : 1
+                      opacity: (editData.status !== originalStatus && !newNote.trim()) ? 0.6 : 1
                     }}
                   >
                     <Edit size={16} />
