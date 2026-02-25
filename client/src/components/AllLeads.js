@@ -462,6 +462,9 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
   const saveEditLead = async () => {
     try {
       const leadId = selectedLead._id || selectedLead.id;
+      const productId = typeof selectedLead.product === 'object'
+        ? selectedLead.product?._id
+        : selectedLead.product;
       
       // Check if status changed and note is required
       if (editData.status !== originalStatus) {
@@ -506,9 +509,8 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
         changes.push(`Requirements updated`);
       }
       
-      // Create updated lead object with all fields
+      // Create clean payload (avoid sending populated objects that can break backend)
       const updatedLeadData = {
-        ...originalLead, // Keep all existing data
         contactPerson: editData.contactPerson,
         name: editData.contactPerson, // For backward compatibility
         companyName: editData.companyName,
@@ -519,7 +521,7 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
         leadSource: editData.leadSource,
         status: editData.status,
         priority: editData.priority,
-        estimatedValue: editData.estimatedValue,
+        estimatedValue: Number(editData.estimatedValue) || 0,
         requirements: editData.requirements,
         address: {
           street: editData.address.street,
@@ -531,16 +533,34 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
         lastActivity: new Date().toISOString(),
         lastUpdatedBy: currentUser?.name || currentUser?.email || 'User'
       };
+
+      if (productId) {
+        updatedLeadData.product = productId; // always send ID, not populated object
+      }
+
+      // Keep existing assignment if any
+      if (selectedLead.assignedTo) {
+        updatedLeadData.assignedTo = typeof selectedLead.assignedTo === 'object'
+          ? selectedLead.assignedTo._id || selectedLead.assignedTo.id
+          : selectedLead.assignedTo;
+      }
       
       // Update lead in backend
       await apiService.updateLead(leadId, updatedLeadData);
       
+      const mergedLead = {
+        ...selectedLead,
+        ...updatedLeadData,
+        product: selectedLead.product || updatedLeadData.product
+      };
+
       // Update local state immediately (no need to refetch)
       setLeads(prevLeads => 
         prevLeads.map(lead => 
-          (lead._id || lead.id) === leadId ? updatedLeadData : lead
+          (lead._id || lead.id) === leadId ? mergedLead : lead
         )
       );
+      setSelectedLead(mergedLead);
       
       // Add update history note if there were changes
       if (changes.length > 0) {
@@ -1717,14 +1737,37 @@ const AllLeads = ({ darkMode = false, crmData = {}, initialFilter = null }) => {
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <h3 style={{
-                  fontSize: '1.25rem',
-                  fontWeight: '600',
-                  color: darkMode ? 'white' : '#1f2937',
-                  margin: 0
-                }}>
-                  Edit Lead: {selectedLead.companyName}
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {selectedLead.product && (() => {
+                    const productObj = typeof selectedLead.product === 'object' 
+                      ? selectedLead.product 
+                      : products.find(p => p._id === selectedLead.product);
+                    return productObj ? (
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        backgroundColor: productObj.color || '#22c55e',
+                        color: 'white',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginBottom: '4px'
+                      }}>
+                        {productObj.icon || '🔵'} {productObj.name || 'Product'}
+                      </span>
+                    ) : null;
+                  })()}
+                  <h3 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: '600',
+                    color: darkMode ? 'white' : '#1f2937',
+                    margin: 0
+                  }}>
+                    Edit Lead: {selectedLead.companyName}
+                  </h3>
+                </div>
                 <button
                   onClick={() => setShowEditModal(false)}
                   style={{

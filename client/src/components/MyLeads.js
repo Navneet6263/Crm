@@ -383,7 +383,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
     try {
       const leadId = selectedLead._id || selectedLead.id;
       
-      // Check if status changed and note is required
       if (editData.status !== originalStatus) {
         if (!newNote.trim()) {
           alert('❌ Status changed! Please add a note explaining the reason.');
@@ -391,7 +390,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         }
       }
       
-      // Track what fields were changed
       const changes = [];
       const originalLead = selectedLead;
       
@@ -426,7 +424,6 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         changes.push(`Requirements updated`);
       }
       
-      // Create updated lead object with all fields
       const updatedLeadData = {
         ...originalLead,
         contactPerson: editData.contactPerson,
@@ -452,81 +449,53 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         lastUpdatedBy: user?.name || user?.email || 'User'
       };
       
-      // Update lead in backend
-      await apiService.updateLead(leadId, updatedLeadData);
-      
-      // Refresh global data
-      if (updateCrmData) {
-        const allLeads = await apiService.getAllLeads();
-        updateCrmData({ leads: allLeads });
-      }
-      
-      // Update local state immediately (no need to refetch)
+      // OPTIMISTIC UPDATE - Update UI immediately
       setLeads(prevLeads => 
         prevLeads.map(lead => 
           (lead._id || lead.id) === leadId ? updatedLeadData : lead
         )
       );
       
-      // Add update history note if there were changes
-      if (changes.length > 0) {
-        const updateNote = `Lead updated by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}:\n\nChanges made:\n${changes.map(change => `• ${change}`).join('\n')}`;
-        try {
-          await apiService.addLeadNote(leadId, updateNote);
-          // Update notes in local state too
-          const newNoteObj = {
-            content: updateNote,
-            createdAt: new Date().toISOString(),
-            createdBy: { name: user?.name || user?.email || 'User' }
-          };
-          setLeads(prevLeads => 
-            prevLeads.map(lead => {
-              if ((lead._id || lead.id) === leadId) {
-                return {
-                  ...lead,
-                  notes: [...(lead.notes || []), newNoteObj]
-                };
-              }
-              return lead;
-            })
-          );
-        } catch (noteError) {
-          console.error('Error adding update note:', noteError);
-        }
-      }
-      
-      // Add additional note if provided
-      if (newNote.trim()) {
-        try {
-          await apiService.addLeadNote(leadId, newNote);
-          // Update notes in local state
-          const newNoteObj = {
-            content: newNote,
-            createdAt: new Date().toISOString(),
-            createdBy: { name: user?.name || user?.email || 'User' }
-          };
-          setLeads(prevLeads => 
-            prevLeads.map(lead => {
-              if ((lead._id || lead.id) === leadId) {
-                return {
-                  ...lead,
-                  notes: [...(lead.notes || []), newNoteObj]
-                };
-              }
-              return lead;
-            })
-          );
-        } catch (noteError) {
-          console.error('Error adding note:', noteError);
-        }
-      }
-      
-      // Close modal and reset
+      // Close modal immediately
       setShowEditModal(false);
       setSelectedLead(null);
       setNewNote('');
       
-      alert('Lead updated successfully!');
+      if (window.showToast) {
+        window.showToast('success', '✅ Lead updated successfully!');
+      }
+      
+      // Backend updates in background
+      (async () => {
+        try {
+          await apiService.updateLead(leadId, updatedLeadData);
+          
+          if (changes.length > 0) {
+            const updateNote = `Lead updated by ${user?.name || user?.email || 'User'} at ${new Date().toLocaleString('en-IN')}:\n\nChanges made:\n${changes.map(change => `• ${change}`).join('\n')}`;
+            await apiService.addLeadNote(leadId, updateNote);
+          }
+          
+          if (newNote.trim()) {
+            await apiService.addLeadNote(leadId, newNote);
+          }
+          
+          if (updateCrmData) {
+            const allLeads = await apiService.getAllLeads();
+            updateCrmData({ leads: allLeads });
+          }
+        } catch (error) {
+          console.error('Error updating lead in background:', error);
+          if (window.showToast) {
+            window.showToast('error', '❌ Failed to sync changes to server');
+          }
+          // Revert on error
+          setLeads(prevLeads => 
+            prevLeads.map(lead => 
+              (lead._id || lead.id) === leadId ? originalLead : lead
+            )
+          );
+        }
+      })();
       
     } catch (error) {
       console.error('Error updating lead:', error);
