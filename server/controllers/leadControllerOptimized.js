@@ -100,7 +100,7 @@ const getLeadsOptimized = async (req, res) => {
 
     const [leads, total] = await Promise.all([
       Lead.find(query)
-        .select('contactPerson companyName email phone status priority estimatedValue assignedTo createdBy product createdAt assignedAt address')
+        .select('contactPerson companyName email phone status priority estimatedValue assignedTo createdBy product createdAt assignedAt address leadSource industry requirements notes')
                 .populate('product', 'name color icon')
         .sort({ createdAt: -1, _id: -1 })
         .limit(limitNum)
@@ -167,7 +167,7 @@ const getMyLeadsOptimized = async (req, res) => {
 
     const [leads, total] = await Promise.all([
       Lead.find(query)
-        .select('contactPerson companyName email phone status priority estimatedValue assignedTo createdBy product createdAt assignedAt address')
+        .select('contactPerson companyName email phone status priority estimatedValue assignedTo createdBy product createdAt assignedAt address leadSource industry requirements notes')
                 .populate('product', 'name color icon')
         .sort({ createdAt: -1, _id: -1 })
         .limit(limitNum)
