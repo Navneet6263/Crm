@@ -805,8 +805,8 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
         {/* Leads Display */}
         <div style={{
           display: viewMode === 'grid' ? 'grid' : 'block',
-          gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(420px, 1fr))' : '1fr',
-          gap: viewMode === 'grid' ? '1.5rem' : '0',
+          gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(360px, 1fr))' : '1fr',
+          gap: viewMode === 'grid' ? '1.1rem' : '0',
           backgroundColor: viewMode === 'list' ? (darkMode ? '#374151' : 'white') : 'transparent',
           borderRadius: viewMode === 'list' ? '16px' : '0',
           overflow: viewMode === 'list' ? 'hidden' : 'visible',
@@ -838,9 +838,9 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     id={`lead-${lead._id || lead.id}`}
                     style={{
                       backgroundColor: highlightedLeadId === (lead._id || lead.id) ? (darkMode ? '#1e3a5f' : '#dbeafe') : (darkMode ? '#374151' : 'white'),
-                      borderRadius: '16px',
-                      padding: '24px',
-                      boxShadow: highlightedLeadId === (lead._id || lead.id) ? '0 0 0 3px #3b82f6' : (darkMode ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)' : '0 4px 6px -1px rgba(0, 0, 0, 0.1)'),
+                      borderRadius: '14px',
+                      padding: '16px',
+                      boxShadow: highlightedLeadId === (lead._id || lead.id) ? '0 0 0 3px #3b82f6' : (darkMode ? '0 3px 8px rgba(0, 0, 0, 0.28)' : '0 4px 14px rgba(15,23,42,0.08)'),
                       border: highlightedLeadId === (lead._id || lead.id) ? '2px solid #3b82f6' : (darkMode ? '1px solid #4b5563' : '1px solid #e5e7eb'),
                       transition: 'all 0.3s ease',
                       cursor: 'pointer',
@@ -867,19 +867,19 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     }} />
                     
                     {/* Header */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
-                          width: '48px',
-                          height: '48px',
+                          width: '40px',
+                          height: '40px',
                           background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                          borderRadius: '12px',
+                          borderRadius: '10px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: 'white',
-                          fontWeight: 'bold',
-                          fontSize: '16px'
+                          fontWeight: '700',
+                          fontSize: '14px'
                         }}>
                           {(lead.contactPerson || lead.name || 'U').split(' ').map(n => n[0]).join('')}
                         </div>
@@ -892,8 +892,8 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                               }
                             }}
                             style={{
-                            fontSize: '18px',
-                            fontWeight: '600',
+                            fontSize: '17px',
+                            fontWeight: '700',
                             color: '#3b82f6',
                             margin: 0,
                             marginBottom: '4px',
@@ -906,7 +906,7 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                             {lead.contactPerson || lead.name}
                           </h3>
                           <p style={{
-                            fontSize: '14px',
+                            fontSize: '13px',
                             color: darkMode ? '#9ca3af' : '#6b7280',
                             margin: 0
                           }}>
@@ -934,19 +934,19 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                     </div>
                     
                     {/* Contact Info */}
-                    <div style={{ marginBottom: '16px' }}>
+                    <div style={{ marginBottom: '12px' }}>
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
-                        gap: '12px',
-                        fontSize: '14px'
+                        gap: '10px',
+                        fontSize: '13px'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#d1d5db' : '#6b7280' }}>
-                          <Mail size={16} style={{ color: '#3b82f6' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: darkMode ? '#d1d5db' : '#6b7280' }}>
+                          <Mail size={15} style={{ color: '#3b82f6' }} />
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.email}</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: darkMode ? '#d1d5db' : '#6b7280' }}>
-                          <Phone size={16} style={{ color: '#22c55e' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: darkMode ? '#d1d5db' : '#6b7280' }}>
+                          <Phone size={15} style={{ color: '#22c55e' }} />
                           <span>{lead.phone}</span>
                         </div>
                       </div>
@@ -957,8 +957,8 @@ const MyLeads = ({ darkMode = false, crmData, user, updateCrmData, onNavigate })
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginBottom: '16px',
-                      padding: '12px',
+                      marginBottom: '12px',
+                      padding: '10px',
                       backgroundColor: darkMode ? '#4b556320' : '#f8fafc',
                       borderRadius: '8px'
                     }}>

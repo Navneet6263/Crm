@@ -1445,6 +1445,12 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   const activeLeads = leadsArray.filter(l => ['qualified', 'proposal', 'negotiation', 'contacted'].includes(l.status)).length;
   const closedWonLeads = leadsArray.filter(l => l.status === 'closed-won').length;
   const pendingLeads = leadsArray.filter(l => ['new', 'pending'].includes(l.status)).length;
+  const today = new Date().toISOString().slice(0, 10);
+  const newToday = leadsArray.filter(l => (l.createdAt || l.createdDate || '').slice(0, 10) === today).length;
+  const avgDealValue = leadsArray.length
+    ? Math.round(leadsArray.reduce((sum, l) => sum + (Number(l.estimatedValue) || 0), 0) / leadsArray.length)
+    : 0;
+  const conversionRate = totalLeads ? Math.round((closedWonLeads / totalLeads) * 100) : 0;
   
   const stats = [
     { 
@@ -1762,72 +1768,134 @@ const SuperAdminDashboard = ({ darkMode = false, currentUser, onNavigate }) => {
   return (
     <div style={{
       padding: '2rem',
-      maxWidth: '1200px',
+      maxWidth: '1280px',
       margin: '0 auto',
-      background: darkMode ? '#0f172a' : 'transparent',
+      background: darkMode
+        ? 'linear-gradient(180deg, #0f172a 0%, #0c1220 45%, #0a0f1a 100%)'
+        : 'linear-gradient(180deg, #f9fafb 0%, #f3f4f6 45%, #ffffff 100%)',
       minHeight: '100vh',
       color: darkMode ? '#f8fafc' : '#111827'
     }}>
-      <div style={{
-        marginBottom: '2rem'
-      }}>
+      {/* Hero */}
+      <div style={{ marginBottom: '2rem' }}>
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '1rem'
+          borderRadius: '18px',
+          padding: '1.75rem',
+          background: darkMode
+            ? 'linear-gradient(120deg, #0ea5e9 0%, #22c55e 45%, #a855f7 100%)'
+            : 'linear-gradient(120deg, #e0f2fe 0%, #dcfce7 45%, #ede9fe 100%)',
+          color: darkMode ? '#0b1220' : '#0f172a',
+          boxShadow: darkMode ? '0 20px 50px -24px rgba(0,0,0,0.6)' : '0 20px 50px -24px rgba(15,23,42,0.25)',
+          border: 'none'
         }}>
-          <div>
-            <h1 style={{
-              fontSize: '1.875rem',
-              fontWeight: '700',
-              color: darkMode ? '#f8fafc' : '#111827',
-              marginBottom: '0.5rem'
-            }}>{
-              currentUser?.role === 'super-admin' ? 'Super Admin Dashboard' : 
-              currentUser?.role === 'admin' ? 'Admin Dashboard' :
-              currentUser?.role === 'manager' ? 'Manager Dashboard' :
-              currentUser?.role === 'senior-manager' ? 'Senior Manager Dashboard' :
-              'Dashboard'
-            }</h1>
-            <p style={{
-              color: darkMode ? '#cbd5e1' : '#6b7280'
-            }}>Welcome back! Here's what's happening with your business today.</p>
-          </div>
-          
-          {/* Just Refresh Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              onClick={handleRefreshAll}
-              disabled={loading}
-              style={{
-                padding: '0.5rem 1rem',
-                background: loading ? (darkMode ? '#4b5563' : '#e5e7eb') : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: loading ? (darkMode ? '#9ca3af' : '#6b7280') : 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <div style={{
-                width: '16px',
-                height: '16px',
-                border: loading ? '2px solid transparent' : 'none',
-                borderTop: loading ? `2px solid ${darkMode ? '#9ca3af' : '#6b7280'}` : 'none',
-                borderRadius: '50%',
-                animation: loading ? 'spin 1s linear infinite' : 'none'
-              }}>
-                {!loading && '↻'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span style={{
+                  padding: '4px 10px',
+                  background: 'rgba(0,0,0,0.1)',
+                  borderRadius: '999px',
+                  color: darkMode ? '#0b1220' : '#0f172a',
+                  fontWeight: 700,
+                  fontSize: '0.8rem'
+                }}>
+                  {currentUser?.role === 'super-admin' ? 'Super Admin' : 'Admin'}
+                </span>
+                <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>Real-time control center</span>
               </div>
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
+              <h1 style={{
+                fontSize: '2rem',
+                fontWeight: '800',
+                margin: 0,
+                color: darkMode ? '#0b1220' : '#0f172a'
+              }}>
+                Welcome back, {currentUser?.name || 'Leader'} 👋
+              </h1>
+              <p style={{
+                margin: '0.35rem 0 0',
+                color: darkMode ? '#0b1220' : '#0f172a',
+                opacity: 0.8,
+                fontWeight: 600
+              }}>
+                Keep an eye on pipeline, teams, and revenue hotspots.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                {[
+                  { label: 'New today', value: newToday },
+                  { label: 'Win rate', value: `${conversionRate}%` },
+                  { label: 'Avg deal', value: `₹${avgDealValue.toLocaleString()}` }
+                ].map((chip, idx) => (
+                  <span key={idx} style={{
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.9)',
+                    color: '#0f172a',
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    display: 'inline-flex',
+                    gap: '6px',
+                    alignItems: 'center',
+                    boxShadow: '0 10px 24px -14px rgba(15,23,42,0.35)'
+                  }}>
+                    {chip.value}
+                    <span style={{ opacity: 0.65, fontWeight: 600 }}>{chip.label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleRefreshAll}
+                disabled={loading}
+                style={{
+                  padding: '0.75rem 1.1rem',
+                  background: loading ? 'rgba(255,255,255,0.5)' : '#0f172a',
+                  color: loading ? '#475569' : 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  boxShadow: '0 10px 25px -15px rgba(0,0,0,0.6)'
+                }}
+              >
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: loading ? '2px solid transparent' : 'none',
+                  borderTop: loading ? '2px solid #475569' : 'none',
+                  borderRadius: '50%',
+                  animation: loading ? 'spin 1s linear infinite' : 'none'
+                }}>
+                  {!loading && '↻'}
+                </div>
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={() => onNavigate('add-enquiry')}
+                style={{
+                  padding: '0.75rem 1.1rem',
+                  background: 'rgba(255,255,255,0.9)',
+                  color: '#0f172a',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  boxShadow: '0 10px 25px -15px rgba(0,0,0,0.35)'
+                }}
+              >
+                <Plus size={18} />
+                New Lead
+              </button>
+            </div>
           </div>
         </div>
         

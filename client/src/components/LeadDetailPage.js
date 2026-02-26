@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, 
   Phone, 
@@ -34,6 +34,7 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
   const [activityDescription, setActivityDescription] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
+  const [leadScoreRequested, setLeadScoreRequested] = useState(false);
   const [taskData, setTaskData] = useState({
     title: '',
     description: '',
@@ -50,6 +51,7 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
     recurringEndDate: ''
   });
   const [users, setUsers] = useState([]);
+  const fetchIdRef = useRef(0);
 
   useEffect(() => {
     const initialMatch = initialLead && ((initialLead._id || initialLead.id) === leadId);
@@ -60,6 +62,7 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
       setLead(null);
       setLoading(true);
     }
+    setLeadScoreRequested(false);
 
     fetchLeadDetails();
     loadUsers();
@@ -149,17 +152,21 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
     }
   };
 
-  const fetchLeadDetails = async () => {
+  const fetchLeadDetails = async (options = {}) => {
+    const { skipScore = false } = options;
+    const fetchId = ++fetchIdRef.current;
     if (!leadId) {
       setLoading(false);
       return;
     }
     try {
       const response = await apiService.getLeadById(leadId);
+      if (fetchId !== fetchIdRef.current) return;
       setLead(response);
       
       // Auto-calculate score if not present
-      if (!response.leadScore) {
+      if (!response.leadScore && !leadScoreRequested && !skipScore) {
+        setLeadScoreRequested(true);
         calculateLeadScore();
       }
       
@@ -179,7 +186,7 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
           'Content-Type': 'application/json'
         }
       });
-      fetchLeadDetails();
+      fetchLeadDetails({ skipScore: true });
     } catch (error) {
       console.error('Error calculating score:', error);
     }
@@ -303,7 +310,60 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 style={{ fontSize: '2rem', fontWeight: '700', margin: 0 }}>{lead.contactPerson}</h1>
+        <div style={{ display: 'grid', gap: '0.35rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '700', margin: 0 }}>{lead.contactPerson}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {lead.product && (
+              <span style={{
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '11px',
+                fontWeight: '600',
+                backgroundColor: (typeof lead.product === 'object' && lead.product.color) || '#22c55e',
+                color: 'white',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {(typeof lead.product === 'object' && lead.product.icon) || '🔵'}
+                {(typeof lead.product === 'object' && lead.product.name) || 'Product'}
+              </span>
+            )}
+            <span style={{
+              padding: '4px 10px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              backgroundColor: '#dbeafe',
+              color: '#1d4ed8'
+            }}>
+              {(lead.status || 'NEW').toUpperCase()}
+            </span>
+            <span style={{
+              padding: '4px 10px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: '700',
+              backgroundColor: lead.priority === 'high' || lead.priority === 'urgent' ? '#fee2e2' : '#fef3c7',
+              color: lead.priority === 'high' || lead.priority === 'urgent' ? '#dc2626' : '#d97706',
+              border: `1px solid ${lead.priority === 'high' || lead.priority === 'urgent' ? '#ef4444' : '#f59e0b'}`
+            }}>
+              {(lead.priority || 'medium').toUpperCase()}
+            </span>
+            {lead.assignedTo && (
+              <span style={{
+                padding: '4px 8px',
+                borderRadius: '10px',
+                fontSize: '11px',
+                backgroundColor: darkMode ? '#111827' : '#f3f4f6',
+                color: darkMode ? '#e5e7eb' : '#374151',
+                border: `1px dashed ${darkMode ? '#374151' : '#d1d5db'}`
+              }}>
+                Assigned to {typeof lead.assignedTo === 'object' ? lead.assignedTo.name : lead.assignedTo}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Lead Intelligence Stats */}
@@ -376,7 +436,14 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
         {/* Left Column */}
         <div>
           {/* Lead Info Card */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ 
+            background: darkMode ? '#111827' : 'white', 
+            borderRadius: '12px', 
+            padding: '2rem', 
+            marginBottom: '2rem', 
+            boxShadow: darkMode ? '0 1px 3px rgba(0,0,0,0.35)' : '0 1px 3px rgba(0,0,0,0.1)',
+            border: darkMode ? '1px solid #1f2937' : '1px solid #e5e7eb'
+          }}>
             <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Lead Information</h2>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
@@ -448,7 +515,14 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
 
           {/* Address Section */}
           {lead.address && (lead.address.street || lead.address.city || lead.address.state || lead.address.postalCode) && (
-            <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', marginTop: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ 
+              background: darkMode ? '#111827' : 'white', 
+              borderRadius: '12px', 
+              padding: '2rem', 
+              marginTop: '2rem', 
+              boxShadow: darkMode ? '0 1px 3px rgba(0,0,0,0.35)' : '0 1px 3px rgba(0,0,0,0.1)',
+              border: darkMode ? '1px solid #1f2937' : '1px solid #e5e7eb'
+            }}>
               <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 📍 Address Information
               </h2>
@@ -489,7 +563,13 @@ const LeadDetailPage = ({ leadId, initialLead = null, darkMode = false, onBack }
           )}
 
           {/* Activity History */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ 
+            background: darkMode ? '#111827' : 'white', 
+            borderRadius: '12px', 
+            padding: '2rem', 
+            boxShadow: darkMode ? '0 1px 3px rgba(0,0,0,0.35)' : '0 1px 3px rgba(0,0,0,0.1)',
+            border: darkMode ? '1px solid #1f2937' : '1px solid #e5e7eb'
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1.5rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Activity size={24} />

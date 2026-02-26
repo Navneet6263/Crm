@@ -41,37 +41,70 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
       const [analyticsResponse, allLeads] = await Promise.all([analyticsPromise, leadsPromise]);
 
       if (analyticsResponse.ok) {
-        const analyticsData = await analyticsResponse.json();
+      const analyticsData = await analyticsResponse.json();
+      if (!analyticsData || !analyticsData.userActivity) {
+        setAnalytics(null);
+        setLeadStatusChanges({});
+        return;
+      }
         const allLeadsList = Array.isArray(allLeads) ? allLeads : [];
-        
+
+        // Fast lookup for leads by assigned email/id
+        const leadIndex = {};
+        allLeadsList.forEach(lead => {
+          const at = lead.assignedTo || null;
+          const email = at && typeof at === 'object' && at.email ? at.email.toLowerCase() : '';
+          const username = at && typeof at === 'object' && at.username ? at.username.toLowerCase() : '';
+          const id = at && typeof at === 'object' ? (at._id || at.id) : at;
+          const keys = [];
+          if (email) keys.push(`email:${email}`);
+          if (username) keys.push(`email:${username}`);
+          if (id) keys.push(`id:${id}`);
+          keys.forEach(k => {
+            if (!leadIndex[k]) leadIndex[k] = [];
+            leadIndex[k].push(lead);
+          });
+        });
+
         // Build status change history per user
         const statusChangesByUser = {};
         
         // Enhance user activity with lead details
-        const enhancedUserActivity = analyticsData.userActivity.map(user => {
-          // Get leads assigned to this user
-          const userLeads = allLeadsList.filter(lead => 
-            lead.assignedTo?._id === user.userEmail || 
-            lead.assignedTo?.email === user.userEmail
-          );
+        const enhancedUserActivity = (analyticsData.userActivity || []).map(user => {
+          const emailKey = user.userEmail ? `email:${user.userEmail.toLowerCase()}` : null;
+          const idKey = user.userId || user._id || user.id ? `id:${user.userId || user._id || user.id}` : null;
+
+          const userLeads = [
+            ...(emailKey && leadIndex[emailKey] ? leadIndex[emailKey] : []),
+            ...(idKey && leadIndex[idKey] ? leadIndex[idKey] : [])
+          ];
+
+          // de-duplicate
+          const seen = new Set();
+          const uniqueLeads = userLeads.filter(l => {
+            const key = l._id || l.id;
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
           
           // Calculate this month's assignments
           const thisMonth = new Date();
           const monthStart = new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 1);
           
-          const leadsAssignedThisMonth = userLeads.filter(lead => 
+          const leadsAssignedThisMonth = uniqueLeads.filter(lead => 
             lead.assignedAt && new Date(lead.assignedAt) >= monthStart
           ).length;
           
           // Count leads worked on (with notes or activities)
-          const leadsWorkedOn = userLeads.filter(lead => 
+          const leadsWorkedOn = uniqueLeads.filter(lead => 
             (lead.notes && lead.notes.length > 0) || 
             (lead.activities && lead.activities.length > 0)
           ).length;
           
           // Extract status changes with details
           const statusChangeDetails = [];
-          userLeads.forEach(lead => {
+          uniqueLeads.forEach(lead => {
             // Check activities array for status changes
             if (lead.activities && lead.activities.length > 0) {
               lead.activities.forEach(activity => {
@@ -580,34 +613,34 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
                     {isExpanded && (
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
-                          <tr style={{ borderBottom: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
-                            <th style={{ padding: '1rem', textAlign: 'left', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>User</th>
-                            <th style={{ padding: '1rem', textAlign: 'left', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Status</th>
-                            <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Sessions</th>
-                            <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Time (mins)</th>
-                            <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Leads Added</th>
-                            <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Customers</th>
+                          <tr style={{ borderBottom: `2px solid ${darkMode ? '#334155' : '#e5e7eb'}`, background: darkMode ? '#0f172a' : '#f8fafc' }}>
+                            <th style={{ padding: '0.9rem', textAlign: 'left', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>User</th>
+                            <th style={{ padding: '0.9rem', textAlign: 'left', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Status</th>
+                            <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Sessions</th>
+                            <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Time (mins)</th>
+                            <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Leads Added</th>
+                            <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Customers</th>
                             {isSalesRole && (
                               <>
-                                <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Assigned (Month)</th>
-                                <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Worked On</th>
-                                <th style={{ padding: '1rem', textAlign: 'center', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Status Changed</th>
+                                <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Assigned (Month)</th>
+                                <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Worked On</th>
+                                <th style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Status Changed</th>
                               </>
                             )}
-                            <th style={{ padding: '1rem', textAlign: 'left', color: darkMode ? '#9ca3af' : '#6b7280', fontWeight: '600' }}>Last Active</th>
+                            <th style={{ padding: '0.9rem', textAlign: 'left', color: darkMode ? '#cbd5e1' : '#4b5563', fontWeight: '700', letterSpacing: '0.01em' }}>Last Active</th>
                           </tr>
                         </thead>
                         <tbody>
                           {users.map((user, index) => (
                             <React.Fragment key={index}>
-                              <tr style={{ borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}` }}>
-                                <td style={{ padding: '1rem' }}>
+                              <tr style={{ borderBottom: `1px solid ${darkMode ? '#1f2937' : '#e5e7eb'}`, background: index % 2 === 0 ? (darkMode ? '#0f172a' : '#f8fafc') : 'transparent' }}>
+                                <td style={{ padding: '0.9rem' }}>
                                   <div>
                                     <div style={{ color: darkMode ? 'white' : '#1f2937', fontWeight: '500' }}>{user.userName}</div>
                                     <div style={{ color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>{user.userEmail}</div>
                                   </div>
                                 </td>
-                                <td style={{ padding: '1rem' }}>
+                                <td style={{ padding: '0.9rem' }}>
                                   <span style={{
                                     padding: '0.25rem 0.75rem',
                                     borderRadius: '12px',
@@ -619,37 +652,37 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
                                     {user.isActive ? 'Active' : 'Inactive'}
                                   </span>
                                 </td>
-                                <td style={{ padding: '1rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>
+                                <td style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '700' }}>
                                   {user.sessions}
                                 </td>
-                                <td style={{ padding: '1rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>
+                                <td style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '700' }}>
                                   {user.totalTime}
                                 </td>
-                                <td style={{ padding: '1rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>
+                                <td style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '700' }}>
                                   {user.leadsAdded}
                                 </td>
-                                <td style={{ padding: '1rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '600' }}>
+                                <td style={{ padding: '0.9rem', textAlign: 'center', color: darkMode ? 'white' : '#1f2937', fontWeight: '700' }}>
                                   {user.customersAdded}
                                 </td>
                                 {isSalesRole && (
                                   <>
-                                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                    <td style={{ padding: '0.85rem', textAlign: 'center' }}>
                                       <span style={{
-                                        padding: '0.5rem 0.75rem',
+                                        padding: '0.35rem 0.6rem',
                                         borderRadius: '8px',
-                                        fontSize: '1rem',
+                                        fontSize: '0.95rem',
                                         fontWeight: '700',
                                         background: '#dbeafe',
-                                        color: '#1e40af'
+                                        color: '#1e3a8a'
                                       }}>
                                         {user.leadsAssignedThisMonth || 0}
                                       </span>
                                     </td>
-                                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                    <td style={{ padding: '0.85rem', textAlign: 'center' }}>
                                       <span style={{
-                                        padding: '0.5rem 0.75rem',
+                                        padding: '0.35rem 0.6rem',
                                         borderRadius: '8px',
-                                        fontSize: '1rem',
+                                        fontSize: '0.95rem',
                                         fontWeight: '700',
                                         background: '#dcfce7',
                                         color: '#166534'
@@ -657,13 +690,13 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
                                         {user.leadsWorkedOn || 0}
                                       </span>
                                     </td>
-                                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                    <td style={{ padding: '0.85rem', textAlign: 'center' }}>
                                       <span 
                                         onClick={() => setExpandedUsers(prev => ({ ...prev, [user.userEmail]: !prev[user.userEmail] }))}
                                         style={{
-                                          padding: '0.5rem 0.75rem',
+                                          padding: '0.35rem 0.6rem',
                                           borderRadius: '8px',
-                                          fontSize: '1rem',
+                                          fontSize: '0.95rem',
                                           fontWeight: '700',
                                           background: '#fef3c7',
                                           color: '#d97706',
@@ -675,7 +708,7 @@ const UserPerformanceReport = ({ darkMode, currentUser }) => {
                                     </td>
                                   </>
                                 )}
-                                <td style={{ padding: '1rem', color: darkMode ? '#9ca3af' : '#6b7280', fontSize: '0.875rem' }}>
+                                <td style={{ padding: '0.9rem', color: darkMode ? '#94a3b8' : '#6b7280', fontSize: '0.85rem' }}>
                                   {new Date(user.lastActive).toLocaleString('en-IN')}
                                 </td>
                               </tr>

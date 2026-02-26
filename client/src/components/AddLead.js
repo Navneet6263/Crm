@@ -210,25 +210,24 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
   return (
     <div style={{
       position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
+      inset: 0,
+      background: 'rgba(0, 0, 0, 0.55)',
+      backdropFilter: 'blur(4px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      padding: '1rem'
+      padding: '1.5rem'
     }}>
       <div style={{
-        background: darkMode ? '#1f2937' : 'white',
-        borderRadius: '16px',
-        width: '90%',
-        maxWidth: '800px',
-        maxHeight: '90vh',
+        background: darkMode ? 'linear-gradient(165deg, #0f172a 0%, #111827 40%, #0b1324 100%)' : 'linear-gradient(165deg, #ffffff 0%, #f8fafc 45%, #eef2ff 100%)',
+        borderRadius: '18px',
+        width: '95%',
+        maxWidth: '920px',
+        maxHeight: '92vh',
         overflow: 'auto',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+        boxShadow: darkMode ? '0 25px 60px -20px rgba(0,0,0,0.75)' : '0 25px 60px -20px rgba(15,23,42,0.25)',
+        border: darkMode ? '1px solid #1f2937' : '1px solid #e5e7eb'
       }}>
         {/* Header */}
         <div style={{
@@ -236,7 +235,8 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
           borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '1rem'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{
@@ -285,7 +285,14 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
 
         {/* Form */}
         <div style={{ padding: '2rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{
+            background: darkMode ? 'rgba(255,255,255,0.03)' : '#ffffff',
+            borderRadius: '12px',
+            border: darkMode ? '1px solid #1f2937' : '1px solid #e5e7eb',
+            boxShadow: darkMode ? '0 12px 40px -24px rgba(0,0,0,0.8)' : '0 12px 30px -22px rgba(15,23,42,0.18)',
+            padding: '1.5rem'
+          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
             {/* Company Selection for SuperAdmin */}
             {user?.role === 'super-admin' && (
               <div style={{ gridColumn: '1 / -1' }}>
@@ -664,6 +671,7 @@ const SimpleAddEnquiry = ({ darkMode, onSave, onCancel, user }) => {
               />
             </div>
           </div>
+        </div>
         </div>
 
         {/* Footer */}
