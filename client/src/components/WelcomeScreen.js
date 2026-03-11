@@ -5,15 +5,15 @@ const WelcomeScreen = ({ userName, onComplete, darkMode }) => {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    // Start fade out after 1.5 seconds
+    // Start fade out after 1.2 seconds
     const fadeTimer = setTimeout(() => {
       setFadeOut(true);
-    }, 1500);
+    }, 1200);
 
-    // Complete transition after 2 seconds
+    // Complete transition after fade (1.2 + 0.5 = 1.7s)
     const completeTimer = setTimeout(() => {
       onComplete();
-    }, 2000);
+    }, 1700);
 
     return () => {
       clearTimeout(fadeTimer);

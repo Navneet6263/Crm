@@ -846,33 +846,31 @@ const AppContent = () => {
     );
   }
 
-  // Show welcome screen first after login
-  if (showWelcomeScreen) {
+  // NavigationHub pre-rendered under WelcomeScreen to avoid white flash on transition
+  if (showWelcomeScreen || showNavigationHub) {
     return (
-      <WelcomeScreen
-        userName={currentUser?.name || 'User'}
-        onComplete={handleWelcomeComplete}
-        darkMode={darkMode}
-      />
-    );
-  }
-
-  // Show navigation hub after welcome screen
-  if (showNavigationHub) {
-    return (
-      <NavigationHub
-        userName={currentUser?.name || 'User'}
-        userRole={currentUser?.role}
-        onNavigate={handleNavigationHubNavigate}
-        darkMode={darkMode}
-        recentActivity={{
-          lastView: 'dashboard',
-          lastViewName: 'Dashboard',
-          myLeadsCount: crmData.leads?.filter(lead => lead.assignedTo === currentUser?.id)?.length || 0,
-          totalLeads: crmData.leads?.length || 0,
-          recentCount: 3
-        }}
-      />
+      <div style={{ position: 'relative', minHeight: '100vh' }}>
+        <NavigationHub
+          userName={currentUser?.name || 'User'}
+          userRole={currentUser?.role}
+          onNavigate={handleNavigationHubNavigate}
+          darkMode={darkMode}
+          recentActivity={{
+            lastView: 'dashboard',
+            lastViewName: 'Dashboard',
+            myLeadsCount: crmData.leads?.filter(lead => lead.assignedTo === currentUser?.id)?.length || 0,
+            totalLeads: crmData.leads?.length || 0,
+            recentCount: 3
+          }}
+        />
+        {showWelcomeScreen && (
+          <WelcomeScreen
+            userName={currentUser?.name || 'User'}
+            onComplete={handleWelcomeComplete}
+            darkMode={darkMode}
+          />
+        )}
+      </div>
     );
   }
 
