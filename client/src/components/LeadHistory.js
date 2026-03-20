@@ -2,28 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { 
   Clock, 
   Search, 
-  Filter, 
-  Calendar,
   User,
-  Building,
   Phone,
   Mail,
-  DollarSign,
   TrendingUp,
   TrendingDown,
   Eye,
-  Edit,
   Download,
   ArrowUpDown,
-  Activity
+  Activity,
+  Package,
+  RotateCcw
 } from 'lucide-react';
+import { showToast } from './ToastNotification';
 
 const LeadHistory = ({ crmData, darkMode = false }) => {
   const [leads, setLeads] = useState([]);
   const [filteredLeads, setFilteredLeads] = useState([]);
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [productFilter, setProductFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [createdByFilter, setCreatedByFilter] = useState('all');
+  const [assignedToFilter, setAssignedToFilter] = useState('all');
+  const [workflowStageFilter, setWorkflowStageFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [dateFromFilter, setDateFromFilter] = useState('');
+  const [dateToFilter, setDateToFilter] = useState('');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedLead, setSelectedLead] = useState(null);
@@ -39,15 +46,210 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
   }, [crmData]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchProducts = async () => {
+      try {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5004/api';
+        const response = await fetch(`${apiUrl}/products`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const productList = Array.isArray(data) ? data : (data.products || data || []);
+
+        if (isMounted) {
+          setProducts(Array.isArray(productList) ? productList : []);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
+
+    fetchProducts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const normalizeText = (value) => String(value || '').trim().toLowerCase();
+
+  const titleize = (value) => {
+    if (!value) return 'N/A';
+    return String(value)
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const productLookup = products.reduce((accumulator, product) => {
+    const productId = product?._id || product?.id;
+    if (productId) {
+      accumulator[productId] = product;
+    }
+    if (product?.name) {
+      accumulator[normalizeText(product.name)] = product;
+    }
+    return accumulator;
+  }, {});
+
+  const getLeadDate = (lead) => lead.createdDate || lead.createdAt || null;
+
+  const getProductValue = (lead) => {
+    const product = lead?.product;
+    if (!product) return '';
+    if (typeof product === 'object') {
+      return product._id || product.id || product.name || '';
+    }
+    return String(product);
+  };
+
+  const getProductLabel = (lead) => {
+    const product = lead?.product;
+    if (!product) return 'Not set';
+    if (typeof product === 'object') {
+      if (product.name) return product.name;
+      const productId = product._id || product.id;
+      return productLookup[productId]?.name || 'Not set';
+    }
+    return productLookup[product]?.name || productLookup[normalizeText(product)]?.name || String(product);
+  };
+
+  const getSourceValue = (lead) => lead.customLeadSource || lead.leadSource || lead.source || '';
+  const getSourceLabel = (lead) => titleize(getSourceValue(lead));
+
+  const getCreatedByValue = (lead) => {
+    if (!lead?.createdBy) return '';
+    if (typeof lead.createdBy === 'object') {
+      return lead.createdBy._id || lead.createdBy.id || lead.createdBy.email || lead.createdBy.name || '';
+    }
+    return String(lead.createdBy);
+  };
+
+  const getCreatedByLabel = (lead) => {
+    if (!lead?.createdBy) return 'Unknown';
+    if (typeof lead.createdBy === 'object') {
+      return lead.createdBy.name || lead.createdBy.email || 'Unknown';
+    }
+    return String(lead.createdBy);
+  };
+
+  const getAssignedToValue = (lead) => {
+    if (!lead?.assignedTo) return '';
+    if (typeof lead.assignedTo === 'object') {
+      return lead.assignedTo._id || lead.assignedTo.id || lead.assignedTo.email || lead.assignedTo.name || '';
+    }
+    return String(lead.assignedTo);
+  };
+
+  const getAssignedToLabel = (lead) => {
+    if (!lead?.assignedTo) return 'Unassigned';
+    if (typeof lead.assignedTo === 'object') {
+      return lead.assignedTo.name || lead.assignedTo.email || 'Unassigned';
+    }
+    return String(lead.assignedTo);
+  };
+
+  const getWorkflowStageValue = (lead) => lead.workflowStage || '';
+  const getWorkflowStageLabel = (lead) => titleize(getWorkflowStageValue(lead));
+
+  const getLastActivityDate = (lead) => {
+    if (lead?.lastActivity) return lead.lastActivity;
+    if (Array.isArray(lead?.activities) && lead.activities.length > 0) {
+      const datedActivities = lead.activities
+        .map((activity) => activity?.createdAt || activity?.timestamp)
+        .filter(Boolean)
+        .map((value) => new Date(value))
+        .filter((date) => !Number.isNaN(date.getTime()))
+        .sort((first, second) => second.getTime() - first.getTime());
+
+      if (datedActivities.length > 0) {
+        return datedActivities[0];
+      }
+    }
+    return null;
+  };
+
+  const productOptions = Array.from(
+    new Map(
+      leads
+        .map((lead) => [getProductValue(lead), getProductLabel(lead)])
+        .filter(([value]) => value)
+    ),
+    ([value, label]) => ({ value, label })
+  ).sort((first, second) => first.label.localeCompare(second.label));
+
+  const sourceOptions = Array.from(
+    new Map(
+      leads
+        .map((lead) => [normalizeText(getSourceValue(lead)), getSourceLabel(lead)])
+        .filter(([value]) => value)
+    ),
+    ([value, label]) => ({ value, label })
+  ).sort((first, second) => first.label.localeCompare(second.label));
+
+  const creatorOptions = Array.from(
+    new Map(
+      leads
+        .map((lead) => [getCreatedByValue(lead), getCreatedByLabel(lead)])
+        .filter(([value]) => value)
+    ),
+    ([value, label]) => ({ value, label })
+  ).sort((first, second) => first.label.localeCompare(second.label));
+
+  const assigneeOptions = Array.from(
+    new Map(
+      leads
+        .map((lead) => [getAssignedToValue(lead), getAssignedToLabel(lead)])
+        .filter(([value]) => value)
+    ),
+    ([value, label]) => ({ value, label })
+  ).sort((first, second) => first.label.localeCompare(second.label));
+
+  const workflowOptions = Array.from(
+    new Map(
+      leads
+        .map((lead) => [normalizeText(getWorkflowStageValue(lead)), getWorkflowStageLabel(lead)])
+        .filter(([value]) => value)
+    ),
+    ([value, label]) => ({ value, label })
+  ).sort((first, second) => first.label.localeCompare(second.label));
+
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
     let filtered = [...leads];
 
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(lead =>
-        (lead.contactPerson || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (lead.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const normalizedSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(lead => {
+        const searchableValues = [
+          lead.contactPerson,
+          lead.name,
+          lead.companyName,
+          lead.company,
+          lead.email,
+          lead.phone,
+          lead.industry,
+          lead.requirements,
+          getProductLabel(lead),
+          getSourceLabel(lead),
+          getCreatedByLabel(lead),
+          getAssignedToLabel(lead),
+          lead.status,
+          lead.priority,
+          lead.workflowStage
+        ].filter(Boolean);
+
+        return searchableValues.some(value => String(value).toLowerCase().includes(normalizedSearch));
+      });
     }
 
     // Status filter
@@ -55,34 +257,80 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
       filtered = filtered.filter(lead => lead.status === statusFilter);
     }
 
+    // Product filter
+    if (productFilter !== 'all') {
+      filtered = filtered.filter(lead => getProductValue(lead) === productFilter);
+    }
+
+    // Priority filter
+    if (priorityFilter !== 'all') {
+      filtered = filtered.filter(lead => (lead.priority || 'medium') === priorityFilter);
+    }
+
+    // Source filter
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(lead => normalizeText(getSourceValue(lead)) === sourceFilter);
+    }
+
+    // Created by filter
+    if (createdByFilter !== 'all') {
+      filtered = filtered.filter(lead => getCreatedByValue(lead) === createdByFilter);
+    }
+
+    // Assigned to filter
+    if (assignedToFilter !== 'all') {
+      if (assignedToFilter === 'unassigned') {
+        filtered = filtered.filter(lead => !getAssignedToValue(lead));
+      } else {
+        filtered = filtered.filter(lead => getAssignedToValue(lead) === assignedToFilter);
+      }
+    }
+
+    // Workflow stage filter
+    if (workflowStageFilter !== 'all') {
+      filtered = filtered.filter(lead => normalizeText(getWorkflowStageValue(lead)) === workflowStageFilter);
+    }
+
     // Date filter
-    if (dateFilter !== 'all') {
+    if (dateFilter !== 'all' || dateFromFilter || dateToFilter) {
       const now = new Date();
-      const filterDate = new Date();
+      let presetFromDate = null;
+      let presetToDate = null;
       
       switch (dateFilter) {
         case 'today':
-          filterDate.setHours(0, 0, 0, 0);
-          filtered = filtered.filter(lead => {
-            const leadDate = new Date(lead.createdDate || lead.createdAt);
-            return !isNaN(leadDate.getTime()) && leadDate >= filterDate;
-          });
+          presetFromDate = new Date();
+          presetFromDate.setHours(0, 0, 0, 0);
+          presetToDate = new Date();
+          presetToDate.setHours(23, 59, 59, 999);
           break;
         case 'week':
-          filterDate.setDate(now.getDate() - 7);
-          filtered = filtered.filter(lead => {
-            const leadDate = new Date(lead.createdDate || lead.createdAt);
-            return !isNaN(leadDate.getTime()) && leadDate >= filterDate;
-          });
+          presetFromDate = new Date();
+          presetFromDate.setDate(now.getDate() - 7);
+          presetFromDate.setHours(0, 0, 0, 0);
           break;
         case 'month':
-          filterDate.setMonth(now.getMonth() - 1);
-          filtered = filtered.filter(lead => {
-            const leadDate = new Date(lead.createdDate || lead.createdAt);
-            return !isNaN(leadDate.getTime()) && leadDate >= filterDate;
-          });
+          presetFromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        default:
           break;
       }
+
+      const customFromDate = dateFromFilter ? new Date(dateFromFilter) : null;
+      const customToDate = dateToFilter ? new Date(dateToFilter) : null;
+
+      if (customFromDate) customFromDate.setHours(0, 0, 0, 0);
+      if (customToDate) customToDate.setHours(23, 59, 59, 999);
+
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(getLeadDate(lead));
+        if (Number.isNaN(leadDate.getTime())) return false;
+        if (presetFromDate && leadDate < presetFromDate) return false;
+        if (presetToDate && leadDate > presetToDate) return false;
+        if (customFromDate && leadDate < customFromDate) return false;
+        if (customToDate && leadDate > customToDate) return false;
+        return true;
+      });
     }
 
     // Sort
@@ -91,8 +339,8 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
       
       switch (sortBy) {
         case 'date':
-          aValue = new Date(a.createdDate || a.createdAt);
-          bValue = new Date(b.createdDate || b.createdAt);
+          aValue = new Date(getLeadDate(a));
+          bValue = new Date(getLeadDate(b));
           break;
         case 'name':
           aValue = (a.contactPerson || '').toLowerCase();
@@ -102,13 +350,25 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
           aValue = (a.companyName || '').toLowerCase();
           bValue = (b.companyName || '').toLowerCase();
           break;
+        case 'product':
+          aValue = getProductLabel(a).toLowerCase();
+          bValue = getProductLabel(b).toLowerCase();
+          break;
+        case 'assignedTo':
+          aValue = getAssignedToLabel(a).toLowerCase();
+          bValue = getAssignedToLabel(b).toLowerCase();
+          break;
+        case 'createdBy':
+          aValue = getCreatedByLabel(a).toLowerCase();
+          bValue = getCreatedByLabel(b).toLowerCase();
+          break;
         case 'value':
           aValue = a.estimatedValue || 0;
           bValue = b.estimatedValue || 0;
           break;
         default:
-          aValue = new Date(a.createdDate || a.createdAt);
-          bValue = new Date(b.createdDate || b.createdAt);
+          aValue = new Date(getLeadDate(a));
+          bValue = new Date(getLeadDate(b));
       }
 
       if (sortOrder === 'asc') {
@@ -120,7 +380,24 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
 
     setFilteredLeads(filtered);
     setCurrentPage(1); // Reset to page 1 when filters change
-  }, [leads, searchTerm, statusFilter, dateFilter, sortBy, sortOrder]);
+  }, [
+    leads,
+    products,
+    searchTerm,
+    statusFilter,
+    productFilter,
+    priorityFilter,
+    sourceFilter,
+    createdByFilter,
+    assignedToFilter,
+    workflowStageFilter,
+    dateFilter,
+    dateFromFilter,
+    dateToFilter,
+    sortBy,
+    sortOrder
+  ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Pagination
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage);
@@ -177,40 +454,199 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     }
   };
 
+  const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString('en-IN')}`;
+
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const resetAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setProductFilter('all');
+    setPriorityFilter('all');
+    setSourceFilter('all');
+    setCreatedByFilter('all');
+    setAssignedToFilter('all');
+    setWorkflowStageFilter('all');
+    setDateFilter('all');
+    setDateFromFilter('');
+    setDateToFilter('');
+  };
+
+  const getExportRows = () => filteredLeads.map(lead => ({
+    contactPerson: lead.contactPerson || lead.name || '',
+    companyName: lead.companyName || lead.company || '',
+    product: getProductLabel(lead),
+    source: getSourceLabel(lead),
+    status: titleize(lead.status || 'new'),
+    priority: titleize(lead.priority || 'medium'),
+    workflowStage: getWorkflowStageLabel(lead),
+    createdBy: getCreatedByLabel(lead),
+    assignedTo: getAssignedToLabel(lead),
+    email: lead.email || '',
+    phone: lead.phone || '',
+    estimatedValue: formatCurrency(lead.estimatedValue || 0),
+    industry: lead.industry || 'N/A',
+    createdDate: formatDate(getLeadDate(lead)),
+    lastActivity: formatDate(getLastActivityDate(lead)),
+    requirements: lead.requirements || '',
+    notesCount: Array.isArray(lead.notes) ? lead.notes.length : (lead.notes ? 1 : 0),
+    activitiesCount: Array.isArray(lead.activities) ? lead.activities.length : 0
+  }));
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleExport = () => {
     try {
-      const headers = ['Contact Person', 'Company', 'Email', 'Phone', 'Status', 'Priority', 'Estimated Value', 'Created Date', 'Assigned To'];
-      const csvRows = [headers.join(',')];
+      const exportRows = getExportRows();
+      if (exportRows.length === 0) {
+        showToast('error', 'No lead history data to export');
+        return;
+      }
 
-      filteredLeads.forEach(lead => {
-        const row = [
-          lead.contactPerson || lead.name || '',
-          lead.companyName || lead.company || '',
-          lead.email || '',
-          lead.phone || '',
-          lead.status || '',
-          lead.priority || 'medium',
-          lead.estimatedValue || 0,
-          formatDate(lead.createdDate || lead.createdAt),
-          typeof lead.assignedTo === 'object' ? lead.assignedTo?.name || 'Unassigned' : lead.assignedTo || 'Unassigned'
-        ].map(field => `"${field}"`);
-        csvRows.push(row.join(','));
-      });
+      const headers = [
+        'Contact Person',
+        'Company',
+        'Product',
+        'Lead Source',
+        'Status',
+        'Priority',
+        'Workflow Stage',
+        'Created By',
+        'Assigned To',
+        'Email',
+        'Phone',
+        'Estimated Value',
+        'Industry',
+        'Created Date',
+        'Last Activity',
+        'Requirements',
+        'Notes Count',
+        'Activities Count'
+      ];
+      const csvRows = [
+        headers,
+        ...exportRows.map(row => [
+          row.contactPerson,
+          row.companyName,
+          row.product,
+          row.source,
+          row.status,
+          row.priority,
+          row.workflowStage,
+          row.createdBy,
+          row.assignedTo,
+          row.email,
+          row.phone,
+          row.estimatedValue,
+          row.industry,
+          row.createdDate,
+          row.lastActivity,
+          row.requirements,
+          row.notesCount,
+          row.activitiesCount
+        ])
+      ];
 
-      const csvContent = csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      
-      link.setAttribute('href', url);
-      link.setAttribute('download', `lead_history_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const csvContent = '\uFEFF' + csvRows
+        .map(row => row.map(field => `"${String(field ?? '').replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      downloadBlob(
+        new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
+        `lead_history_${new Date().toISOString().split('T')[0]}.csv`
+      );
+      showToast('success', `${exportRows.length} leads exported in CSV`);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export leads. Please try again.');
+      showToast('error', 'Failed to export lead history');
+    }
+  };
+
+  const handleExcelExport = () => {
+    try {
+      const exportRows = getExportRows();
+      if (exportRows.length === 0) {
+        showToast('error', 'No lead history data to export');
+        return;
+      }
+
+      let html = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head><meta charset="UTF-8"></head>
+        <body>
+        <table border="1">
+          <tr style="background-color: #2563eb; color: white; font-weight: bold;">
+            <th>Contact Person</th>
+            <th>Company</th>
+            <th>Product</th>
+            <th>Lead Source</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Workflow Stage</th>
+            <th>Created By</th>
+            <th>Assigned To</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Estimated Value</th>
+            <th>Industry</th>
+            <th>Created Date</th>
+            <th>Last Activity</th>
+            <th>Requirements</th>
+            <th>Notes Count</th>
+            <th>Activities Count</th>
+          </tr>
+      `;
+
+      exportRows.forEach(row => {
+        html += `
+          <tr>
+            <td>${escapeHtml(row.contactPerson)}</td>
+            <td>${escapeHtml(row.companyName)}</td>
+            <td>${escapeHtml(row.product)}</td>
+            <td>${escapeHtml(row.source)}</td>
+            <td>${escapeHtml(row.status)}</td>
+            <td>${escapeHtml(row.priority)}</td>
+            <td>${escapeHtml(row.workflowStage)}</td>
+            <td>${escapeHtml(row.createdBy)}</td>
+            <td>${escapeHtml(row.assignedTo)}</td>
+            <td>${escapeHtml(row.email)}</td>
+            <td>${escapeHtml(row.phone)}</td>
+            <td>${escapeHtml(row.estimatedValue)}</td>
+            <td>${escapeHtml(row.industry)}</td>
+            <td>${escapeHtml(row.createdDate)}</td>
+            <td>${escapeHtml(row.lastActivity)}</td>
+            <td>${escapeHtml(row.requirements)}</td>
+            <td>${escapeHtml(row.notesCount)}</td>
+            <td>${escapeHtml(row.activitiesCount)}</td>
+          </tr>
+        `;
+      });
+
+      html += '</table></body></html>';
+
+      downloadBlob(
+        new Blob([html], { type: 'application/vnd.ms-excel' }),
+        `lead_history_${new Date().toISOString().split('T')[0]}.xls`
+      );
+      showToast('success', `${exportRows.length} leads exported in Excel`);
+    } catch (error) {
+      console.error('Excel export failed:', error);
+      showToast('error', 'Failed to export Excel sheet');
     }
   };
 
@@ -357,9 +793,13 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
 
       {/* Filters */}
       <div style={{ ...cardStyle, padding: '1.5rem', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Search */}
-          <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '1rem',
+          alignItems: 'end'
+        }}>
+          <div style={{ position: 'relative', gridColumn: 'span 2', minWidth: '250px' }}>
             <Search size={20} style={{
               position: 'absolute',
               left: '1rem',
@@ -369,7 +809,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             }} />
             <input
               type="text"
-              placeholder="Search leads by name, company, or email..."
+              placeholder="Search name, company, email, product..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -385,78 +825,282 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             />
           </div>
 
-          {/* Status Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Filter size={20} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                padding: '0.75rem',
-                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                borderRadius: '8px',
-                background: darkMode ? '#374151' : 'white',
-                color: darkMode ? 'white' : '#1f2937',
-                fontSize: '1rem',
-                outline: 'none'
-              }}
-            >
-              <option value="all">All Status</option>
-              <option value="new">New</option>
-              <option value="contacted">Contacted</option>
-              <option value="qualified">Qualified</option>
-              <option value="proposal">Proposal</option>
-              <option value="negotiation">Negotiation</option>
-              <option value="converted">Converted</option>
-              <option value="closed-won">Closed Won</option>
-              <option value="lost">Lost</option>
-              <option value="closed-lost">Closed Lost</option>
-            </select>
-          </div>
-
-          {/* Date Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Calendar size={20} style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              style={{
-                padding: '0.75rem',
-                border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                borderRadius: '8px',
-                background: darkMode ? '#374151' : 'white',
-                color: darkMode ? 'white' : '#1f2937',
-                fontSize: '1rem',
-                outline: 'none'
-              }}
-            >
-              <option value="all">All Time</option>
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-            </select>
-          </div>
-
-          {/* Export Button */}
-          <button
-            onClick={handleExport}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
             style={{
-              padding: '0.75rem 1rem',
-              background: 'linear-gradient(135deg, #22c55e, #4ade80)',
-              color: 'white',
-              border: 'none',
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
               borderRadius: '8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-              fontWeight: '500'
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
             }}
           >
-            <Download size={16} />
-            Export
-          </button>
+            <option value="all">All Status</option>
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="qualified">Qualified</option>
+            <option value="proposal">Proposal</option>
+            <option value="negotiation">Negotiation</option>
+            <option value="converted">Converted</option>
+            <option value="closed-won">Closed Won</option>
+            <option value="lost">Lost</option>
+            <option value="closed-lost">Closed Lost</option>
+          </select>
+
+          <select
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Products</option>
+            {productOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Priority</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Sources</option>
+            {sourceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={createdByFilter}
+            onChange={(e) => setCreatedByFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Creators</option>
+            {creatorOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={assignedToFilter}
+            onChange={(e) => setAssignedToFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Assignees</option>
+            <option value="unassigned">Unassigned</option>
+            {assigneeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={workflowStageFilter}
+            onChange={(e) => setWorkflowStageFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Workflow</option>
+            {workflowOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">This Month</option>
+          </select>
+
+          <input
+            type="date"
+            value={dateFromFilter}
+            onChange={(e) => setDateFromFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          />
+
+          <input
+            type="date"
+            value={dateToFilter}
+            onChange={(e) => setDateToFilter(e.target.value)}
+            style={{
+              padding: '0.75rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          />
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem',
+          flexWrap: 'wrap',
+          marginTop: '1rem',
+          paddingTop: '1rem',
+          borderTop: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`
+        }}>
+          <div style={{ color: darkMode ? '#d1d5db' : '#6b7280', fontSize: '0.9rem', fontWeight: '600' }}>
+            Showing {filteredLeads.length} of {leads.length} leads
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={resetAllFilters}
+              style={{
+                padding: '0.75rem 1rem',
+                background: darkMode ? '#374151' : '#f3f4f6',
+                color: darkMode ? 'white' : '#1f2937',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+            >
+              <RotateCcw size={16} />
+              Reset
+            </button>
+
+            <button
+              onClick={handleExport}
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+            >
+              <Download size={16} />
+              CSV
+            </button>
+
+            <button
+              onClick={handleExcelExport}
+              style={{
+                padding: '0.75rem 1rem',
+                background: 'linear-gradient(135deg, #2563eb, #60a5fa)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}
+            >
+              <Download size={16} />
+              Excel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -566,9 +1210,20 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
                       </div>
                       <div style={{
                         fontSize: '0.875rem',
-                        color: darkMode ? '#9ca3af' : '#6b7280'
+                        color: darkMode ? '#9ca3af' : '#6b7280',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
                       }}>
-                        {lead.industry || 'N/A'}
+                        <Package size={14} />
+                        {getProductLabel(lead)}
+                      </div>
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: darkMode ? '#9ca3af' : '#6b7280',
+                        marginTop: '0.2rem'
+                      }}>
+                        {getSourceLabel(lead)} {lead.industry ? `• ${lead.industry}` : ''}
                       </div>
                     </div>
 
@@ -618,7 +1273,13 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
                       fontSize: '0.875rem',
                       color: darkMode ? '#9ca3af' : '#6b7280'
                     }}>
-                      {formatDate(lead.createdDate || lead.createdAt)}
+                      <div>{formatDate(getLeadDate(lead))}</div>
+                      <div style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                        By: {getCreatedByLabel(lead)}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', marginTop: '0.15rem' }}>
+                        To: {getAssignedToLabel(lead)}
+                      </div>
                     </div>
 
                     {/* Actions */}
@@ -829,21 +1490,39 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
                       </p>
                     </div>
                     <div>
+                      <strong style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Product:</strong>
+                      <p style={{ margin: '0.25rem 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                        {getProductLabel(lead)}
+                      </p>
+                    </div>
+                    <div>
+                      <strong style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Created by:</strong>
+                      <p style={{ margin: '0.25rem 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                        {getCreatedByLabel(lead)}
+                      </p>
+                    </div>
+                    <div>
                       <strong style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Assigned to:</strong>
                       <p style={{ margin: '0.25rem 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                        {typeof lead.assignedTo === 'object' ? lead.assignedTo?.name || 'Unassigned' : lead.assignedTo || 'Unassigned'}
+                        {getAssignedToLabel(lead)}
+                      </p>
+                    </div>
+                    <div>
+                      <strong style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Workflow:</strong>
+                      <p style={{ margin: '0.25rem 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                        {getWorkflowStageLabel(lead)}
                       </p>
                     </div>
                     <div>
                       <strong style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Created:</strong>
                       <p style={{ margin: '0.25rem 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                        {formatDate(lead.createdDate || lead.createdAt)}
+                        {formatDate(getLeadDate(lead))}
                       </p>
                     </div>
                     <div>
                       <strong style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Last Activity:</strong>
                       <p style={{ margin: '0.25rem 0', color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                        {formatDate(lead.lastActivity) || 'No activity yet'}
+                        {formatDate(getLastActivityDate(lead)) || 'No activity yet'}
                       </p>
                     </div>
                   </div>
@@ -929,7 +1608,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             No leads found
           </h3>
           <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-            {searchTerm || statusFilter !== 'all' || dateFilter !== 'all'
+            {searchTerm || statusFilter !== 'all' || productFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all' || createdByFilter !== 'all' || assignedToFilter !== 'all' || workflowStageFilter !== 'all' || dateFilter !== 'all' || dateFromFilter || dateToFilter
               ? 'Try adjusting your search or filter criteria'
               : 'No lead history available yet'
             }

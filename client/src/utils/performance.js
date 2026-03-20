@@ -1,6 +1,6 @@
 // Performance optimization utilities for mobile CRM
 
-// Debounce function for search inputs
+//  Debounce function for search inputs
 export const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
