@@ -21,6 +21,8 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
   const [filteredLeads, setFilteredLeads] = useState([]);
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [notesTextFilter, setNotesTextFilter] = useState('');
+  const [notesFilter, setNotesFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -160,6 +162,47 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
   const getWorkflowStageValue = (lead) => lead.workflowStage || '';
   const getWorkflowStageLabel = (lead) => titleize(getWorkflowStageValue(lead));
 
+  const getNotesText = (lead) => {
+    if (!lead?.notes) return '';
+    if (typeof lead.notes === 'string') return lead.notes;
+    if (!Array.isArray(lead.notes)) return '';
+
+    return lead.notes
+      .map((note) => {
+        if (!note) return '';
+        if (typeof note === 'string') return note;
+        return note.content || '';
+      })
+      .filter(Boolean)
+      .join(' | ');
+  };
+
+  const getNoteActorNames = (lead) => {
+    if (!Array.isArray(lead?.notes)) return [];
+
+    const noteNames = lead.notes.flatMap((note) => {
+      const names = [];
+
+      if (note?.createdBy) {
+        if (typeof note.createdBy === 'object' && note.createdBy.name) {
+          names.push(note.createdBy.name);
+        } else if (typeof note.createdBy === 'string') {
+          names.push(note.createdBy);
+        }
+      }
+
+      const noteContent = typeof note === 'string' ? note : note?.content || '';
+      const updatedByMatch = noteContent.match(/lead updated by\s+(.+?)\s+at/i);
+      if (updatedByMatch?.[1]) {
+        names.push(updatedByMatch[1].trim());
+      }
+
+      return names;
+    });
+
+    return Array.from(new Set(noteNames.filter(Boolean)));
+  };
+
   const getLastActivityDate = (lead) => {
     if (lead?.lastActivity) return lead.lastActivity;
     if (Array.isArray(lead?.activities) && lead.activities.length > 0) {
@@ -222,6 +265,15 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     ([value, label]) => ({ value, label })
   ).sort((first, second) => first.label.localeCompare(second.label));
 
+  const noteActorOptions = Array.from(
+    new Map(
+      leads
+        .flatMap((lead) => getNoteActorNames(lead).map((name) => [normalizeText(name), name]))
+        .filter(([value]) => value)
+    ),
+    ([value, label]) => ({ value, label })
+  ).sort((first, second) => first.label.localeCompare(second.label));
+
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     let filtered = [...leads];
@@ -239,6 +291,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
           lead.phone,
           lead.industry,
           lead.requirements,
+          getNotesText(lead),
           getProductLabel(lead),
           getSourceLabel(lead),
           getCreatedByLabel(lead),
@@ -255,6 +308,19 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(lead => lead.status === statusFilter);
+    }
+
+    // Notes text filter
+    if (notesTextFilter.trim()) {
+      const normalizedNotesTextFilter = notesTextFilter.toLowerCase();
+      filtered = filtered.filter(lead => getNotesText(lead).toLowerCase().includes(normalizedNotesTextFilter));
+    }
+
+    // Notes filter
+    if (notesFilter !== 'all') {
+      filtered = filtered.filter(lead =>
+        getNoteActorNames(lead).some((name) => normalizeText(name) === notesFilter)
+      );
     }
 
     // Product filter
@@ -384,6 +450,8 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     leads,
     products,
     searchTerm,
+    notesTextFilter,
+    notesFilter,
     statusFilter,
     productFilter,
     priorityFilter,
@@ -465,6 +533,8 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
 
   const resetAllFilters = () => {
     setSearchTerm('');
+    setNotesTextFilter('');
+    setNotesFilter('all');
     setStatusFilter('all');
     setProductFilter('all');
     setPriorityFilter('all');
@@ -493,6 +563,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
     industry: lead.industry || 'N/A',
     createdDate: formatDate(getLeadDate(lead)),
     lastActivity: formatDate(getLastActivityDate(lead)),
+    notes: getNotesText(lead),
     requirements: lead.requirements || '',
     notesCount: Array.isArray(lead.notes) ? lead.notes.length : (lead.notes ? 1 : 0),
     activitiesCount: Array.isArray(lead.activities) ? lead.activities.length : 0
@@ -534,6 +605,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
         'Industry',
         'Created Date',
         'Last Activity',
+        'Notes',
         'Requirements',
         'Notes Count',
         'Activities Count'
@@ -556,6 +628,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
           row.industry,
           row.createdDate,
           row.lastActivity,
+          row.notes,
           row.requirements,
           row.notesCount,
           row.activitiesCount
@@ -606,6 +679,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             <th>Industry</th>
             <th>Created Date</th>
             <th>Last Activity</th>
+            <th>Notes</th>
             <th>Requirements</th>
             <th>Notes Count</th>
             <th>Activities Count</th>
@@ -630,6 +704,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             <td>${escapeHtml(row.industry)}</td>
             <td>${escapeHtml(row.createdDate)}</td>
             <td>${escapeHtml(row.lastActivity)}</td>
+            <td>${escapeHtml(row.notes)}</td>
             <td>${escapeHtml(row.requirements)}</td>
             <td>${escapeHtml(row.notesCount)}</td>
             <td>${escapeHtml(row.activitiesCount)}</td>
@@ -824,6 +899,43 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
               }}
             />
           </div>
+
+          <input
+            type="text"
+            placeholder="Search notes text..."
+            value={notesTextFilter}
+            onChange={(e) => setNotesTextFilter(e.target.value)}
+            style={{
+              padding: '0.75rem 1rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          />
+
+          <select
+            value={notesFilter}
+            onChange={(e) => setNotesFilter(e.target.value)}
+            style={{
+              padding: '0.75rem 1rem',
+              border: `2px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+              borderRadius: '8px',
+              background: darkMode ? '#374151' : 'white',
+              color: darkMode ? 'white' : '#1f2937',
+              fontSize: '1rem',
+              outline: 'none'
+            }}
+          >
+            <option value="all">All Notes Names</option>
+            {noteActorOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
 
           <select
             value={statusFilter}
@@ -1608,7 +1720,7 @@ const LeadHistory = ({ crmData, darkMode = false }) => {
             No leads found
           </h3>
           <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-            {searchTerm || statusFilter !== 'all' || productFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all' || createdByFilter !== 'all' || assignedToFilter !== 'all' || workflowStageFilter !== 'all' || dateFilter !== 'all' || dateFromFilter || dateToFilter
+            {searchTerm || notesTextFilter || notesFilter !== 'all' || statusFilter !== 'all' || productFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all' || createdByFilter !== 'all' || assignedToFilter !== 'all' || workflowStageFilter !== 'all' || dateFilter !== 'all' || dateFromFilter || dateToFilter
               ? 'Try adjusting your search or filter criteria'
               : 'No lead history available yet'
             }
