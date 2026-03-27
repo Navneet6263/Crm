@@ -58,7 +58,6 @@ const CalendarSync = lazy(() => import('./components/CalendarSync'));
 const AIAssistant = lazy(() => import('./components/AIAssistant'));
 const WorkflowAutomation = lazy(() => import('./components/WorkflowAutomation'));
 const Settings = lazy(() => import('./components/Settings'));
-const CustomerTimeline = lazy(() => import('./components/CustomerTimeline'));
 const AllLeads = lazy(() => import('./components/AllLeads'));
 const Posts = lazy(() => import('./components/Posts'));
 const BillingManagement = lazy(() => import('./components/BillingManagement'));
@@ -292,7 +291,7 @@ const AppContent = () => {
         
         if (matches) {
           results.push({ 
-            id: `customer-${customer.id}`, 
+            id: `customer-${customer._id || customer.id}`, 
             name: customer.name || customer.contactPerson || 'Unknown Customer',
             type: 'Customer',
             subtitle: customer.company || customer.companyName || customer.email || 'Customer'
@@ -306,7 +305,7 @@ const AppContent = () => {
       { id: 'add-enquiry', name: 'Add New Lead', type: 'Action', subtitle: 'Create a new lead', roles: ['all'] },
       { id: 'my-leads', name: 'My Leads', type: 'Action', subtitle: 'View my assigned leads', roles: ['sales', 'manager'] },
       { id: 'leads', name: 'All Leads', type: 'Action', subtitle: 'View all leads', roles: ['admin', 'manager', 'senior-manager', 'super-admin'] },
-      { id: 'customers', name: 'Customers', type: 'Action', subtitle: 'Manage customers', roles: ['all'] },
+      { id: 'customers', name: 'Customer Management', type: 'Action', subtitle: 'Manage customers and follow-ups', roles: ['all'] },
       { id: 'analytics', name: 'View Analytics', type: 'Action', subtitle: 'Dashboard analytics', roles: ['admin', 'manager', 'senior-manager', 'super-admin'] },
       { id: 'settings', name: 'Settings', type: 'Action', subtitle: 'System settings', roles: ['all'] }
     ];
@@ -354,7 +353,7 @@ const AppContent = () => {
       'dashboard': 'Dashboard - Green Call CRM',
       'leads': 'All Leads - Green Call CRM',
       'add-enquiry': 'Add Lead - Green Call CRM',
-      'customers': 'Customers - Green Call CRM',
+      'customers': 'Customer Management - Green Call CRM',
       'analytics': 'Analytics - Green Call CRM',
       'settings': 'Settings - Green Call CRM',
       'billing': 'Billing - Green Call CRM',
@@ -744,12 +743,7 @@ const AppContent = () => {
       case 'automation': return <WorkflowAutomation darkMode={darkMode} currentUser={currentUser} crmData={crmData} />;
       case 'settings': return <Settings darkMode={darkMode} toggleDarkMode={toggleDarkMode} currentUser={currentUser} />;
 
-      case 'customers': return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-          <CustomerManagement darkMode={darkMode} crmData={crmData} userRole={currentUser?.role} />
-          <CustomerTimeline darkMode={darkMode} customer={crmData.customers && crmData.customers.length > 0 ? crmData.customers[0] : null} />
-        </div>
-      );
+      case 'customers': return <CustomerManagement darkMode={darkMode} userRole={currentUser?.role} updateCrmData={updateCrmData} />;
       case 'product-management': 
         if (!['super-admin', 'admin', 'manager', 'senior-manager'].includes(currentUser?.role)) {
           return <AccessDenied darkMode={darkMode} message="You need Admin or Manager role to access Product Management" />;

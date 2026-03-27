@@ -62,7 +62,7 @@ export const menuSections = [
   {
     title: 'Data Management',
     items: [
-      { id: 'customers', icon: Building, label: 'Customers', color: '#3b82f6' },
+      { id: 'customers', icon: Building, label: 'Customer Management', color: '#3b82f6' },
       { id: 'product-management', icon: Package, label: 'Product Management', color: '#22c55e', adminOnly: true },
       { id: 'data-table', icon: Database, label: 'Data Table', color: '#6b7280' },
       { id: 'sales-pipeline', icon: Target, label: 'Sales Pipeline', color: '#22c55e' },

@@ -73,6 +73,9 @@ const customerSchema = new mongoose.Schema({
   lastInteraction: {
     type: Date
   },
+  nextFollowUp: {
+    type: Date
+  },
   notes: {
     type: String,
     default: ''
@@ -88,6 +91,39 @@ const customerSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  followUps: [{
+    title: {
+      type: String,
+      trim: true
+    },
+    description: {
+      type: String,
+      trim: true
+    },
+    dueDate: {
+      type: Date
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'completed', 'cancelled'],
+      default: 'pending'
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    completedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    completedAt: {
+      type: Date
+    }
+  }],
   tags: [String],
   isActive: {
     type: Boolean,
@@ -100,5 +136,8 @@ const customerSchema = new mongoose.Schema({
 // Index for better search performance
 customerSchema.index({ name: 'text', companyName: 'text', email: 'text' });
 customerSchema.index({ assignedTo: 1, status: 1 });
+customerSchema.index({ companyId: 1, isActive: 1, createdAt: -1 });
+customerSchema.index({ companyId: 1, status: 1, nextFollowUp: 1 });
+customerSchema.index({ companyId: 1, assignedTo: 1, nextFollowUp: 1 });
 
 module.exports = mongoose.model('Customer', customerSchema);

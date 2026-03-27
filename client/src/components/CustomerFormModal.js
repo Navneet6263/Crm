@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Building, Mail, Phone, MapPin, Tag, DollarSign } from 'lucide-react';
+import { X, User, Building, Phone, MapPin, DollarSign } from 'lucide-react';
 import customerService from '../services/customerService';
 
 const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated, darkMode, editCustomer = null }) => {
@@ -18,7 +18,12 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
     industry: '',
     customerType: 'business',
     totalValue: 0,
-    notes: ''
+    notes: '',
+    initialFollowUp: {
+      title: '',
+      dueDate: '',
+      description: ''
+    }
   });
 
   // Initialize form data when editing
@@ -39,7 +44,12 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
         industry: editCustomer.industry || '',
         customerType: editCustomer.customerType || 'business',
         totalValue: editCustomer.totalValue || 0,
-        notes: editCustomer.notes || ''
+        notes: editCustomer.notes || '',
+        initialFollowUp: {
+          title: '',
+          dueDate: '',
+          description: ''
+        }
       });
     } else {
       setFormData({
@@ -57,7 +67,12 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
         industry: '',
         customerType: 'business',
         totalValue: 0,
-        notes: ''
+        notes: '',
+        initialFollowUp: {
+          title: '',
+          dueDate: '',
+          description: ''
+        }
       });
     }
   }, [editCustomer]);
@@ -74,6 +89,15 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
         address: {
           ...prev.address,
           [addressField]: value
+        }
+      }));
+    } else if (name.startsWith('initialFollowUp.')) {
+      const followUpField = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        initialFollowUp: {
+          ...prev.initialFollowUp,
+          [followUpField]: value
         }
       }));
     } else {
@@ -125,14 +149,21 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
         ...formData,
         phone: formData.phone.replace(/[^\d]/g, ''), // Send only digits
         totalValue: parseFloat(formData.totalValue) || 0,
-        notes: formData.notes.trim()
+        notes: formData.notes.trim(),
+        initialFollowUp: formData.initialFollowUp.title.trim() && formData.initialFollowUp.dueDate
+          ? {
+              title: formData.initialFollowUp.title.trim(),
+              dueDate: formData.initialFollowUp.dueDate,
+              description: formData.initialFollowUp.description.trim()
+            }
+          : null
       };
       
       console.log('Submitting customer data:', customerData);
       
       if (editCustomer) {
         // Update existing customer
-        const updatedCustomer = await customerService.updateCustomer(editCustomer.id, customerData);
+        const updatedCustomer = await customerService.updateCustomer(editCustomer._id || editCustomer.id, customerData);
         if (onCustomerUpdated) onCustomerUpdated(updatedCustomer);
       } else {
         // Create new customer
@@ -157,7 +188,12 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
         industry: '',
         customerType: 'business',
         totalValue: 0,
-        notes: ''
+        notes: '',
+        initialFollowUp: {
+          title: '',
+          dueDate: '',
+          description: ''
+        }
       });
     } catch (err) {
       console.error('Customer creation error:', err);
@@ -617,6 +653,88 @@ const CustomerFormModal = ({ isOpen, onClose, onCustomerAdded, onCustomerUpdated
                 }}
                 placeholder="Additional notes..."
               />
+            </div>
+
+            {/* First Follow-up */}
+            <div>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: darkMode ? 'white' : '#1f2937',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <DollarSign size={20} />
+                First Follow-up
+              </h3>
+
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Follow-up Title
+                    </label>
+                    <input
+                      type="text"
+                      name="initialFollowUp.title"
+                      value={formData.initialFollowUp.title}
+                      onChange={handleInputChange}
+                      style={inputStyle}
+                      placeholder="Call back, demo, payment check..."
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      color: darkMode ? '#d1d5db' : '#374151',
+                      marginBottom: '0.5rem'
+                    }}>
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      name="initialFollowUp.dueDate"
+                      value={formData.initialFollowUp.dueDate}
+                      onChange={handleInputChange}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    color: darkMode ? '#d1d5db' : '#374151',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Follow-up Notes
+                  </label>
+                  <textarea
+                    name="initialFollowUp.description"
+                    value={formData.initialFollowUp.description}
+                    onChange={handleInputChange}
+                    rows={3}
+                    style={{
+                      ...inputStyle,
+                      resize: 'vertical'
+                    }}
+                    placeholder="Optional action details..."
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

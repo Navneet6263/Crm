@@ -135,6 +135,42 @@ const customerService = {
       console.error('Error adding note:', error);
       throw error;
     }
+  },
+
+  // Add follow-up to customer
+  addFollowUp: async (customerId, followUpData) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/customers/${customerId}/follow-ups`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeader(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(followUpData)
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error adding follow-up:', error);
+      throw error;
+    }
+  },
+
+  // Update follow-up status
+  updateFollowUpStatus: async (customerId, followUpId, status) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/customers/${customerId}/follow-ups/${followUpId}`, {
+        method: 'PATCH',
+        headers: {
+          ...getAuthHeader(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+      return await handleResponse(response);
+    } catch (error) {
+      console.error('Error updating follow-up status:', error);
+      throw error;
+    }
   }
 };
 

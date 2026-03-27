@@ -5,7 +5,9 @@ const {
   getCustomerById,
   updateCustomer,
   deleteCustomer,
-  addNote
+  addNote,
+  addFollowUp,
+  updateFollowUpStatus
 } = require('../controllers/customerController');
 const { auth } = require('../middleware/auth');
 
@@ -23,6 +25,8 @@ router.route('/:id')
   .delete(deleteCustomer);
 
 router.post('/:id/notes', addNote);
+router.post('/:id/follow-ups', addFollowUp);
+router.patch('/:id/follow-ups/:followUpId', updateFollowUpStatus);
 // Remove auth middleware for bulk upload as it has its own auth handling
 const bulkUploadRouter = express.Router();
 bulkUploadRouter.post('/bulk-upload', require('../controllers/bulkUploadController').handleBulkAuth, require('../controllers/bulkUploadController').bulkUploadCustomers);

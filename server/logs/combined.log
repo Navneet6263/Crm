@@ -230,3 +230,4 @@
 {"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2026-02-04T08:01:49.554Z"}
 {"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2026-02-04T08:17:44.492Z"}
 {"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2026-02-06T09:03:04.614Z"}
+{"action":"LOGIN","ipAddress":"::1","level":"info","message":"Audit event","service":"green-crm","timestamp":"2026-03-27T05:36:37.638Z"}
